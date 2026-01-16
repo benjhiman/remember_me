@@ -1,0 +1,196 @@
+### Leads API - Complete Test Flow
+### Base URL
+@baseUrl = http://localhost:4000/api
+@token = 
+
+### 1. Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test-leads@example.com",
+  "password": "TestPassword123",
+  "name": "Test User",
+  "organizationName": "Test Organization"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test-leads@example.com",
+  "password": "TestPassword123"
+}
+
+### Save token from response (if requiresOrgSelection: false, use accessToken directly)
+### If requiresOrgSelection: true, use tempToken in step 3
+
+### 3. Select Organization (if needed)
+POST {{baseUrl}}/auth/select-organization
+Content-Type: application/json
+Authorization: Bearer {{tempToken}}
+
+{
+  "organizationId": "org-id-from-login-response"
+}
+
+### 4. Get Pipelines (should have default pipeline from seed)
+GET {{baseUrl}}/leads/pipelines
+Authorization: Bearer {{token}}
+
+### 5. Create New Pipeline
+POST {{baseUrl}}/leads/pipelines
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Sales Pipeline",
+  "color": "#6366f1"
+}
+
+### Save pipelineId from response
+
+### 6. Create Stage 1
+POST {{baseUrl}}/leads/stages
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pipelineId": "pipeline-id-from-step-5",
+  "name": "Qualified",
+  "color": "#10b981"
+}
+
+### Save stageId from response
+
+### 7. Create Stage 2
+POST {{baseUrl}}/leads/stages
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pipelineId": "pipeline-id-from-step-5",
+  "name": "Proposal",
+  "color": "#3b82f6"
+}
+
+### 8. Get Default Pipeline (to get stage IDs)
+GET {{baseUrl}}/leads/pipelines
+Authorization: Bearer {{token}}
+
+### Save stageId from default pipeline (e.g., "New" stage)
+
+### 9. Create Lead
+POST {{baseUrl}}/leads
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pipelineId": "pipeline-id-from-step-4",
+  "stageId": "stage-id-from-step-8",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "source": "instagram",
+  "city": "Buenos Aires",
+  "budget": 1500.00,
+  "model": "iPhone 15 Pro",
+  "tags": ["vip", "urgent"],
+  "customFields": {
+    "preferredColor": "blue",
+    "tradeIn": true
+  }
+}
+
+### Save leadId from response
+
+### 10. List Leads (with filters)
+GET {{baseUrl}}/leads?page=1&limit=20&q=John&status=ACTIVE&sort=createdAtDesc
+Authorization: Bearer {{token}}
+
+### 11. List Leads (with date range)
+GET {{baseUrl}}/leads?createdFrom=2024-01-01&createdTo=2024-12-31&page=1&limit=10
+Authorization: Bearer {{token}}
+
+### 12. Get Lead by ID
+GET {{baseUrl}}/leads/lead-id-from-step-9
+Authorization: Bearer {{token}}
+
+### 13. Assign Lead
+POST {{baseUrl}}/leads/lead-id-from-step-9/assign
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assignedToId": "user-id-from-login-response"
+}
+
+### 14. Update Lead
+PUT {{baseUrl}}/leads/lead-id-from-step-9
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "John Doe Updated",
+  "stageId": "stage-id-from-step-6",
+  "status": "ACTIVE"
+}
+
+### 15. Create Note
+POST {{baseUrl}}/leads/notes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "leadId": "lead-id-from-step-9",
+  "content": "Cliente interesado en iPhone 15 Pro. Presupuesto aprobado.",
+  "isPrivate": false
+}
+
+### 16. Get Lead Notes
+GET {{baseUrl}}/leads/lead-id-from-step-9/notes
+Authorization: Bearer {{token}}
+
+### 17. Create Task
+POST {{baseUrl}}/leads/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "leadId": "lead-id-from-step-9",
+  "title": "Llamar al cliente",
+  "description": "Seguimiento de presupuesto",
+  "dueDate": "2024-01-15T10:00:00Z",
+  "assignedToId": "user-id-from-login-response"
+}
+
+### 18. Get Lead Tasks
+GET {{baseUrl}}/leads/lead-id-from-step-9/tasks
+Authorization: Bearer {{token}}
+
+### 19. Update Task Status
+PATCH {{baseUrl}}/leads/tasks/task-id-from-step-17
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "completed": true
+}
+
+### 20. Reorder Stages
+PATCH {{baseUrl}}/leads/stages/reorder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stages": [
+    { "stageId": "stage-1-id", "order": 0 },
+    { "stageId": "stage-2-id", "order": 1 },
+    { "stageId": "stage-3-id", "order": 2 }
+  ]
+}
+
+### 21. List Leads (with multiple filters)
+GET {{baseUrl}}/leads?pipelineId=pipeline-id&stageId=stage-id&assignedToId=user-id&status=ACTIVE&q=John&page=1&limit=10&sort=updatedAtDesc
+Authorization: Bearer {{token}}

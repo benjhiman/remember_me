@@ -1,0 +1,46 @@
+remember-me/
+├── apps/
+│   ├── api/                          # NestJS Backend
+│   │   ├── src/
+│   │   │   ├── app.module.ts         ✅ REAL (bootstrap)
+│   │   │   ├── app.controller.ts     ✅ REAL (health check)
+│   │   │   ├── app.service.ts        ✅ REAL (basic service)
+│   │   │   ├── main.ts               ✅ REAL (entry point)
+│   │   │   ├── auth/                 ❌ STUB (empty)
+│   │   │   ├── organizations/        ❌ STUB (empty)
+│   │   │   ├── users/                ❌ STUB (empty)
+│   │   │   ├── leads/                ❌ STUB (empty)
+│   │   │   ├── stock/                ❌ STUB (empty)
+│   │   │   ├── pricing/              ❌ STUB (empty)
+│   │   │   ├── sales/                ❌ STUB (empty)
+│   │   │   ├── dashboard/            ❌ STUB (empty)
+│   │   │   └── common/               ❌ STUB (index files only)
+│   │   │       ├── decorators/
+│   │   │       ├── guards/
+│   │   │       ├── interceptors/
+│   │   │       └── dto/
+│   │   ├── package.json              ✅ REAL
+│   │   ├── tsconfig.json             ✅ REAL
+│   │   └── nest-cli.json             ✅ REAL
+│   └── web/                          # Next.js Frontend
+│       ├── app/
+│       │   ├── layout.tsx            ✅ REAL (basic)
+│       │   ├── page.tsx              ✅ REAL (basic)
+│       │   ├── (auth)/               ❌ STUB (empty)
+│       │   └── (dashboard)/          ❌ STUB (empty)
+│       ├── components/               ❌ STUB (empty folders)
+│       ├── lib/                      ❌ STUB (index files only)
+│       └── types/                    ✅ REAL (re-exports)
+├── packages/
+│   ├── prisma/
+│   │   ├── schema.prisma             ✅ REAL (complete schema)
+│   │   ├── package.json              ✅ REAL
+│   │   └── index.ts                  ✅ REAL
+│   └── shared/
+│       ├── src/
+│       │   └── types/                ✅ REAL (type exports)
+│       └── package.json              ✅ REAL
+└── [config files]                    ✅ REAL (turbo, tsconfig, etc.)
+
+✅ REAL = Tiene implementación
+❌ STUB = Solo estructura/carpetas vacías

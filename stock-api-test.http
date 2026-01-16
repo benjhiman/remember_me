@@ -1,0 +1,173 @@
+### Stock API - Complete Test Flow
+### Base URL
+@baseUrl = http://localhost:4000/api
+@token = 
+@orgId = 
+
+### 1. Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test-stock@example.com",
+  "password": "TestPassword123",
+  "name": "Test User",
+  "organizationName": "Test Organization"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test-stock@example.com",
+  "password": "TestPassword123"
+}
+
+### Save token from response (use accessToken if requiresOrgSelection: false, or use tempToken + step 3)
+
+### 3. Select Organization (if needed)
+POST {{baseUrl}}/auth/select-organization
+Content-Type: application/json
+Authorization: Bearer {{tempToken}}
+
+{
+  "organizationId": "{{orgId}}"
+}
+
+### 4. Health Check
+GET {{baseUrl}}/stock/health
+Authorization: Bearer {{token}}
+
+### 5. List Stock Items (should be empty or have seed data)
+GET {{baseUrl}}/stock?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### 6. Create Stock Item - Unit with IMEI
+POST {{baseUrl}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "iPhone 15 Pro 256GB",
+  "storage": "256GB",
+  "color": "Natural Titanium",
+  "condition": "NEW",
+  "imei": "123456789012345",
+  "quantity": 1,
+  "costPrice": 1000.00,
+  "basePrice": 1200.00,
+  "location": "Almacén Principal",
+  "notes": "Nuevo en caja sellado"
+}
+
+### 7. Create Stock Item - Batch without IMEI
+POST {{baseUrl}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "iPhone 14 128GB",
+  "storage": "128GB",
+  "color": "Midnight",
+  "condition": "NEW",
+  "quantity": 10,
+  "costPrice": 700.00,
+  "basePrice": 950.00,
+  "location": "Almacén Principal",
+  "notes": "Lote de 10 unidades"
+}
+
+### 8. Get Stock Item
+GET {{baseUrl}}/stock/{itemId}
+Authorization: Bearer {{token}}
+
+### 9. List Stock Items with Filters
+GET {{baseUrl}}/stock?status=AVAILABLE&model=iPhone&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### 10. Adjust Stock (Increase)
+POST {{baseUrl}}/stock/{itemId}/adjust
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quantityChange": 5,
+  "reason": "Inventory count - found 5 additional units"
+}
+
+### 11. Adjust Stock (Decrease)
+POST {{baseUrl}}/stock/{itemId}/adjust
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quantityChange": -2,
+  "reason": "Damaged during transport"
+}
+
+### 12. View Stock Movements
+GET {{baseUrl}}/stock/{itemId}/movements?page=1&limit=50
+Authorization: Bearer {{token}}
+
+### 13. Create Reservation
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{itemId}",
+  "quantity": 3,
+  "expiresAt": "2024-12-31T23:59:59.000Z",
+  "notes": "Reserved for customer John Doe"
+}
+
+### 14. List Reservations
+GET {{baseUrl}}/stock/reservations?status=ACTIVE&page=1&limit=50
+Authorization: Bearer {{token}}
+
+### 15. List Reservations by Item
+GET {{baseUrl}}/stock/reservations?itemId={itemId}&status=ACTIVE
+Authorization: Bearer {{token}}
+
+### 16. Get Reservation
+GET {{baseUrl}}/stock/reservations/{reservationId}
+Authorization: Bearer {{token}}
+
+### 17. Confirm Reservation (Sell)
+POST {{baseUrl}}/stock/reservations/{reservationId}/confirm
+Authorization: Bearer {{token}}
+
+### 18. Create Another Reservation
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{itemId}",
+  "quantity": 2,
+  "notes": "Reserved for customer Jane Doe"
+}
+
+### 19. Release Reservation (Cancel)
+POST {{baseUrl}}/stock/reservations/{reservationId}/release
+Authorization: Bearer {{token}}
+
+### 20. Update Stock Item
+PUT {{baseUrl}}/stock/{itemId}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "location": "Almacén Secundario",
+  "notes": "Updated location"
+}
+
+### 21. Final Stock Check
+GET {{baseUrl}}/stock/{itemId}
+Authorization: Bearer {{token}}
+
+### 22. Final Movements Check
+GET {{baseUrl}}/stock/{itemId}/movements?page=1&limit=50
+Authorization: Bearer {{token}}
+

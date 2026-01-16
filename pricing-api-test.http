@@ -1,0 +1,281 @@
+### Pricing API - Complete Test Flow
+### Base URL
+@baseUrl = http://localhost:4000/api
+@token = 
+@orgId = 
+
+### 1. Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test-pricing@example.com",
+  "password": "TestPassword123",
+  "name": "Test User",
+  "organizationName": "Test Organization"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test-pricing@example.com",
+  "password": "TestPassword123"
+}
+
+### Save token from response (use accessToken if requiresOrgSelection: false, or use tempToken + step 3)
+
+### 3. Select Organization (if needed)
+POST {{baseUrl}}/auth/select-organization
+Content-Type: application/json
+Authorization: Bearer {{tempToken}}
+
+{
+  "organizationId": "{{orgId}}"
+}
+
+### 4. Health Check
+GET {{baseUrl}}/pricing/health
+Authorization: Bearer {{token}}
+
+### 5. Create Stock Item (for pricing tests)
+POST {{baseUrl}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "iPhone 15 Pro 256GB",
+  "storage": "256GB",
+  "color": "Natural Titanium",
+  "condition": "NEW",
+  "quantity": 5,
+  "costPrice": 900.00,
+  "basePrice": 1200.00,
+  "location": "Almacén Principal"
+}
+
+### Save stockItemId from response
+
+### 6. Create Another Stock Item (USED condition)
+POST {{baseUrl}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "iPhone 14 128GB",
+  "storage": "128GB",
+  "color": "Midnight",
+  "condition": "USED",
+  "imei": "123456789012345",
+  "quantity": 1,
+  "costPrice": 700.00,
+  "basePrice": 950.00,
+  "location": "Almacén Usados"
+}
+
+### Save stockItemId2 from response
+
+### 7. List Pricing Rules (should be empty or have seed data)
+GET {{baseUrl}}/pricing/rules?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### 8. Create Global Markup Rule (20%)
+POST {{baseUrl}}/pricing/rules
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Global 20% Markup",
+  "priority": 10,
+  "isActive": true,
+  "ruleType": "MARKUP_PERCENT",
+  "scopeType": "GLOBAL",
+  "matchers": {},
+  "value": 20,
+  "currency": "USD"
+}
+
+### Save ruleId1 from response
+
+### 9. Create Product Override Rule (Higher Priority)
+POST {{baseUrl}}/pricing/rules
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "iPhone 15 Pro Override",
+  "priority": 50,
+  "isActive": true,
+  "ruleType": "OVERRIDE_PRICE",
+  "scopeType": "BY_PRODUCT",
+  "matchers": {
+    "model": "iPhone 15 Pro 256GB"
+  },
+  "value": 1500,
+  "currency": "USD"
+}
+
+### Save ruleId2 from response
+
+### 10. Create Condition-Based Rule (USED items)
+POST {{baseUrl}}/pricing/rules
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Used Items Fixed Markup",
+  "priority": 30,
+  "isActive": true,
+  "ruleType": "MARKUP_FIXED",
+  "scopeType": "BY_CONDITION",
+  "matchers": {
+    "condition": "USED"
+  },
+  "value": 50,
+  "currency": "USD"
+}
+
+### Save ruleId3 from response
+
+### 11. List All Rules
+GET {{baseUrl}}/pricing/rules?page=1&limit=50&sort=priority&order=desc
+Authorization: Bearer {{token}}
+
+### 12. Get Single Rule
+GET {{baseUrl}}/pricing/rules/{{ruleId1}}
+Authorization: Bearer {{token}}
+
+### 13. Compute Price - Item with Override (should use override)
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "context": {}
+}
+
+### 14. Compute Price - USED Item (should use condition rule)
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId2}",
+  "context": {}
+}
+
+### 15. Compute Price - With Base Cost Override
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "baseCost": 1000,
+  "context": {}
+}
+
+### 16. Compute Bulk Prices
+POST {{baseUrl}}/pricing/compute-bulk
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "stockItemId": "{stockItemId}"
+    },
+    {
+      "stockItemId": "{stockItemId2}"
+    }
+  ],
+  "context": {}
+}
+
+### 17. Create Stock Reservation for Sale
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "quantity": 1,
+  "notes": "Reserved for sale pricing test"
+}
+
+### Save reservationId from response
+
+### 18. Create Sale
+POST {{baseUrl}}/sales
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockReservationIds": ["{reservationId}"],
+  "customerName": "John Doe",
+  "customerEmail": "john@example.com"
+}
+
+### Save saleId from response
+
+### 19. Compute Sale Prices (Preview)
+POST {{baseUrl}}/pricing/compute-sale
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "saleId": "{saleId}"
+}
+
+### 20. Update Rule (Change Priority)
+PATCH {{baseUrl}}/pricing/rules/{{ruleId1}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "priority": 5,
+  "isActive": true
+}
+
+### 21. Compute Price Again (Priority Changed)
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "context": {}
+}
+
+### 22. Deactivate Rule
+PATCH {{baseUrl}}/pricing/rules/{{ruleId2}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "isActive": false
+}
+
+### 23. Compute Price After Deactivation (Should use next rule)
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "context": {}
+}
+
+### 24. List Active Rules Only
+GET {{baseUrl}}/pricing/rules?isActive=true&page=1&limit=50
+Authorization: Bearer {{token}}
+
+### 25. Delete Rule (Optional)
+DELETE {{baseUrl}}/pricing/rules/{{ruleId3}}
+Authorization: Bearer {{token}}
+
+### 26. List Rules After Delete
+GET {{baseUrl}}/pricing/rules?page=1&limit=50
+Authorization: Bearer {{token}}

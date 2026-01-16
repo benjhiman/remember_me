@@ -1,0 +1,170 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { useConversations } from '@/lib/api/hooks/use-conversations';
+import { ConversationListItem } from '@/components/inbox/conversation-list-item';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { env } from '@/lib/config/env';
+import type { IntegrationProvider, ConversationStatus } from '@/types/api';
+
+export default function InboxPage() {
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const [page, setPage] = useState(1);
+  const [provider, setProvider] = useState<IntegrationProvider | undefined>();
+  const [status, setStatus] = useState<ConversationStatus | undefined>();
+  const [search, setSearch] = useState('');
+
+  const { data, isLoading, error } = useConversations({
+    provider,
+    status,
+    q: search || undefined,
+    page,
+    limit: 20,
+    enabled: !!user,
+    refetchInterval: env.NEXT_PUBLIC_POLLING_INTERVAL_CONVERSATIONS,
+  });
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+    }
+  }, [user, router]);
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Inbox</h1>
+          <p className="text-gray-600">Conversaciones unificadas de WhatsApp e Instagram</p>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Búsqueda</label>
+              <Input
+                placeholder="Teléfono, handle, nombre..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Provider</label>
+              <select
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={provider || ''}
+                onChange={(e) => {
+                  setProvider(e.target.value as IntegrationProvider | undefined);
+                  setPage(1);
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="INSTAGRAM">Instagram</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Estado</label>
+              <select
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={status || ''}
+                onChange={(e) => {
+                  setStatus(e.target.value as ConversationStatus | undefined);
+                  setPage(1);
+                }}
+              >
+                <option value="">Todos</option>
+                <option value="OPEN">Abierto</option>
+                <option value="PENDING">Pendiente</option>
+                <option value="CLOSED">Cerrado</option>
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setProvider(undefined);
+                  setStatus(undefined);
+                  setSearch('');
+                  setPage(1);
+                }}
+                className="w-full"
+              >
+                Limpiar filtros
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="bg-white rounded-lg shadow">
+          {isLoading && (
+            <div className="p-8 text-center text-gray-500">Cargando conversaciones...</div>
+          )}
+          {error && (
+            <div className="p-8 text-center text-red-500">
+              Error: {(error as Error).message}
+            </div>
+          )}
+          {data && (
+            <>
+              {data.data.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  No hay conversaciones que coincidan con los filtros
+                </div>
+              ) : (
+                <>
+                  {data.data.map((conv) => (
+                    <ConversationListItem
+                      key={conv.id}
+                      conversation={conv}
+                      onClick={() => router.push(`/inbox/${conv.id}`)}
+                    />
+                  ))}
+                  {/* Pagination */}
+                  {data.meta.totalPages > 1 && (
+                    <div className="p-4 border-t flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Mostrando {data.data.length} de {data.meta.total} conversaciones
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                        >
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPage((p) => Math.min(data.meta.totalPages, p + 1))}
+                          disabled={page === data.meta.totalPages}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

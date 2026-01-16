@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: remember_me_redis_staging
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data_staging:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - remember_me_network
+    command: ["redis-server", "--appendonly", "yes"]
+
+  db:
+    image: postgres:16-alpine
+    container_name: remember_me_db_staging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-remember_me}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db_data_staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - remember_me_network
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: remember_me_api_staging
+    environment:
+      # Core
+      NODE_ENV: ${NODE_ENV:-staging}
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-remember_me}?schema=public
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      
+      # Token Encryption
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+      TOKEN_ENCRYPTION_KEY_ID: ${TOKEN_ENCRYPTION_KEY_ID:-v1}
+      
+      # WhatsApp
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_APP_ID: ${WHATSAPP_APP_ID}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN}
+      WHATSAPP_WEBHOOK_URL: ${WHATSAPP_WEBHOOK_URL}
+      
+      # Meta/Instagram
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_OAUTH_REDIRECT_URI: ${META_OAUTH_REDIRECT_URI}
+      INSTAGRAM_VERIFY_TOKEN: ${INSTAGRAM_VERIFY_TOKEN}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN:-}
+      INSTAGRAM_PAGE_ID: ${INSTAGRAM_PAGE_ID:-}
+      META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID:-}
+      
+      # Job Runner (disabled in API mode)
+      WORKER_MODE: "0"
+      JOB_RUNNER_ENABLED: ${JOB_RUNNER_ENABLED:-false}
+      JOB_RUNNER_INTERVAL_MS: ${JOB_RUNNER_INTERVAL_MS:-5000}
+      NO_REPLY_SCAN_ENABLED: ${NO_REPLY_SCAN_ENABLED:-true}
+      NO_REPLY_SCAN_INTERVAL_MS: ${NO_REPLY_SCAN_INTERVAL_MS:-300000}
+      META_SPEND_ENABLED: ${META_SPEND_ENABLED:-true}
+      META_SPEND_CRON: ${META_SPEND_CRON:-0 6 * * *}
+      META_TOKEN_REFRESH_ENABLED: ${META_TOKEN_REFRESH_ENABLED:-true}
+      META_TOKEN_REFRESH_CRON: ${META_TOKEN_REFRESH_CRON:-0 4 * * *}
+      
+      # Queue Mode (BullMQ for staging)
+      QUEUE_MODE: ${QUEUE_MODE:-bullmq}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-redis://redis:6379}
+      BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-integration-jobs}
+      INTEGRATION_WORKER_CONCURRENCY: ${INTEGRATION_WORKER_CONCURRENCY:-5}
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      
+      # Metrics
+      METRICS_TOKEN: ${METRICS_TOKEN:-staging-metrics-token-change-me}
+      
+      # Test Mode (for smoke e2e)
+      STAGING_TEST_MODE: ${STAGING_TEST_MODE:-true}
+      EXTERNAL_HTTP_MODE: ${EXTERNAL_HTTP_MODE:-mock}
+      
+      # Inbox
+      INBOX_SLA_MINUTES: ${INBOX_SLA_MINUTES:-60}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    networks:
+      - remember_me_network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: remember_me_worker_staging
+    environment:
+      # Core
+      NODE_ENV: ${NODE_ENV:-staging}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-remember_me}?schema=public
+      
+      # Worker Mode
+      WORKER_MODE: "1"
+      JOB_RUNNER_ENABLED: ${JOB_RUNNER_ENABLED:-true}
+      JOB_RUNNER_INTERVAL_MS: ${JOB_RUNNER_INTERVAL_MS:-5000}
+      NO_REPLY_SCAN_ENABLED: ${NO_REPLY_SCAN_ENABLED:-true}
+      NO_REPLY_SCAN_INTERVAL_MS: ${NO_REPLY_SCAN_INTERVAL_MS:-300000}
+      META_SPEND_ENABLED: ${META_SPEND_ENABLED:-true}
+      META_SPEND_CRON: ${META_SPEND_CRON:-0 6 * * *}
+      META_TOKEN_REFRESH_ENABLED: ${META_TOKEN_REFRESH_ENABLED:-true}
+      META_TOKEN_REFRESH_CRON: ${META_TOKEN_REFRESH_CRON:-0 4 * * *}
+      
+      # Queue Mode (BullMQ for staging)
+      QUEUE_MODE: ${QUEUE_MODE:-bullmq}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-redis://redis:6379}
+      BULLMQ_QUEUE_NAME: ${BULLMQ_QUEUE_NAME:-integration-jobs}
+      INTEGRATION_WORKER_CONCURRENCY: ${INTEGRATION_WORKER_CONCURRENCY:-5}
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      
+      # WhatsApp
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_APP_ID: ${WHATSAPP_APP_ID}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN}
+      
+      # Meta/Instagram
+      META_APP_ID: ${META_APP_ID}
+      META_APP_SECRET: ${META_APP_SECRET}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN:-}
+      INSTAGRAM_PAGE_ID: ${INSTAGRAM_PAGE_ID:-}
+      META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID:-}
+      
+      # Token Encryption
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+      TOKEN_ENCRYPTION_KEY_ID: ${TOKEN_ENCRYPTION_KEY_ID:-v1}
+      
+      # Test Mode (for smoke e2e)
+      STAGING_TEST_MODE: ${STAGING_TEST_MODE:-true}
+      EXTERNAL_HTTP_MODE: ${EXTERNAL_HTTP_MODE:-mock}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    command: ["node", "dist/worker.main.js"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - remember_me_network
+    restart: unless-stopped
+
+volumes:
+  db_data_staging:
+    driver: local
+  redis_data_staging:
+    driver: local
+
+networks:
+  remember_me_network:
+    driver: bridge

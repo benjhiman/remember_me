@@ -1,0 +1,140 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: remember_me_db_local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-remember_me}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - db_data_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - remember_me_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: remember_me_redis_local
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data_local:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - remember_me_network
+    command: ["redis-server", "--appendonly", "yes"]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: remember_me_api_local
+    environment:
+      # Core
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-remember_me}?schema=public
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      
+      # Worker Mode (API debe tener esto deshabilitado)
+      WORKER_MODE: "0"
+      JOB_RUNNER_ENABLED: "false"
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-redis://redis:6379}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    ports:
+      - "${API_PORT:-4000}:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - remember_me_network
+    restart: unless-stopped
+    command: ["node", "dist/main.js"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: remember_me_worker_local
+    environment:
+      # Core
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-remember_me}?schema=public
+      
+      # Worker Mode
+      WORKER_MODE: "1"
+      JOB_RUNNER_ENABLED: ${JOB_RUNNER_ENABLED:-true}
+      JOB_RUNNER_INTERVAL_MS: ${JOB_RUNNER_INTERVAL_MS:-5000}
+      NO_REPLY_SCAN_ENABLED: ${NO_REPLY_SCAN_ENABLED:-true}
+      NO_REPLY_SCAN_INTERVAL_MS: ${NO_REPLY_SCAN_INTERVAL_MS:-300000}
+      META_SPEND_ENABLED: ${META_SPEND_ENABLED:-true}
+      META_SPEND_CRON: ${META_SPEND_CRON:-0 6 * * *}
+      META_TOKEN_REFRESH_ENABLED: ${META_TOKEN_REFRESH_ENABLED:-true}
+      META_TOKEN_REFRESH_CRON: ${META_TOKEN_REFRESH_CRON:-0 4 * * *}
+      
+      # WhatsApp (si aplica)
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      
+      # Meta/Instagram (si aplica)
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_PAGE_ACCESS_TOKEN: ${META_PAGE_ACCESS_TOKEN:-}
+      INSTAGRAM_PAGE_ID: ${INSTAGRAM_PAGE_ID:-}
+      
+      # Token Encryption (si aplica)
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+      TOKEN_ENCRYPTION_KEY_ID: ${TOKEN_ENCRYPTION_KEY_ID:-v1}
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-false}
+      RATE_LIMIT_REDIS_URL: ${RATE_LIMIT_REDIS_URL:-redis://redis:6379}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - remember_me_network
+    restart: unless-stopped
+    command: ["node", "dist/worker.main.js"]
+
+volumes:
+  db_data_local:
+    driver: local
+  redis_data_local:
+    driver: local
+
+networks:
+  remember_me_network:
+    driver: bridge

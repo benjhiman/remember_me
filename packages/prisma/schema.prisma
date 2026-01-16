@@ -1,0 +1,958 @@
+// packages/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== AUTH & ORGANIZATIONS =====
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String?
+  avatar        String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relaciones
+  memberships           Membership[]
+  refreshTokens         RefreshToken[]
+  sentInvitations       Invitation[]
+  assignedLeads         Lead[]             @relation("LeadAssignee")
+  createdLeads          Lead[]             @relation("LeadCreator")
+  createdSales          Sale[]             @relation("SaleCreator")
+  assignedSales         Sale[]             @relation("SaleAssignedTo")
+  notes                 Note[]
+  assignedTasks         Task[]             @relation("TaskAssignedTo")
+  createdTasks          Task[]             @relation("TaskCreator")
+  StockMovement         StockMovement[]
+  StockReservation      StockReservation[]
+  idempotencyKeys       IdempotencyKey[]
+  assignedConversations Conversation[]
+
+  @@index([email])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  settings  Json? // Configuraciones generales
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  members                  Membership[]
+  invitations              Invitation[]
+  refreshTokens            RefreshToken[]
+  pipelines                Pipeline[]
+  leads                    Lead[]
+  stockItems               StockItem[]
+  whatsappTemplates        WhatsAppTemplate[]
+  stockReservations        StockReservation[]
+  stockMovements           StockMovement[]
+  pricingRules             PricingRule[]
+  sales                    Sale[]
+  tasks                    Task[]
+  notes                    Note[]
+  auditLogs                AuditLog[]
+  idempotencyKeys          IdempotencyKey[]
+  connectedAccounts        ConnectedAccount[]
+  integrationJobs          IntegrationJob[]
+  whatsappAutomationRules  WhatsAppAutomationRule[]
+  conversations            Conversation[]
+  conversationTags         ConversationTag[]
+  metaAttributionSnapshots MetaAttributionSnapshot[]
+  MetaSpendDaily           MetaSpendDaily[]
+
+  @@index([slug])
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role     @default(SELLER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, role])
+  @@index([userId])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  SELLER
+}
+
+model RefreshToken {
+  id             String   @id @default(cuid())
+  token          String   @unique
+  userId         String
+  organizationId String
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([userId, organizationId])
+}
+
+model Invitation {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           Role         @default(SELLER)
+  token          String       @unique
+  status         InviteStatus @default(PENDING)
+  invitedById    String
+  acceptedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation(fields: [invitedById], references: [id])
+
+  @@unique([organizationId, email, status])
+  @@index([token])
+  @@index([email, status])
+  @@index([organizationId])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+// ===== CRM LEADS =====
+
+model Pipeline {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  color          String?   @default("#6366f1")
+  order          Int       @default(0) // Para ordenar pipelines
+  isDefault      Boolean   @default(false)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stages       Stage[]
+  leads        Lead[]
+
+  @@index([organizationId, order])
+}
+
+model Stage {
+  id         String    @id @default(cuid())
+  pipelineId String
+  name       String
+  order      Int       @default(0)
+  color      String?   @default("#94a3b8")
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  leads    Lead[]
+
+  @@index([pipelineId, order])
+}
+
+model Lead {
+  id             String  @id @default(cuid())
+  organizationId String
+  pipelineId     String
+  stageId        String
+  assignedToId   String?
+  createdById    String
+
+  // Campos estándar
+  name   String
+  email  String?
+  phone  String?
+  source String? // "instagram", "tiktok", "manual", etc.
+  city   String?
+  budget Decimal? @db.Decimal(10, 2)
+  model  String? // "iPhone 15 Pro", etc.
+
+  // Campos custom (JSON para flexibilidad)
+  customFields Json? // { "preferredColor": "blue", "tradeIn": true, ... }
+  tags         String[] @default([])
+
+  status      LeadStatus @default(ACTIVE)
+  convertedAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pipeline     Pipeline     @relation(fields: [pipelineId], references: [id])
+  stage        Stage        @relation(fields: [stageId], references: [id])
+  assignedTo   User?        @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  creator      User         @relation("LeadCreator", fields: [createdById], references: [id])
+
+  notes                    Note[]
+  tasks                    Task[]
+  sales                    Sale[]
+  Conversation             Conversation[]
+  metaAttributionSnapshots MetaAttributionSnapshot[]
+
+  @@index([organizationId, pipelineId, stageId])
+  @@index([organizationId, assignedToId])
+  @@index([organizationId, status])
+  @@index([organizationId, createdAt])
+}
+
+enum LeadStatus {
+  ACTIVE
+  CONVERTED
+  LOST
+  ARCHIVED
+}
+
+model Note {
+  id             String   @id @default(cuid())
+  organizationId String
+  leadId         String?
+  userId         String
+  content        String   @db.Text
+  isPrivate      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, leadId])
+  @@index([createdAt])
+}
+
+model Task {
+  id             String    @id @default(cuid())
+  organizationId String
+  leadId         String?
+  assignedToId   String
+  createdById    String
+  title          String
+  description    String?   @db.Text
+  dueDate        DateTime?
+  completed      Boolean   @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedTo   User         @relation("TaskAssignedTo", fields: [assignedToId], references: [id])
+  creator      User         @relation("TaskCreator", fields: [createdById], references: [id])
+
+  @@index([organizationId, assignedToId, completed])
+  @@index([organizationId, dueDate])
+}
+
+// ===== STOCK & PRICING =====
+
+model StockItem {
+  id             String        @id @default(cuid())
+  organizationId String
+  sku            String? // SKU interno
+  model          String // "iPhone 15 Pro 256GB"
+  storage        String? // "256GB"
+  color          String? // "Natural Titanium"
+  condition      ItemCondition @default(NEW)
+  imei           String?       @unique
+  serialNumber   String?
+  quantity       Int           @default(1) // Para lotes sin IMEI
+  costPrice      Decimal       @db.Decimal(10, 2)
+  basePrice      Decimal       @db.Decimal(10, 2) // Precio base antes de reglas
+  status         StockStatus   @default(AVAILABLE)
+  location       String? // "Almacén A", "En tránsito", etc.
+  notes          String?       @db.Text
+  metadata       Json? // Info adicional (proveedor, fecha compra, etc.)
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reservations      SaleItem[]
+  movements         StockMovement[]
+  stockReservations StockReservation[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, model])
+  @@index([sku])
+  @@index([imei])
+}
+
+enum ItemCondition {
+  NEW
+  USED
+  REFURBISHED
+}
+
+enum StockStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  DAMAGED
+  RETURNED
+  CANCELLED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  RESERVE
+  RELEASE
+  ADJUST
+  SOLD
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+model PricingRule {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  priority       Int       @default(0) // Mayor = más prioridad
+  isActive       Boolean   @default(true)
+  ruleType       RuleType // MARKUP_PERCENT, MARKUP_FIXED, OVERRIDE_PRICE
+  scopeType      ScopeType @default(GLOBAL) // GLOBAL, BY_PRODUCT, BY_CONDITION, BY_CATEGORY
+
+  // Matchers (JSON para flexibilidad)
+  // { "model": "iPhone 15 Pro", "condition": "USED", "category": "premium" }
+  matchers Json? // Campos para matchear: model, condition, storage, color, etc.
+
+  // Valor según ruleType:
+  // MARKUP_PERCENT: porcentaje (ej: 20.00 = 20%)
+  // MARKUP_FIXED: monto fijo (ej: 100.00)
+  // OVERRIDE_PRICE: precio final (ej: 1500.00)
+  value Decimal @db.Decimal(10, 2)
+
+  currency  String    @default("USD")
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive, priority])
+  @@index([organizationId, scopeType])
+}
+
+enum RuleType {
+  MARKUP_PERCENT
+  MARKUP_FIXED
+  OVERRIDE_PRICE
+}
+
+enum ScopeType {
+  GLOBAL
+  BY_PRODUCT
+  BY_CONDITION
+  BY_CATEGORY
+}
+
+// ===== SALES =====
+
+model Sale {
+  id             String     @id @default(cuid())
+  organizationId String
+  leadId         String? // Si viene de un lead
+  createdById    String // Usuario que crea la venta
+  assignedToId   String // Vendedor asignado
+  saleNumber     String     @unique // "SALE-2024-001"
+  status         SaleStatus @default(DRAFT)
+
+  // Cliente
+  customerName  String
+  customerEmail String?
+  customerPhone String?
+  customerCity  String?
+
+  // Monto
+  subtotal Decimal @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+  currency String  @default("USD")
+
+  // Fechas
+  reservedAt  DateTime?
+  paidAt      DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+
+  notes     String?   @db.Text
+  metadata  Json? // Tracking info, etc.
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  organization            Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead                    Lead?                    @relation(fields: [leadId], references: [id])
+  createdBy               User                     @relation("SaleCreator", fields: [createdById], references: [id])
+  assignedTo              User                     @relation("SaleAssignedTo", fields: [assignedToId], references: [id])
+  items                   SaleItem[]
+  stockReservations       StockReservation[]
+  stockMovements          StockMovement[]
+  metaAttributionSnapshot MetaAttributionSnapshot?
+
+  @@index([organizationId, status])
+  @@index([organizationId, assignedToId])
+  @@index([organizationId, createdById])
+  @@index([organizationId, createdAt])
+  @@index([saleNumber])
+}
+
+enum SaleStatus {
+  DRAFT
+  RESERVED
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model SaleItem {
+  id          String   @id @default(cuid())
+  saleId      String
+  stockItemId String? // Nullable si el item fue eliminado
+  model       String // Snapshot del modelo al momento de la venta
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+
+  sale      Sale       @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  stockItem StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@index([stockItemId])
+}
+
+model StockMovement {
+  id             String            @id @default(cuid())
+  organizationId String
+  stockItemId    String
+  type           StockMovementType
+  quantity       Int // Cantidad afectada
+  quantityBefore Int // Cantidad antes del movimiento
+  quantityAfter  Int // Cantidad después del movimiento
+  reason         String? // Motivo del movimiento
+  reservationId  String?
+  saleId         String?
+  createdById    String
+  metadata       Json? // Info adicional
+  createdAt      DateTime          @default(now())
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  reservation  StockReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  sale         Sale?             @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdBy    User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([stockItemId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([reservationId])
+  @@index([saleId])
+}
+
+model StockReservation {
+  id             String            @id @default(cuid())
+  organizationId String
+  stockItemId    String
+  quantity       Int               @default(1)
+  status         ReservationStatus @default(ACTIVE)
+  expiresAt      DateTime?
+  saleId         String?
+  createdById    String
+  notes          String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockItem    StockItem       @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  sale         Sale?           @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  createdBy    User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  movements    StockMovement[]
+
+  @@index([organizationId])
+  @@index([stockItemId])
+  @@index([status])
+  @@index([saleId])
+  @@index([expiresAt])
+}
+
+// ===== AUDIT LOG =====
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+  PAY
+  CANCEL
+  RESERVE
+  CONFIRM
+  RELEASE
+  SHIP
+  DELIVER
+  ASSIGN
+  ADJUST
+}
+
+enum AuditEntityType {
+  Lead
+  StockItem
+  Sale
+  PricingRule
+  Pipeline
+  Stage
+  StockReservation
+  SaleItem
+  Note
+  Task
+}
+
+model AuditLog {
+  id             String          @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  action         AuditAction
+  entityType     AuditEntityType
+  entityId       String
+  beforeJson     Json?
+  afterJson      Json?
+  metadataJson   Json?
+  requestId      String?
+  createdAt      DateTime        @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+  @@index([actorUserId, createdAt])
+  @@index([requestId])
+}
+
+// ===== IDEMPOTENCY =====
+
+model IdempotencyKey {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  method         String
+  path           String
+  key            String
+  requestHash    String
+  statusCode     Int?
+  responseBody   Json?
+  createdAt      DateTime @default(now())
+  expiresAt      DateTime
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, method, path, key])
+  @@index([expiresAt])
+  @@index([organizationId, createdAt])
+  @@map("idempotency_keys")
+}
+
+// ============================================
+// INTEGRATIONS MODELS
+// ============================================
+
+enum IntegrationProvider {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+}
+
+enum ConnectedAccountStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+enum WebhookEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum WhatsAppTemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum WhatsAppTemplateStatus {
+  APPROVED
+  PENDING
+  REJECTED
+  DISABLED
+}
+
+enum IntegrationJobType {
+  SEND_MESSAGE
+  SEND_MESSAGE_TEMPLATE
+  PROCESS_WEBHOOK
+  SYNC_ACCOUNT
+  RETRY
+  AUTOMATION_ACTION
+  FETCH_META_SPEND
+  REFRESH_META_TOKEN
+}
+
+enum WhatsAppAutomationTrigger {
+  LEAD_CREATED
+  SALE_RESERVED
+  SALE_PAID
+  NO_REPLY_24H
+}
+
+enum WhatsAppAutomationAction {
+  SEND_TEMPLATE
+  SEND_TEXT
+}
+
+enum IntegrationJobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model ConnectedAccount {
+  id                String                 @id @default(uuid())
+  organizationId    String
+  provider          IntegrationProvider
+  externalAccountId String
+  displayName       String?
+  status            ConnectedAccountStatus @default(CONNECTED)
+  metadataJson      Json? // { metaUserId, pageId, igUserId, adAccounts: [...] }
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  oauthTokens     OAuthToken[]
+  integrationJobs IntegrationJob[]
+
+  @@unique([organizationId, provider, externalAccountId])
+  @@index([organizationId, provider])
+  @@index([organizationId, status])
+}
+
+model OAuthToken {
+  id                    String    @id @default(uuid())
+  connectedAccountId    String
+  accessTokenEncrypted  String // Base64 encoded encrypted token
+  refreshTokenEncrypted String? // Base64 encoded encrypted token (optional)
+  expiresAt             DateTime?
+  scopes                String[]
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  connectedAccount ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+
+  @@index([connectedAccountId])
+}
+
+model WebhookEvent {
+  id          String              @id @default(uuid())
+  provider    IntegrationProvider
+  eventType   String
+  payloadJson Json
+  receivedAt  DateTime            @default(now())
+  processedAt DateTime?
+  status      WebhookEventStatus  @default(PENDING)
+  retries     Int                 @default(0)
+
+  @@index([provider, status])
+  @@index([status, receivedAt])
+}
+
+model MessageLog {
+  id                String              @id @default(uuid())
+  provider          IntegrationProvider
+  direction         MessageDirection
+  to                String
+  from              String
+  text              String
+  status            MessageStatus?      @default(QUEUED)
+  externalMessageId String?             @unique
+  errorCode         String?
+  errorMessage      String?
+  statusUpdatedAt   DateTime?
+  metaJson          Json?
+  conversationId    String?
+  createdAt         DateTime            @default(now())
+
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([provider, createdAt])
+  @@index([to])
+  @@index([from])
+  @@index([externalMessageId])
+  @@index([conversationId])
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+model Conversation {
+  id               String              @id @default(cuid())
+  organizationId   String
+  provider         IntegrationProvider
+  externalThreadId String?
+  phone            String?
+  handle           String? // IG username
+  leadId           String?
+  assignedToId     String?
+  status           ConversationStatus  @default(OPEN)
+  lastMessageAt    DateTime            @default(now())
+  lastInboundAt    DateTime?
+  lastOutboundAt   DateTime?
+  lastReadAt       DateTime?
+  unreadCount      Int                 @default(0)
+  deletedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  assignedTo   User?                 @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  messages     MessageLog[]
+  tags         ConversationTagLink[]
+
+  @@unique([organizationId, provider, phone])
+  @@index([organizationId, provider, lastMessageAt])
+  @@index([organizationId, assignedToId])
+  @@index([organizationId, status])
+  @@index([organizationId, provider, status])
+}
+
+model ConversationTag {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  color          String? // Hex color
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversations ConversationTagLink[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, deletedAt])
+}
+
+model ConversationTagLink {
+  id             String   @id @default(cuid())
+  conversationId String
+  tagId          String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tag          ConversationTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, tagId])
+  @@index([conversationId])
+  @@index([tagId])
+}
+
+model WhatsAppTemplate {
+  id             String                   @id @default(cuid())
+  organizationId String
+  name           String
+  language       String                   @default("es_AR")
+  category       WhatsAppTemplateCategory
+  componentsJson Json // body/header/buttons with placeholders
+  status         WhatsAppTemplateStatus   @default(PENDING)
+  deletedAt      DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name, language])
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+}
+
+model WhatsAppAutomationRule {
+  id             String                    @id @default(cuid())
+  organizationId String
+  name           String
+  trigger        WhatsAppAutomationTrigger
+  action         WhatsAppAutomationAction
+  payloadJson    Json // templateId/text + variables mapping
+  enabled        Boolean                   @default(true)
+  cooldownHours  Int                       @default(24)
+  deletedAt      DateTime?
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, trigger, enabled])
+  @@index([organizationId, enabled])
+}
+
+model IntegrationJob {
+  id                 String               @id @default(uuid())
+  organizationId     String
+  provider           IntegrationProvider
+  jobType            IntegrationJobType
+  payloadJson        Json
+  status             IntegrationJobStatus @default(PENDING)
+  attempts           Int                  @default(0)
+  lastError          String?
+  runAt              DateTime             @default(now())
+  connectedAccountId String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectedAccount ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
+
+  @@index([status, runAt])
+  @@index([organizationId, status])
+  @@index([provider, status])
+}
+
+// ===== JOB RUNNER LOCK & STATE =====
+
+model JobRunnerLock {
+  id            String   @id @default("singleton") // Singleton pattern
+  lockedBy      String   // Worker instance ID (hostname + pid)
+  lockedAt      DateTime @default(now())
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("job_runner_lock")
+}
+
+model JobRunnerState {
+  id                String   @id @default("singleton") // Singleton pattern
+  lastRunAt         DateTime?
+  lastRunDurationMs Int?
+  lastRunJobCount   Int?
+  lastRunError      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("job_runner_state")
+}
+
+// ===== ATTRIBUTION =====
+
+enum AttributionSource {
+  META_LEAD_ADS
+}
+
+model MetaAttributionSnapshot {
+  id             String            @id @default(cuid())
+  organizationId String
+  saleId         String            @unique
+  leadId         String?
+  source         AttributionSource @default(META_LEAD_ADS)
+  campaignId     String?
+  adsetId        String?
+  adId           String?
+  formId         String?
+  pageId         String?
+  leadgenId      String?
+  createdAt      DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, campaignId])
+  @@index([organizationId, adId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, source])
+}
+
+// ===== SPEND TRACKING =====
+
+enum MetaSpendLevel {
+  CAMPAIGN
+  ADSET
+  AD
+}
+
+model MetaSpendDaily {
+  id             String              @id @default(cuid())
+  organizationId String
+  provider       IntegrationProvider @default(INSTAGRAM) // META via INSTAGRAM provider
+  date           DateTime            @db.Date
+  level          MetaSpendLevel
+  campaignId     String?
+  adsetId        String?
+  adId           String?
+  currency       String              @default("USD")
+  spend          Decimal             @db.Decimal(18, 2)
+  impressions    Int?
+  clicks         Int?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, date, level, campaignId, adsetId, adId])
+  @@index([organizationId, date])
+  @@index([organizationId, campaignId])
+  @@index([organizationId, adId])
+  @@index([organizationId, provider, date])
+}

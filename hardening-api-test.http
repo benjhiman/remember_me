@@ -1,0 +1,614 @@
+### Hardening API Tests
+### This file tests rate limiting, request ID, error handling, and security headers
+
+@baseUrl = http://localhost:4000/api
+@requestId = test-request-id-{{$randomUUID}}
+
+### Test 1: Request ID Middleware
+### Should return X-Request-Id header (generated or provided)
+
+GET {{baseUrl}}/auth/login
+X-Request-Id: {{requestId}}
+Content-Type: application/json
+
+### Test 2: Rate Limiting - Login (5 req/min per IP)
+### Try to exceed the limit (will fail after 5 requests)
+
+### Request 1
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+### Request 2
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+### Request 3
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+### Request 4
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+### Request 5
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+### Request 6 (Should return 429 Too Many Requests)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "wrongpassword"
+}
+
+### Test 3: Rate Limiting - Register (3 req/min per IP)
+
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test1@example.com",
+  "password": "Test123456",
+  "name": "Test User"
+}
+
+### Test 4: Error Handling - Invalid Input (400 Bad Request)
+### Should return structured error with requestId
+
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+X-Request-Id: error-test-{{$randomUUID}}
+
+{
+  "email": "invalid-email",
+  "password": "short"
+}
+
+### Test 5: Error Handling - Not Found (404)
+### Should return structured error
+
+GET {{baseUrl}}/leads/non-existent-id
+Authorization: Bearer {{accessToken}}
+X-Request-Id: notfound-test-{{$randomUUID}}
+
+### Test 6: Security Headers
+### Check that security headers are present (use browser dev tools or curl)
+
+GET {{baseUrl}}/dashboard/overview
+Authorization: Bearer {{accessToken}}
+
+### Test 7: CORS Preflight (OPTIONS request)
+### Should return appropriate CORS headers
+
+OPTIONS {{baseUrl}}/auth/login
+Origin: http://localhost:3000
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type
+
+### Test 8: Rate Limiting - Authenticated Endpoint (User-based)
+### Note: Requires valid accessToken
+### This endpoint has 50 req/min per user
+
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+X-Request-Id: pricing-test-{{$randomUUID}}
+
+{
+  "stockItemId": "test-item-id",
+  "baseCost": 100
+}
+
+### Test 9: Rate Limiting - Sales Pay (10 req/min per user)
+### Note: Requires valid accessToken and sale ID
+
+PATCH {{baseUrl}}/sales/sale-id/pay
+Authorization: Bearer {{accessToken}}
+X-Request-Id: sales-pay-test-{{$randomUUID}}
+
+### Test 10: Rate Limiting - Stock Reservations (20 req/min per user)
+### Note: Requires valid accessToken
+
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+X-Request-Id: stock-reservation-test-{{$randomUUID}}
+
+{
+  "stockItemId": "test-item-id",
+  "quantity": 1
+}
+
+### Test 11: Validation Error Format
+### Should return structured error with validation details
+
+POST {{baseUrl}}/leads
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+X-Request-Id: validation-test-{{$randomUUID}}
+
+{
+  "email": "not-an-email",
+  "name": ""
+}
+
+### Test 12: Request ID in Error Response
+### Verify that error responses include the requestId from header
+
+GET {{baseUrl}}/non-existent-route
+X-Request-Id: error-request-id-12345
+
+### ============================================
+### SOFT DELETE & RESTORE TESTS
+### ============================================
+
+### Soft delete a lead
+DELETE {{baseUrl}}/leads/{{leadId}}
+Authorization: Bearer {{accessToken}}
+
+### List leads (should exclude deleted)
+GET {{baseUrl}}/leads
+Authorization: Bearer {{accessToken}}
+
+### List leads with includeDeleted (admin only)
+GET {{baseUrl}}/leads?includeDeleted=true
+Authorization: Bearer {{accessToken}}
+
+### Try to update deleted lead (should fail)
+PATCH {{baseUrl}}/leads/{{leadId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Updated Name"
+}
+
+### Restore deleted lead
+PATCH {{baseUrl}}/leads/{{leadId}}/restore
+Authorization: Bearer {{accessToken}}
+
+### Soft delete a stock item
+DELETE {{baseUrl}}/stock/items/{{stockItemId}}
+Authorization: Bearer {{accessToken}}
+
+### List stock items (should exclude deleted)
+GET {{baseUrl}}/stock
+Authorization: Bearer {{accessToken}}
+
+### List stock items with includeDeleted (admin only)
+GET {{baseUrl}}/stock?includeDeleted=true
+Authorization: Bearer {{accessToken}}
+
+### Restore deleted stock item
+PATCH {{baseUrl}}/stock/items/{{stockItemId}}/restore
+Authorization: Bearer {{accessToken}}
+
+### Soft delete a sale
+DELETE {{baseUrl}}/sales/{{saleId}}
+Authorization: Bearer {{accessToken}}
+
+### List sales (should exclude deleted)
+GET {{baseUrl}}/sales
+Authorization: Bearer {{accessToken}}
+
+### List sales with includeDeleted (admin only)
+GET {{baseUrl}}/sales?includeDeleted=true
+Authorization: Bearer {{accessToken}}
+
+### Try to pay deleted sale (should fail)
+PATCH {{baseUrl}}/sales/{{saleId}}/pay
+Authorization: Bearer {{accessToken}}
+
+### Restore deleted sale
+PATCH {{baseUrl}}/sales/{{saleId}}/restore
+Authorization: Bearer {{accessToken}}
+
+### Soft delete a pricing rule
+DELETE {{baseUrl}}/pricing/rules/{{pricingRuleId}}
+Authorization: Bearer {{accessToken}}
+
+### List pricing rules (should exclude deleted)
+GET {{baseUrl}}/pricing/rules
+Authorization: Bearer {{accessToken}}
+
+### List pricing rules with includeDeleted (admin only)
+GET {{baseUrl}}/pricing/rules?includeDeleted=true
+Authorization: Bearer {{accessToken}}
+
+### Compute price (deleted rule should be ignored)
+POST {{baseUrl}}/pricing/compute
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{{stockItemId}}"
+}
+
+### Restore deleted pricing rule
+PATCH {{baseUrl}}/pricing/rules/{{pricingRuleId}}/restore
+Authorization: Bearer {{accessToken}}
+
+### ============================================
+### IDEMPOTENCY TESTS
+### ============================================
+
+### Create stock reservation with Idempotency-Key (first request)
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: reservation-test-{{$timestamp}}
+Content-Type: application/json
+
+{
+  "stockItemId": "item-1",
+  "quantity": 1,
+  "notes": "Test reservation with idempotency"
+}
+
+### Repeat same request (same key + same body) - should return cached response
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: reservation-test-{{$timestamp}}
+Content-Type: application/json
+
+{
+  "stockItemId": "item-1",
+  "quantity": 1,
+  "notes": "Test reservation with idempotency"
+}
+
+### Reuse key with different payload - should return 409 Conflict
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: reservation-test-{{$timestamp}}
+Content-Type: application/json
+
+{
+  "stockItemId": "item-2",
+  "quantity": 2,
+  "notes": "Different payload"
+}
+
+### Create sale with Idempotency-Key
+POST {{baseUrl}}/sales
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: sale-test-{{$uuid}}
+Content-Type: application/json
+
+{
+  "stockReservationIds": ["reservation-id-1"],
+  "customerName": "Test Customer",
+  "customerEmail": "test@example.com"
+}
+
+### Repeat sale creation (same key + same body) - should return cached
+POST {{baseUrl}}/sales
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: sale-test-{{$uuid}}
+Content-Type: application/json
+
+{
+  "stockReservationIds": ["reservation-id-1"],
+  "customerName": "Test Customer",
+  "customerEmail": "test@example.com"
+}
+
+### Pay sale with Idempotency-Key (first request)
+PATCH {{baseUrl}}/sales/sale-123/pay
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: pay-sale-123-{{$timestamp}}
+Content-Type: application/json
+
+### Pay sale again (same key) - should return cached, no duplicate payment
+PATCH {{baseUrl}}/sales/sale-123/pay
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: pay-sale-123-{{$timestamp}}
+Content-Type: application/json
+
+### Missing Idempotency-Key header - should return 400
+POST {{baseUrl}}/sales
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "stockReservationIds": ["reservation-id-1"]
+}
+
+### ============================================
+### WHATSAPP INTEGRATION TESTS
+### ============================================
+
+### Webhook Verification (GET) - Meta calls this to verify webhook
+### Replace {{whatsappVerifyToken}} with your WHATSAPP_VERIFY_TOKEN
+GET {{baseUrl}}/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={{whatsappVerifyToken}}&hub.challenge=test-challenge-123
+
+### Webhook Verification - Wrong Token (should return 403)
+GET {{baseUrl}}/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=test-challenge-123
+
+### Receive WhatsApp Webhook (POST) - Meta sends messages here
+POST {{baseUrl}}/webhooks/whatsapp
+Content-Type: application/json
+X-Organization-Id: {{organizationId}}
+
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "WABA_ID",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "1234567890",
+              "phone_number_id": "PHONE_NUMBER_ID"
+            },
+            "messages": [
+              {
+                "from": "1234567890",
+                "id": "wamid.test123",
+                "timestamp": "1234567890",
+                "text": {
+                  "body": "Hello, I want to buy an iPhone 15 Pro"
+                },
+                "type": "text"
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
+
+### Send WhatsApp Message
+POST {{baseUrl}}/integrations/whatsapp/send
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+Content-Type: application/json
+
+{
+  "toPhone": "+1234567890",
+  "text": "Hello! How can I help you today?",
+  "leadId": "{{leadId}}"
+}
+
+### List Messages (by lead)
+GET {{baseUrl}}/integrations/messages?leadId={{leadId}}&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### List All Messages
+GET {{baseUrl}}/integrations/messages?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### ============================================
+### INSTAGRAM INTEGRATION TESTS
+### ============================================
+
+### Webhook Verification (GET) - Meta calls this to verify webhook
+### Replace {{instagramVerifyToken}} with your INSTAGRAM_VERIFY_TOKEN
+GET {{baseUrl}}/webhooks/instagram?hub.mode=subscribe&hub.verify_token={{instagramVerifyToken}}&hub.challenge=test-challenge-123
+
+### Webhook Verification - Wrong Token (should return 403)
+GET {{baseUrl}}/webhooks/instagram?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=test-challenge-123
+
+### Receive Instagram Webhook (POST) - Meta sends messages here
+### Note: Requires X-Hub-Signature-256 header with valid signature if META_APP_SECRET is set
+POST {{baseUrl}}/webhooks/instagram
+Content-Type: application/json
+X-Organization-Id: {{organizationId}}
+X-Hub-Signature-256: sha256=signature_here
+
+{
+  "object": "instagram",
+  "entry": [
+    {
+      "id": "page-123",
+      "messaging": [
+        {
+          "sender": {
+            "id": "instagram-user-id"
+          },
+          "recipient": {
+            "id": "page-123"
+          },
+          "timestamp": "1234567890",
+          "message": {
+            "mid": "message-id-123",
+            "text": "Hello from Instagram!",
+            "type": "text"
+  }
+}
+
+### ============================================
+### Meta Spend Tracking
+### ============================================
+
+### Force Fetch Meta Spend (Dev/Admin Only)
+### Manually trigger spend fetch for a specific date
+POST {{baseUrl}}/integrations/meta/spend/fetch-now?date=2024-01-15
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+Content-Type: application/json
+
+### Get Attribution Metrics with Spend & ROAS
+GET {{baseUrl}}/dashboard/attribution/meta?groupBy=campaign&from=2024-01-01&to=2024-01-31
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### Get Attribution Metrics by Ad
+GET {{baseUrl}}/dashboard/attribution/meta?groupBy=ad&includeZeroRevenue=true
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+      ]
+    }
+  ]
+}
+
+### Send Instagram Message (via Inbox Quick Action)
+POST {{baseUrl}}/inbox/conversations/{{conversationId}}/send-text
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+Content-Type: application/json
+
+{
+  "text": "Hello! How can I help you today?"
+}
+
+### List Instagram Conversations (via Unified Inbox)
+GET {{baseUrl}}/inbox/conversations?provider=INSTAGRAM&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### Get Instagram Conversation
+GET {{baseUrl}}/inbox/conversations/{{conversationId}}
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### Get Instagram Conversation Messages
+GET {{baseUrl}}/inbox/conversations/{{conversationId}}/messages?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### ============================================
+### META LEAD ADS INTEGRATION TESTS
+### ============================================
+
+### Receive Meta Lead Ads Webhook (POST)
+### Note: Requires X-Hub-Signature-256 header with valid signature if META_APP_SECRET is set
+POST {{baseUrl}}/webhooks/meta-lead-ads
+Content-Type: application/json
+X-Organization-Id: {{organizationId}}
+X-Hub-Signature-256: sha256=signature_here
+
+{
+  "entry": [
+    {
+      "id": "page-123",
+      "leadgen": [
+        {
+          "id": "leadgen-456",
+          "ad_id": "ad-789",
+          "adset_id": "adset-101",
+          "campaign_id": "campaign-202",
+          "form_id": "form-303",
+          "created_time": "2024-01-15T10:00:00Z",
+          "field_data": [
+            {
+              "name": "full_name",
+              "values": ["John Doe"]
+            },
+            {
+              "name": "email",
+              "values": ["john@example.com"]
+            },
+            {
+              "name": "phone_number",
+              "values": ["+1234567890"]
+            },
+            {
+              "name": "city",
+              "values": ["New York"]
+            },
+            {
+              "name": "custom_question",
+              "values": ["Custom answer"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+### List Leads with META_ADS tag
+GET {{baseUrl}}/leads?tags=META_ADS&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### Get Lead by ID (check customFields for attribution)
+GET {{baseUrl}}/leads/{{leadId}}
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### ============================================
+### Meta OAuth (Manual Step)
+### ============================================
+### NOTE: OAuth flow requires manual browser interaction
+### Step 1: Start OAuth Flow
+### This returns a URL that must be opened in a browser
+
+GET {{baseUrl}}/integrations/meta/oauth/start
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### Response will include:
+### {
+###   "url": "https://www.facebook.com/v21.0/dialog/oauth?...",
+###   "state": "signed-state-string"
+### }
+###
+### MANUAL STEP: Open the "url" in your browser and complete the OAuth flow
+### After granting permissions, Meta will redirect to the callback URL
+### The callback will automatically complete the connection
+
+### Step 2: OAuth Callback (Automatic)
+### This endpoint is called by Meta after user grants permissions
+### You cannot manually call this - it requires the OAuth code from Meta
+### Example URL (what Meta redirects to):
+### GET {{baseUrl}}/integrations/meta/oauth/callback?code=AQB...&state=signed-state
+
+### Step 3: List Connected Accounts
+### After OAuth completes, verify the account is connected
+
+GET {{baseUrl}}/integrations/meta/ad-accounts?connectedAccountId={{connectedAccountId}}
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### Step 4: Disconnect Account (if needed)
+
+POST {{baseUrl}}/integrations/meta/oauth/disconnect/{{connectedAccountId}}
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+
+### ============================================
+### Meta Spend Tracking (Updated)
+### ============================================
+
+### Force Fetch Meta Spend (Dev/Admin Only)
+### Manually trigger spend fetch for a specific date and ad account
+POST {{baseUrl}}/integrations/meta/spend/fetch-now?date=2024-01-15&adAccountId=act_123456789
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+X-Organization-Id: {{organizationId}}

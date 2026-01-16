@@ -1,0 +1,223 @@
+### Sales API - Complete Test Flow
+### Base URL
+@baseUrl = http://localhost:4000/api
+@token = 
+@orgId = 
+
+### 1. Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test-sales@example.com",
+  "password": "TestPassword123",
+  "name": "Test User",
+  "organizationName": "Test Organization"
+}
+
+### 2. Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test-sales@example.com",
+  "password": "TestPassword123"
+}
+
+### Save token from response (use accessToken if requiresOrgSelection: false, or use tempToken + step 3)
+
+### 3. Select Organization (if needed)
+POST {{baseUrl}}/auth/select-organization
+Content-Type: application/json
+Authorization: Bearer {{tempToken}}
+
+{
+  "organizationId": "{{orgId}}"
+}
+
+### 4. Health Check
+GET {{baseUrl}}/sales/health
+Authorization: Bearer {{token}}
+
+### 5. Create Stock Item (for reservations)
+POST {{baseUrl}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "iPhone 15 Pro 256GB",
+  "storage": "256GB",
+  "color": "Natural Titanium",
+  "condition": "NEW",
+  "quantity": 5,
+  "costPrice": 900.00,
+  "basePrice": 1200.00,
+  "location": "Almacén Principal"
+}
+
+### Save stockItemId from response
+
+### 6. Create Stock Reservation 1
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "quantity": 1,
+  "notes": "Reserved for sale 1"
+}
+
+### Save reservationId1 from response
+
+### 7. Create Another Stock Item
+POST {{baseUrl}}/stock
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "iPhone 14 128GB",
+  "storage": "128GB",
+  "color": "Midnight",
+  "condition": "NEW",
+  "quantity": 10,
+  "costPrice": 700.00,
+  "basePrice": 950.00,
+  "location": "Almacén Principal"
+}
+
+### Save stockItemId2 from response
+
+### 8. Create Stock Reservation 2
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId2}",
+  "quantity": 2,
+  "notes": "Reserved for sale 1"
+}
+
+### Save reservationId2 from response
+
+### 9. Create Sale from Reservations
+POST {{baseUrl}}/sales
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockReservationIds": ["{reservationId1}", "{reservationId2}"],
+  "customerName": "John Doe",
+  "customerEmail": "john@example.com",
+  "customerPhone": "+1234567890",
+  "discount": 100,
+  "currency": "USD",
+  "notes": "Customer requested fast shipping"
+}
+
+### Save saleId from response
+
+### 10. Get Sale
+GET {{baseUrl}}/sales/{{saleId}}
+Authorization: Bearer {{token}}
+
+### 11. List Sales (All)
+GET {{baseUrl}}/sales?page=1&limit=10
+Authorization: Bearer {{token}}
+
+### 12. List Sales with Filters
+GET {{baseUrl}}/sales?status=RESERVED&q=John&page=1&limit=20
+Authorization: Bearer {{token}}
+
+### 13. Update Sale (Customer Info)
+PATCH {{baseUrl}}/sales/{{saleId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerName": "Jane Doe",
+  "customerEmail": "jane@example.com",
+  "customerPhone": "+0987654321",
+  "discount": 150,
+  "notes": "Updated customer info"
+}
+
+### 14. Pay Sale (Confirm Reservations)
+PATCH {{baseUrl}}/sales/{{saleId}}/pay
+Authorization: Bearer {{token}}
+
+### 15. Get Sale (Check Status is PAID)
+GET {{baseUrl}}/sales/{{saleId}}
+Authorization: Bearer {{token}}
+
+### 16. Check Stock Item (Quantity Should Be Decreased)
+GET {{baseUrl}}/stock/{stockItemId}
+Authorization: Bearer {{token}}
+
+### 17. Ship Sale
+PATCH {{baseUrl}}/sales/{{saleId}}/ship
+Authorization: Bearer {{token}}
+
+### 18. Deliver Sale
+PATCH {{baseUrl}}/sales/{{saleId}}/deliver
+Authorization: Bearer {{token}}
+
+### 19. Get Sale (Final Status)
+GET {{baseUrl}}/sales/{{saleId}}
+Authorization: Bearer {{token}}
+
+### 20. Create Another Sale for Cancel Test
+POST {{baseUrl}}/stock/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockItemId": "{stockItemId}",
+  "quantity": 1,
+  "notes": "Reserved for cancel test"
+}
+
+### Save reservationId3 from response
+
+### 21. Create Sale 2
+POST {{baseUrl}}/sales
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stockReservationIds": ["{reservationId3}"],
+  "customerName": "Jane Smith",
+  "customerEmail": "jane@example.com"
+}
+
+### Save saleId2 from response
+
+### 22. Cancel Sale 2 (Before Payment)
+PATCH {{baseUrl}}/sales/{{saleId2}}/cancel
+Authorization: Bearer {{token}}
+
+### 23. Check Stock Item (Quantity Should Be Unchanged After Cancel)
+GET {{baseUrl}}/stock/{stockItemId}
+Authorization: Bearer {{token}}
+
+### 24. Try to Update SHIPPED Sale (Should Fail)
+PATCH {{baseUrl}}/sales/{{saleId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerName": "Updated Name"
+}
+
+### 25. Try to Cancel SHIPPED Sale (Should Fail)
+PATCH {{baseUrl}}/sales/{{saleId}}/cancel
+Authorization: Bearer {{token}}
+
+### 26. List Sales with Date Range
+GET {{baseUrl}}/sales?createdFrom=2024-01-01T00:00:00.000Z&createdTo=2024-12-31T23:59:59.000Z&sort=createdAt&order=desc
+Authorization: Bearer {{token}}
+
+### 27. List Sales by Creator
+GET {{baseUrl}}/sales?createdById={userId}&page=1&limit=10
+Authorization: Bearer {{token}}

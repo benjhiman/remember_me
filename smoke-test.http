@@ -1,0 +1,66 @@
+### Smoke Test - Auth + Multi-Org Flow
+### Variables (se actualizarán durante el test)
+@baseUrl = http://localhost:4000/api
+@email = test@example.com
+@password = TestPassword123
+@organizationName = Test Organization
+@accessToken = 
+@refreshToken = 
+@tempToken = 
+@organizationId = 
+
+### 1. Register - Crear usuario y organización
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "name": "Test User",
+  "organizationName": "{{organizationName}}"
+}
+
+### 2. Login - Iniciar sesión (debería devolver tokens directamente si solo tiene 1 org)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 3. Create Second Organization - Para forzar selección de organización
+POST {{baseUrl}}/organizations
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Second Organization",
+  "slug": "second-org"
+}
+
+### 4. Login Again - Ahora debería requerir selección de organización
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
+
+### 5. Select Organization - Seleccionar organización usando tempToken
+POST {{baseUrl}}/auth/select-organization
+Authorization: Bearer {{tempToken}}
+Content-Type: application/json
+
+{
+  "organizationId": "{{organizationId}}"
+}
+
+### 6. Test Protected Endpoint with @CurrentOrganization
+GET {{baseUrl}}/test-org
+Authorization: Bearer {{accessToken}}
+
+### 7. Test Organizations Endpoint (protegido)
+GET {{baseUrl}}/organizations
+Authorization: Bearer {{accessToken}}
