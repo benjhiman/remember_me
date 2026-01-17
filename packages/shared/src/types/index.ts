@@ -1,7 +1,4 @@
-// Shared TypeScript types and interfaces
-// These will be synced between the API and Web apps
-
-export type {
+import type {
   Role,
   InviteStatus,
   LeadStatus,
@@ -14,6 +11,20 @@ export type {
   SaleStatus,
 } from "./prisma-enums";
 
-// Backwards-compatible alias used in code/docs.
-// In Prisma schema this is RuleType.
+// Re-export shared enums for API and Web
+export type {
+  Role,
+  InviteStatus,
+  LeadStatus,
+  ItemCondition,
+  StockStatus,
+  StockMovementType,
+  ReservationStatus,
+  RuleType,
+  ScopeType,
+  SaleStatus,
+};
+
+// Backwards-compatible alias used across the codebase.
+// In Prisma schema this enum is called RuleType.
 export type MarkupType = RuleType;
