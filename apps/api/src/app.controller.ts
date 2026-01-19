@@ -1,3 +1,4 @@
+import { Public } from './common/decorators/public.decorator';
 import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -20,11 +21,13 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Public()
   @Get('health')
   health() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }
 
+  @Public()
   @Get('health/extended')
   async getExtendedHealth() {
     return this.appService.getExtendedHealth();
