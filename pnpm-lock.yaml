@@ -62,9 +62,6 @@ importers:
       '@remember-me/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@types/uuid':
-        specifier: ^11.0.0
-        version: 11.0.0
       bcrypt:
         specifier: ^5.1.1
         version: 5.1.1
@@ -141,6 +138,9 @@ importers:
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
+      '@types/uuid':
+        specifier: ^9.0.8
+        version: 9.0.8
       '@typescript-eslint/eslint-plugin':
         specifier: ^6.19.0
         version: 6.21.0(@typescript-eslint/parser@6.21.0)(eslint@8.57.1)(typescript@5.9.3)
@@ -3066,12 +3066,9 @@ packages:
     resolution: {integrity: sha512-6WaYesThRMCl19iryMYP7/x2OVgCtbIVflDGFpWnb9irXI3UjYE4AzmYuiUKY1AJstGijoY+MgUszMgRxIYTYw==}
     dev: false
 
-  /@types/uuid@11.0.0:
-    resolution: {integrity: sha512-HVyk8nj2m+jcFRNazzqyVKiZezyhDKrGUA3jlEcg/nZ6Ms+qHwocba1Y/AaVaznJTAM9xpdFSh+ptbNrhOGvZA==}
-    deprecated: This is a stub types definition. uuid provides its own type definitions, so you do not need this installed.
-    dependencies:
-      uuid: 13.0.0
-    dev: false
+  /@types/uuid@9.0.8:
+    resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
+    dev: true
 
   /@types/validator@13.15.10:
     resolution: {integrity: sha512-T8L6i7wCuyoK8A/ZeLYt1+q0ty3Zb9+qbSSvrIVitzT3YjZqkTZ40IbRsPanlB4h1QB3JVL1SYCdR6ngtFYcuA==}
@@ -9586,11 +9583,6 @@ packages:
 
   /uuid@11.1.0:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
-    hasBin: true
-    dev: false
-
-  /uuid@13.0.0:
-    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
     hasBin: true
     dev: false
 
