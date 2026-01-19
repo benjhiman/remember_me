@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, forwardRef } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationsController } from './integrations.controller';
 import { WebhooksController } from './webhooks/webhooks.controller';
@@ -43,7 +43,7 @@ import { LeadsModule } from '../leads/leads.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [PrismaModule, LeadsModule, ExternalHttpClientModule],
+  imports: [PrismaModule, forwardRef(() => LeadsModule), ExternalHttpClientModule],
   controllers: [
     IntegrationsController,
     WebhooksController,
