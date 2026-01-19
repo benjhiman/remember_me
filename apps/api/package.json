@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "build:api": "pnpm build && pnpm prisma:generate && pnpm prisma:deploy",
-    "build:worker": "pnpm build && pnpm prisma:generate",
+    "build:api": "pnpm --filter @remember-me/prisma build && pnpm build && pnpm prisma:generate && pnpm prisma:deploy",
+    "build:worker": "pnpm --filter @remember-me/prisma build && pnpm build && pnpm prisma:generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:api": "NODE_ENV=production node dist/main.js",
