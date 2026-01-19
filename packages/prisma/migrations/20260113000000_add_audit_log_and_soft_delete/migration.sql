@@ -1,8 +1,30 @@
--- CreateEnum
-CREATE TYPE "AuditAction" AS ENUM ('CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'PAY', 'CANCEL', 'RESERVE', 'CONFIRM', 'RELEASE', 'SHIP', 'DELIVER', 'ASSIGN', 'ADJUST');
+-- CreateEnum: AuditAction (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'AuditAction'
+  ) THEN
+    CREATE TYPE "AuditAction" AS ENUM ('CREATE', 'UPDATE', 'DELETE', 'RESTORE', 'PAY', 'CANCEL', 'RESERVE', 'CONFIRM', 'RELEASE', 'SHIP', 'DELIVER', 'ASSIGN', 'ADJUST');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "AuditEntityType" AS ENUM ('Lead', 'StockItem', 'Sale', 'PricingRule', 'Pipeline', 'Stage', 'StockReservation', 'SaleItem', 'Note', 'Task');
+-- CreateEnum: AuditEntityType (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'AuditEntityType'
+  ) THEN
+    CREATE TYPE "AuditEntityType" AS ENUM ('Lead', 'StockItem', 'Sale', 'PricingRule', 'Pipeline', 'Stage', 'StockReservation', 'SaleItem', 'Note', 'Task');
+  END IF;
+END $$;
 
 -- AlterTable
 ALTER TABLE "Lead" ADD COLUMN "deletedAt" TIMESTAMP(3);

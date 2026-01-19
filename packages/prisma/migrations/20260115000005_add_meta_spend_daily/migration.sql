@@ -1,8 +1,61 @@
--- CreateEnum
-CREATE TYPE "MetaSpendLevel" AS ENUM ('CAMPAIGN', 'ADSET', 'AD');
+-- Ensure IntegrationProvider exists (idempotent for dev/staging drift)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'IntegrationProvider'
+  ) THEN
+    CREATE TYPE "IntegrationProvider" AS ENUM ('WHATSAPP','INSTAGRAM','FACEBOOK');
+  END IF;
+END $$;
 
--- AlterEnum (add FETCH_META_SPEND to IntegrationJobType)
-ALTER TYPE "IntegrationJobType" ADD VALUE 'FETCH_META_SPEND';
+-- CreateEnum: MetaSpendLevel (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'MetaSpendLevel'
+  ) THEN
+    CREATE TYPE "MetaSpendLevel" AS ENUM ('CAMPAIGN', 'ADSET', 'AD');
+  END IF;
+END $$;
+
+-- Ensure IntegrationJobType exists (idempotent for dev/staging drift)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'IntegrationJobType'
+  ) THEN
+    CREATE TYPE "IntegrationJobType" AS ENUM ('SEND_MESSAGE', 'PROCESS_WEBHOOK', 'SYNC_ACCOUNT', 'RETRY', 'SEND_MESSAGE_TEMPLATE', 'AUTOMATION_ACTION');
+  END IF;
+END $$;
+
+-- AlterEnum: Add 'FETCH_META_SPEND' to IntegrationJobType (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_enum e ON t.oid = e.enumtypid
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'IntegrationJobType'
+      AND e.enumlabel = 'FETCH_META_SPEND'
+  ) THEN
+    ALTER TYPE "IntegrationJobType" ADD VALUE 'FETCH_META_SPEND';
+  END IF;
+END $$;
+
 
 -- CreateTable
 CREATE TABLE "MetaSpendDaily" (

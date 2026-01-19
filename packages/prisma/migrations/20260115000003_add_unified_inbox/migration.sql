@@ -1,5 +1,72 @@
--- CreateEnum
-CREATE TYPE "ConversationStatus" AS ENUM ('OPEN', 'PENDING', 'CLOSED');
+-- Ensure IntegrationProvider exists (idempotent for dev/staging drift)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'IntegrationProvider'
+  ) THEN
+    CREATE TYPE "IntegrationProvider" AS ENUM ('WHATSAPP', 'INSTAGRAM', 'FACEBOOK');
+  END IF;
+END $$;
+
+-- Ensure ConnectedAccountStatus exists (idempotent for dev/staging drift)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'ConnectedAccountStatus'
+  ) THEN
+    CREATE TYPE "ConnectedAccountStatus" AS ENUM ('CONNECTED', 'DISCONNECTED', 'ERROR');
+  END IF;
+END $$;
+
+-- Ensure WebhookEventStatus exists (idempotent for dev/staging drift)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'WebhookEventStatus'
+  ) THEN
+    CREATE TYPE "WebhookEventStatus" AS ENUM ('PENDING', 'PROCESSED', 'FAILED');
+  END IF;
+END $$;
+
+-- Ensure IntegrationJobStatus exists (idempotent for dev/staging drift)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'IntegrationJobStatus'
+  ) THEN
+    CREATE TYPE "IntegrationJobStatus" AS ENUM ('PENDING', 'PROCESSING', 'DONE', 'FAILED');
+  END IF;
+END $$;
+
+-- CreateEnum: ConversationStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'ConversationStatus'
+  ) THEN
+    CREATE TYPE "ConversationStatus" AS ENUM ('OPEN', 'PENDING', 'CLOSED');
+  END IF;
+END $$;
 
 -- AlterTable (add conversationId to MessageLog)
 ALTER TABLE "MessageLog" ADD COLUMN "conversationId" TEXT;

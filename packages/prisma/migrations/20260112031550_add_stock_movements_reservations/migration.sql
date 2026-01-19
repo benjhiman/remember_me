@@ -1,11 +1,46 @@
--- CreateEnum
-CREATE TYPE "StockMovementType" AS ENUM ('IN', 'OUT', 'RESERVE', 'RELEASE', 'ADJUST', 'SOLD');
+-- CreateEnum: StockMovementType (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'StockMovementType'
+  ) THEN
+    CREATE TYPE "StockMovementType" AS ENUM ('IN', 'OUT', 'RESERVE', 'RELEASE', 'ADJUST', 'SOLD');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "ReservationStatus" AS ENUM ('ACTIVE', 'CONFIRMED', 'EXPIRED', 'CANCELLED');
+-- CreateEnum: ReservationStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'ReservationStatus'
+  ) THEN
+    CREATE TYPE "ReservationStatus" AS ENUM ('ACTIVE', 'CONFIRMED', 'EXPIRED', 'CANCELLED');
+  END IF;
+END $$;
 
--- AlterEnum
-ALTER TYPE "StockStatus" ADD VALUE 'CANCELLED';
+-- AlterEnum: Add 'CANCELLED' to StockStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_enum e ON t.oid = e.enumtypid
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'StockStatus'
+      AND e.enumlabel = 'CANCELLED'
+  ) THEN
+    ALTER TYPE "StockStatus" ADD VALUE 'CANCELLED';
+  END IF;
+END $$;
 
 -- CreateTable
 CREATE TABLE "StockMovement" (

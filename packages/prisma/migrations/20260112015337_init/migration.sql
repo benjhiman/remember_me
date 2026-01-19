@@ -1,23 +1,144 @@
--- CreateEnum
-CREATE TYPE "Role" AS ENUM ('OWNER', 'ADMIN', 'MANAGER', 'SELLER');
+-- CreateEnum: Role (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'Role'
+  ) THEN
+    CREATE TYPE "Role" AS ENUM ('OWNER', 'ADMIN', 'MANAGER', 'SELLER');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "InviteStatus" AS ENUM ('PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELLED');
+-- CreateEnum: InviteStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'InviteStatus'
+  ) THEN
+    CREATE TYPE "InviteStatus" AS ENUM ('PENDING', 'ACCEPTED', 'EXPIRED', 'CANCELLED');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "LeadStatus" AS ENUM ('ACTIVE', 'CONVERTED', 'LOST', 'ARCHIVED');
+-- CreateEnum: LeadStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'LeadStatus'
+  ) THEN
+    CREATE TYPE "LeadStatus" AS ENUM ('ACTIVE', 'CONVERTED', 'LOST', 'ARCHIVED');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "ItemCondition" AS ENUM ('NEW', 'USED', 'REFURBISHED');
+-- CreateEnum: ItemCondition (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'ItemCondition'
+  ) THEN
+    CREATE TYPE "ItemCondition" AS ENUM ('NEW', 'USED', 'REFURBISHED');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "StockStatus" AS ENUM ('AVAILABLE', 'RESERVED', 'SOLD', 'DAMAGED', 'RETURNED');
+-- CreateEnum: StockStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'StockStatus'
+  ) THEN
+    CREATE TYPE "StockStatus" AS ENUM ('AVAILABLE', 'RESERVED', 'SOLD', 'DAMAGED', 'RETURNED');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "MarkupType" AS ENUM ('PERCENTAGE', 'FIXED');
+-- CreateEnum: MarkupType (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'MarkupType'
+  ) THEN
+    CREATE TYPE "MarkupType" AS ENUM ('PERCENTAGE', 'FIXED');
+  END IF;
+END $$;
 
--- CreateEnum
-CREATE TYPE "SaleStatus" AS ENUM ('RESERVED', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED');
+-- CreateEnum: RuleType (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'RuleType'
+  ) THEN
+    CREATE TYPE "RuleType" AS ENUM ('MARKUP_PERCENT', 'MARKUP_FIXED', 'OVERRIDE_PRICE');
+  END IF;
+END $$;
+
+-- CreateEnum: ScopeType (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'ScopeType'
+  ) THEN
+    CREATE TYPE "ScopeType" AS ENUM ('GLOBAL', 'BY_PRODUCT', 'BY_CONDITION', 'BY_CATEGORY');
+  END IF;
+END $$;
+
+-- CreateEnum: SaleStatus (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'SaleStatus'
+  ) THEN
+    CREATE TYPE "SaleStatus" AS ENUM ('DRAFT', 'RESERVED', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED');
+  END IF;
+END $$;
+
+-- AlterEnum: Ensure 'DRAFT' exists in SaleStatus (idempotent for drift recovery)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_enum e ON t.oid = e.enumtypid
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = 'SaleStatus'
+      AND e.enumlabel = 'DRAFT'
+  ) THEN
+    ALTER TYPE "SaleStatus" ADD VALUE 'DRAFT' BEFORE 'RESERVED';
+  END IF;
+END $$;
 
 -- CreateTable
 CREATE TABLE "User" (
