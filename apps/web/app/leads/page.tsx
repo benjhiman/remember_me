@@ -43,7 +43,12 @@ export default function LeadsPage() {
             <h1 className="text-3xl font-bold">Leads</h1>
             <p className="text-gray-600">Gestión de leads y oportunidades</p>
           </div>
-          <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push('/leads/board')}>
+              Board
+            </Button>
+            <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
+          </div>
         </div>
 
         {/* Filters */}
