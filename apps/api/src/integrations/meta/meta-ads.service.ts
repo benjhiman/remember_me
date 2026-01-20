@@ -1,6 +1,5 @@
 import { Injectable, Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MetaTokenService } from './meta-token.service';
-import { ExternalHttpClientService } from '../../common/http/external-http-client.service';
 
 interface MetaAdAccount {
   id: string;
@@ -28,7 +27,6 @@ export class MetaAdsService {
 
   constructor(
     private readonly metaTokenService: MetaTokenService,
-    private readonly httpClient: ExternalHttpClientService,
   ) {}
 
   /**
@@ -58,22 +56,35 @@ export class MetaAdsService {
 
       this.logger.log(`Fetching ad accounts for org ${organizationId}`);
 
-      const response = await this.httpClient.get<MetaAdAccountsResponse>(
-        `${url}?${params.toString()}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
+      const response = await fetch(`${url}?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+      });
 
-      if (!response.data) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData: any;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: { message: errorText } };
+        }
+
+        const errorMessage = errorData.error?.message || errorText;
+        throw new Error(`Meta API error: ${errorMessage} (code: ${errorData.error?.code || response.status})`);
+      }
+
+      const data = (await response.json()) as MetaAdAccountsResponse;
+
+      if (!data.data) {
         this.logger.warn(`No ad accounts data returned for org ${organizationId}`);
         return [];
       }
 
       // Transform Meta API response to our format
-      return response.data.map((account) => ({
+      return data.data.map((account: MetaAdAccount) => ({
         id: account.id,
         name: account.name || 'Unnamed Account',
         accountStatus: account.account_status,
