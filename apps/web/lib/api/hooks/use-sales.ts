@@ -26,7 +26,7 @@ export function useSales(params: UseSalesParams = {}) {
   if (filters.status) queryParams.set('status', filters.status);
   if (filters.createdFrom) queryParams.set('createdFrom', filters.createdFrom);
   if (filters.createdTo) queryParams.set('createdTo', filters.createdTo);
-  if (filters.sort) queryParams.set('sort', filters.sort);
+  if (filters.sort) queryParams.set('sort', filters.sort || 'createdAt');
   if (filters.order) queryParams.set('order', filters.order);
 
   return useQuery({

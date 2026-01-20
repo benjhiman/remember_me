@@ -14,6 +14,7 @@ interface UseLeadsParams {
   createdFrom?: string;
   createdTo?: string;
   sort?: string;
+  order?: 'asc' | 'desc';
   enabled?: boolean;
 }
 
@@ -35,6 +36,7 @@ export function useLeads(params: UseLeadsParams = {}) {
   if (filters.createdFrom) queryParams.set('createdFrom', filters.createdFrom);
   if (filters.createdTo) queryParams.set('createdTo', filters.createdTo);
   if (filters.sort) queryParams.set('sort', filters.sort);
+  if (filters.order) queryParams.set('order', filters.order);
 
   return useQuery({
     queryKey: ['leads', params],
