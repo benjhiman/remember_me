@@ -209,8 +209,8 @@ export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps)
                 </a>
               </div>
             )}
-            {errors.stockReservationIds && (
-              <p className="text-sm text-red-500">{errors.stockReservationIds.message}</p>
+            {!sale && selectedReservations.length === 0 && (
+              <p className="text-sm text-red-500">Debe seleccionar al menos una reserva</p>
             )}
           </CardContent>
         </Card>
