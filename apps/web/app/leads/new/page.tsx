@@ -57,7 +57,6 @@ export default function NewLeadPage() {
           onCancel={handleCancel}
           isLoading={createLead.isPending}
         />
-      </div>
     </div>
   );
 }
