@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { SaleStatus } from '@/types/sales';
 
 export default function SalesPage() {
@@ -43,7 +44,9 @@ export default function SalesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Ventas</h1>
             <p className="text-gray-600">Gestión de ventas</p>
           </div>
-          <Button onClick={() => router.push('/sales/new')}>Nueva Venta</Button>
+          {userCan(user, Permission.EDIT_SALES) && (
+            <Button onClick={() => router.push('/sales/new')}>Nueva Venta</Button>
+          )}
         </div>
 
         {/* Filters */}

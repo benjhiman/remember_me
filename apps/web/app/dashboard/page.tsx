@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getDateRange, formatCurrency, formatNumber } from '@/lib/utils/date-range';
 import { formatDate } from '@/lib/utils/lead-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { DateRangePreset } from '@/lib/utils/date-range';
 import {
   LineChart,
@@ -65,6 +66,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) {
       router.push('/login');
+      return;
+    }
+    // Check permission
+    if (!userCan(user, Permission.VIEW_DASHBOARD)) {
+      router.push('/forbidden');
+      return;
     }
   }, [user, router]);
 

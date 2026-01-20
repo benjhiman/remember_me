@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import { useConversations } from '@/lib/api/hooks/use-conversations';
 import { ConversationListItem } from '@/components/inbox/conversation-list-item';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,12 @@ export default function InboxPage() {
   useEffect(() => {
     if (!user) {
       router.push('/login');
+      return;
+    }
+    // Check permission
+    if (!userCan(user, Permission.VIEW_INBOX)) {
+      router.push('/forbidden');
+      return;
     }
   }, [user, router]);
 

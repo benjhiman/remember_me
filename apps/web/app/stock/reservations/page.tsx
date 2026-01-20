@@ -7,6 +7,7 @@ import { useStockReservations, useReleaseReservation } from '@/lib/api/hooks/use
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/lead-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { ReservationStatus } from '@/types/stock';
 
 function getStatusColor(status: ReservationStatus) {
@@ -217,7 +218,7 @@ export default function StockReservationsPage() {
                             {reservation.createdBy?.name || '—'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {reservation.status === 'ACTIVE' && (
+                            {reservation.status === 'ACTIVE' && userCan(user, Permission.EDIT_STOCK) && (
                               <Button
                                 size="sm"
                                 variant="outline"

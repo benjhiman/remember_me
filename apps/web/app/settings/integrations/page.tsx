@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { formatDistanceToNow } from 'date-fns';
 import { useHealth } from '@/lib/api/hooks/use-health';
 import { useJobMetrics } from '@/lib/api/hooks/use-job-metrics';
+import { Permission, userCan } from '@/lib/auth/permissions';
+import { PermissionGuard } from '@/components/auth/permission-guard';
 
 function IntegrationsPageContent() {
   const router = useRouter();
@@ -45,6 +47,11 @@ function IntegrationsPageContent() {
   useEffect(() => {
     if (!user) {
       router.push('/login');
+      return;
+    }
+    // Check permission
+    if (!userCan(user, Permission.VIEW_INTEGRATIONS)) {
+      router.push('/forbidden');
       return;
     }
   }, [user, router]);
@@ -178,29 +185,35 @@ function IntegrationsPageContent() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDisconnect(account.id)}
-                        disabled={disconnecting === account.id}
-                      >
-                        {disconnecting === account.id ? 'Desconectando...' : 'Desconectar'}
-                      </Button>
+                      {userCan(user, Permission.MANAGE_INTEGRATIONS) && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDisconnect(account.id)}
+                          disabled={disconnecting === account.id}
+                        >
+                          {disconnecting === account.id ? 'Desconectando...' : 'Desconectar'}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
-                <div className="pt-4 border-t">
-                  <Button onClick={handleConnectMeta} disabled={loading} variant="outline">
-                    {loading ? 'Conectando...' : '+ Conectar otra cuenta'}
-                  </Button>
-                </div>
+                {userCan(user, Permission.MANAGE_INTEGRATIONS) && (
+                  <div className="pt-4 border-t">
+                    <Button onClick={handleConnectMeta} disabled={loading} variant="outline">
+                      {loading ? 'Conectando...' : '+ Conectar otra cuenta'}
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div>
                 <p className="text-sm text-gray-600 mb-4">No hay cuenta conectada</p>
-                <Button onClick={handleConnectMeta} disabled={loading}>
-                  {loading ? 'Conectando...' : 'Conectar cuenta Meta'}
-                </Button>
+                {userCan(user, Permission.MANAGE_INTEGRATIONS) && (
+                  <Button onClick={handleConnectMeta} disabled={loading}>
+                    {loading ? 'Conectando...' : 'Conectar cuenta Meta'}
+                  </Button>
+                )}
                 <p className="text-xs text-gray-500 mt-2">
                   Se abrirá una ventana para autorizar la conexión. Completa el flujo OAuth y serás
                   redirigido de vuelta.

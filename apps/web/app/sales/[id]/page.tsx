@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSale } from '@/lib/api/hooks/use-sale';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 
 export default function SaleDetailPage() {
   const router = useRouter();
@@ -96,7 +97,9 @@ export default function SaleDetailPage() {
               )}
             </div>
           </div>
-          <Button onClick={() => router.push(`/sales/${saleId}/edit`)}>Editar</Button>
+          {userCan(user, Permission.EDIT_SALES) && (
+            <Button onClick={() => router.push(`/sales/${saleId}/edit`)}>Editar</Button>
+          )}
         </div>
 
         {/* Summary Cards */}

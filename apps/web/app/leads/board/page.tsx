@@ -9,6 +9,7 @@ import { useUpdateLeadStage } from '@/lib/api/hooks/use-update-lead-stage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { Lead, LeadStatus } from '@/types/api';
 import {
   DndContext,
@@ -308,12 +309,16 @@ export default function LeadsBoardPage() {
             <p className="text-gray-600">Arrastra y suelta leads entre stages</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push('/leads')}>
-              Lista
-            </Button>
-            <Button onClick={() => router.push('/leads/new')}>
-              Crear Lead
-            </Button>
+            {userCan(user, Permission.VIEW_LEADS) && (
+              <Button variant="outline" onClick={() => router.push('/leads')}>
+                Lista
+              </Button>
+            )}
+            {userCan(user, Permission.EDIT_LEADS) && (
+              <Button onClick={() => router.push('/leads/new')}>
+                Crear Lead
+              </Button>
+            )}
           </div>
         </div>
 

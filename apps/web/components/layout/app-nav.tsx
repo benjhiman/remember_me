@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import {
   LayoutDashboard,
   Users,
@@ -15,22 +17,27 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/leads', label: 'Leads', icon: Users },
-  { href: '/leads/board', label: 'Kanban', icon: KanbanSquare },
-  { href: '/stock', label: 'Stock', icon: Package },
-  { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck },
-  { href: '/sales', label: 'Ventas', icon: ShoppingCart },
-  { href: '/inbox', label: 'Inbox', icon: Inbox },
-  { href: '/settings/integrations', label: 'Integraciones', icon: Settings },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
+  { href: '/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
+  { href: '/leads/board', label: 'Kanban', icon: KanbanSquare, permission: Permission.VIEW_LEADS },
+  { href: '/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
+  { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
+  { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
+  { href: '/inbox', label: 'Inbox', icon: Inbox, permission: Permission.VIEW_INBOX },
+  { href: '/settings', label: 'Configuración', icon: Settings, permission: Permission.VIEW_DASHBOARD }, // Settings visible to all authenticated users
+  { href: '/settings/integrations', label: 'Integraciones', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
 ];
 
 export function AppNav() {
   const pathname = usePathname();
+  const { user } = useAuthStore();
+
+  // Filter nav items based on permissions
+  const visibleItems = navItems.filter((item) => userCan(user, item.permission));
 
   return (
     <nav className="space-y-1">
-      {navItems.map((item) => {
+      {visibleItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
         

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/lead-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { StockStatus, ItemCondition } from '@/types/stock';
 
 export default function StockPage() {
@@ -30,6 +31,12 @@ export default function StockPage() {
   useEffect(() => {
     if (!user) {
       router.push('/login');
+      return;
+    }
+    // Check permission
+    if (!userCan(user, Permission.VIEW_STOCK)) {
+      router.push('/forbidden');
+      return;
     }
   }, [user, router]);
 

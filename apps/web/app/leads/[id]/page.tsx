@@ -12,6 +12,7 @@ import { useLeadTasks, useCreateTask, useUpdateTask } from '@/lib/api/hooks/use-
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { getErrorMessage } from '@/lib/utils/error-handler';
+import { Permission, userCan } from '@/lib/auth/permissions';
 
 export default function LeadDetailPage() {
   const router = useRouter();
@@ -143,7 +144,9 @@ export default function LeadDetailPage() {
               )}
             </div>
           </div>
-          <Button onClick={() => router.push(`/leads/${leadId}/edit`)}>Editar</Button>
+          {userCan(user, Permission.EDIT_LEADS) && (
+            <Button onClick={() => router.push(`/leads/${leadId}/edit`)}>Editar</Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -156,17 +159,19 @@ export default function LeadDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Create Note Form */}
-                <form onSubmit={handleCreateNote} className="space-y-2">
-                  <textarea
-                    className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    placeholder="Escribir una nota..."
-                    value={newNoteContent}
-                    onChange={(e) => setNewNoteContent(e.target.value)}
-                  />
-                  <Button type="submit" size="sm" disabled={createNote.isPending || !newNoteContent.trim()}>
-                    {createNote.isPending ? 'Guardando...' : 'Agregar Nota'}
-                  </Button>
-                </form>
+                {userCan(user, Permission.EDIT_LEADS) && (
+                  <form onSubmit={handleCreateNote} className="space-y-2">
+                    <textarea
+                      className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      placeholder="Escribir una nota..."
+                      value={newNoteContent}
+                      onChange={(e) => setNewNoteContent(e.target.value)}
+                    />
+                    <Button type="submit" size="sm" disabled={createNote.isPending || !newNoteContent.trim()}>
+                      {createNote.isPending ? 'Guardando...' : 'Agregar Nota'}
+                    </Button>
+                  </form>
+                )}
 
                 {/* Notes List */}
                 {notesLoading ? (
@@ -195,22 +200,24 @@ export default function LeadDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Create Task Form */}
-                <form onSubmit={handleCreateTask} className="space-y-2">
-                  <Input
-                    placeholder="Título de la tarea"
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                  />
-                  <Input
-                    type="datetime-local"
-                    placeholder="Fecha límite (opcional)"
-                    value={newTaskDueDate}
-                    onChange={(e) => setNewTaskDueDate(e.target.value)}
-                  />
-                  <Button type="submit" size="sm" disabled={createTask.isPending || !newTaskTitle.trim()}>
-                    {createTask.isPending ? 'Guardando...' : 'Agregar Tarea'}
-                  </Button>
-                </form>
+                {userCan(user, Permission.EDIT_LEADS) && (
+                  <form onSubmit={handleCreateTask} className="space-y-2">
+                    <Input
+                      placeholder="Título de la tarea"
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                    />
+                    <Input
+                      type="datetime-local"
+                      placeholder="Fecha límite (opcional)"
+                      value={newTaskDueDate}
+                      onChange={(e) => setNewTaskDueDate(e.target.value)}
+                    />
+                    <Button type="submit" size="sm" disabled={createTask.isPending || !newTaskTitle.trim()}>
+                      {createTask.isPending ? 'Guardando...' : 'Agregar Tarea'}
+                    </Button>
+                  </form>
+                )}
 
                 {/* Tasks List */}
                 {tasksLoading ? (

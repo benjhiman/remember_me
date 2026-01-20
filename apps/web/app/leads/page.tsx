@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
 import { getErrorMessage } from '@/lib/utils/error-handler';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { LeadStatus } from '@/types/api';
 
 export default function LeadsPage() {
@@ -44,10 +45,14 @@ export default function LeadsPage() {
             <p className="text-gray-600">Gestión de leads y oportunidades</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push('/leads/board')}>
-              Board
-            </Button>
-            <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
+            {userCan(user, Permission.VIEW_LEADS) && (
+              <Button variant="outline" onClick={() => router.push('/leads/board')}>
+                Board
+              </Button>
+            )}
+            {userCan(user, Permission.EDIT_LEADS) && (
+              <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
+            )}
           </div>
         </div>
 

@@ -10,6 +10,7 @@ import { useStockItem } from '@/lib/api/hooks/use-stock-item';
 import { useStockMovements, useAdjustStock } from '@/lib/api/hooks/use-stock-movements';
 import { useStockReservations, useReleaseReservation } from '@/lib/api/hooks/use-stock-reservations';
 import { formatDate } from '@/lib/utils/lead-utils';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import type { StockStatus, ItemCondition, MovementType } from '@/types/stock';
 
 function getStatusColor(status: StockStatus) {
@@ -237,36 +238,38 @@ export default function StockItemDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Create Movement Form */}
-                <form onSubmit={handleAdjustStock} className="space-y-2 border-b pb-4">
-                  <div className="text-sm font-medium mb-2">Ajustar Stock</div>
-                  <div className="flex gap-2">
+                {userCan(user, Permission.EDIT_STOCK) && (
+                  <form onSubmit={handleAdjustStock} className="space-y-2 border-b pb-4">
+                    <div className="text-sm font-medium mb-2">Ajustar Stock</div>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Cantidad (+/-)"
+                        value={adjustQuantity}
+                        onChange={(e) => setAdjustQuantity(e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
                     <Input
-                      type="number"
-                      placeholder="Cantidad (+/-)"
-                      value={adjustQuantity}
-                      onChange={(e) => setAdjustQuantity(e.target.value)}
-                      className="flex-1"
+                      placeholder="Motivo del ajuste (requerido)"
+                      value={adjustReason}
+                      onChange={(e) => setAdjustReason(e.target.value)}
+                      required
                     />
-                  </div>
-                  <Input
-                    placeholder="Motivo del ajuste (requerido)"
-                    value={adjustReason}
-                    onChange={(e) => setAdjustReason(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={adjustStock.isPending || !adjustQuantity || !adjustReason.trim()}
-                  >
-                    {adjustStock.isPending ? 'Ajustando...' : 'Ajustar'}
-                  </Button>
-                  {adjustStock.isError && (
-                    <p className="text-sm text-red-600">
-                      Error: {(adjustStock.error as Error)?.message || 'Error al ajustar stock'}
-                    </p>
-                  )}
-                </form>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={adjustStock.isPending || !adjustQuantity || !adjustReason.trim()}
+                    >
+                      {adjustStock.isPending ? 'Ajustando...' : 'Ajustar'}
+                    </Button>
+                    {adjustStock.isError && (
+                      <p className="text-sm text-red-600">
+                        Error: {(adjustStock.error as Error)?.message || 'Error al ajustar stock'}
+                      </p>
+                    )}
+                  </form>
+                )}
 
                 {/* Movements List */}
                 {movementsLoading ? (
@@ -343,14 +346,16 @@ export default function StockItemDetailPage() {
                               </div>
                             )}
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleReleaseReservation(reservation.id)}
-                            disabled={releaseReservation.isPending}
-                          >
-                            {releaseReservation.isPending ? 'Liberando...' : 'Liberar'}
-                          </Button>
+                          {userCan(user, Permission.EDIT_STOCK) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReleaseReservation(reservation.id)}
+                              disabled={releaseReservation.isPending}
+                            >
+                              {releaseReservation.isPending ? 'Liberando...' : 'Liberar'}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
