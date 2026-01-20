@@ -2,6 +2,7 @@ import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
+import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -28,10 +29,59 @@ import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { ExternalHttpClientModule } from './common/http/external-http-client.module';
 
+// Resolve .env path relative to apps/api directory
+// Works from any CWD: finds apps/api/.env whether running from root or apps/api
+const envFilePath = (() => {
+  const fs = require('fs');
+  
+  // Strategy: Always resolve to apps/api/.env relative to project root
+  // In dev: __dirname = apps/api/src
+  // In prod: __dirname = dist/apps/api/src
+  
+  // First, find project root by looking for pnpm-workspace.yaml or package.json with workspaces
+  let searchDir = __dirname;
+  let projectRoot: string | null = null;
+  
+  // Walk up to find project root (max 6 levels)
+  for (let i = 0; i < 6; i++) {
+    const workspaceFile = path.join(searchDir, 'pnpm-workspace.yaml');
+    if (fs.existsSync(workspaceFile)) {
+      projectRoot = searchDir;
+      break;
+    }
+    const parent = path.dirname(searchDir);
+    if (parent === searchDir) break;
+    searchDir = parent;
+  }
+  
+  // If found project root, use it
+  if (projectRoot) {
+    const envFile = path.join(projectRoot, 'apps', 'api', '.env');
+    if (fs.existsSync(envFile)) {
+      return envFile;
+    }
+  }
+  
+  // Fallback: resolve relative to __dirname
+  // In dev: apps/api/src -> ../.. = apps/api -> .env
+  // In prod: dist/apps/api/src -> ../../../../apps/api/.env
+  if (__dirname.includes('dist')) {
+    // We're in dist, go to project root then apps/api
+    const distApiDir = path.resolve(__dirname, '../..'); // dist/apps/api
+    const projectRootFromDist = path.resolve(distApiDir, '../../..'); // project root
+    return path.join(projectRootFromDist, 'apps', 'api', '.env');
+  } else {
+    // We're in source, go up to apps/api
+    const apiDir = path.resolve(__dirname, '../..'); // apps/api
+    return path.join(apiDir, '.env');
+  }
+})();
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: envFilePath,
     }),
     ThrottlerModule.forRoot([
       {

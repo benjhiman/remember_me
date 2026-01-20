@@ -33,6 +33,25 @@ export class AppController {
     return this.appService.getExtendedHealth();
   }
 
+  @Public()
+  @Get('debug/config')
+  getConfigDebug() {
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
+    const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
+    
+    return {
+      ok: true,
+      envLoaded: true,
+      nodeEnv,
+      hasJwtSecret: !!jwtSecret,
+      hasJwtRefreshSecret: !!jwtRefreshSecret,
+      jwtSecretLength: jwtSecret ? jwtSecret.length : 0,
+      jwtRefreshSecretLength: jwtRefreshSecret ? jwtRefreshSecret.length : 0,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Get('test-org')
   @UseGuards(JwtAuthGuard)
   testOrganization(@CurrentOrganization() organizationId: string) {

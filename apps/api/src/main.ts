@@ -2,9 +2,22 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // Verify critical environment variables are loaded
+  const configService = app.get(ConfigService);
+  const jwtSecret = configService.get<string>('JWT_SECRET');
+  
+  if (!jwtSecret) {
+    console.warn('⚠️  WARNING: JWT_SECRET missing: env not loaded correctly');
+    console.warn('   Expected .env file at: apps/api/.env');
+    console.warn('   Current working directory:', process.cwd());
+  } else {
+    console.log('✅ Environment variables loaded successfully');
+  }
 
   // Security headers
   app.use(helmet());

@@ -131,7 +131,13 @@ export const api = {
   post: <T>(endpoint: string, data?: any, options?: RequestInit) =>
     apiRequest<T>(endpoint, {
       ...options,
-      method: 'POST',
+      method: options?.method || 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+  put: <T>(endpoint: string, data?: any, options?: RequestInit) =>
+    apiRequest<T>(endpoint, {
+      ...options,
+      method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
     }),
   patch: <T>(endpoint: string, data?: any, options?: RequestInit) =>
