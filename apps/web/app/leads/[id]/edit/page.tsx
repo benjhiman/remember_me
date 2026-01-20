@@ -7,6 +7,8 @@ import { LeadForm } from '@/components/leads/lead-form';
 import { useLead } from '@/lib/api/hooks/use-lead';
 import { useUpdateLead } from '@/lib/api/hooks/use-lead-mutations';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export default function EditLeadPage() {
