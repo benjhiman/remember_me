@@ -26,6 +26,13 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     this.enabled = this.configService.get<string>('RATE_LIMIT_ENABLED') === 'true';
+    
+    // If rate limiting is disabled, we don't need Redis URL
+    if (!this.enabled) {
+      this.redisUrl = '';
+      return;
+    }
+
     // Get Redis URL - use RATE_LIMIT_REDIS_URL or fallback to REDIS_URL
     // NEVER default to localhost in production
     const rateLimitRedisUrl = this.configService.get<string>('RATE_LIMIT_REDIS_URL');
@@ -38,43 +45,83 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
       this.redisUrl = redisUrl;
     } else {
       if (nodeEnv === 'production') {
-        throw new Error('RATE_LIMIT_REDIS_URL or REDIS_URL is required for rate limiting in production. Set one of these environment variables.');
+        throw new Error(
+          'RATE_LIMIT_REDIS_URL or REDIS_URL is required for rate limiting in production. ' +
+          'Set one of these environment variables, or disable rate limiting with RATE_LIMIT_ENABLED=false'
+        );
       }
       // Only allow localhost in development
       this.redisUrl = 'redis://localhost:6379';
+      this.logger.warn('No REDIS_URL found, using localhost:6379 for rate limiting (development only)');
+    }
+
+    // Validate Redis URL format (must be redis:// or rediss://)
+    if (this.redisUrl && !this.redisUrl.match(/^rediss?:\/\//)) {
+      throw new Error(
+        `Invalid Redis URL format: ${this.redisUrl}. ` +
+        'Expected format: redis://[password@]host:port or rediss://[password@]host:port'
+      );
     }
   }
 
-  onModuleInit() {
-    if (this.enabled) {
-      try {
-        this.redis = new Redis(this.redisUrl, {
-          retryStrategy: (times) => {
-            const delay = Math.min(times * 50, 2000);
-            return delay;
-          },
-          maxRetriesPerRequest: 3,
-          lazyConnect: true,
-        });
-
-        this.redis.on('connect', () => {
-          this.logger.log('Redis connected for rate limiting');
-        });
-
-        this.redis.on('error', (error) => {
-          this.logger.error(`Redis error: ${error.message}`);
-        });
-
-        this.redis.connect().catch((error) => {
-          this.logger.error(`Failed to connect to Redis: ${error.message}`);
-          this.redis = null;
-        });
-      } catch (error) {
-        this.logger.error(`Failed to initialize Redis: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        this.redis = null;
-      }
-    } else {
+  async onModuleInit() {
+    if (!this.enabled) {
       this.logger.log('Rate limiting disabled (RATE_LIMIT_ENABLED=false)');
+      return;
+    }
+
+    if (!this.redisUrl) {
+      this.logger.warn('Rate limiting enabled but no Redis URL configured. Rate limiting will be disabled.');
+      return;
+    }
+
+    try {
+      this.redis = new Redis(this.redisUrl, {
+        retryStrategy: (times) => {
+          const delay = Math.min(times * 50, 2000);
+          return delay;
+        },
+        maxRetriesPerRequest: 3,
+        lazyConnect: true,
+        enableOfflineQueue: false, // Don't queue commands if disconnected
+        connectTimeout: 5000, // 5 second timeout
+      });
+
+      this.redis.on('connect', () => {
+        this.logger.log(`Redis connected for rate limiting (${this.redisUrl?.replace(/:[^:@]+@/, ':****@') || 'unknown'})`);
+      });
+
+      this.redis.on('ready', () => {
+        this.logger.log('Redis ready for rate limiting');
+      });
+
+      this.redis.on('error', (error) => {
+        this.logger.error(`Redis error for rate limiting: ${error.message}`);
+        // Don't set redis to null on error - let retry strategy handle reconnection
+      });
+
+      this.redis.on('close', () => {
+        this.logger.warn('Redis connection closed for rate limiting');
+      });
+
+      // Attempt connection
+      await this.redis.connect();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to connect to Redis for rate limiting: ${errorMessage}`);
+      this.logger.error(`Redis URL: ${this.redisUrl?.replace(/:[^:@]+@/, ':****@') || 'not set'}`);
+      
+      // In production, this is critical - log but don't crash (fail open)
+      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+      if (nodeEnv === 'production') {
+        this.logger.error(
+          'Rate limiting Redis connection failed in production. ' +
+          'Requests will be allowed (fail open). ' +
+          'Please check REDIS_URL or RATE_LIMIT_REDIS_URL configuration.'
+        );
+      }
+      
+      this.redis = null;
     }
   }
 
