@@ -185,3 +185,62 @@ export interface ConnectedAccount {
   createdAt: string;
   updatedAt: string;
 }
+
+// Lead types
+export type LeadStatus = 'ACTIVE' | 'CONVERTED' | 'LOST' | 'ARCHIVED';
+
+export interface Lead {
+  id: string;
+  organizationId: string;
+  pipelineId: string;
+  stageId: string;
+  assignedToId?: string;
+  createdById: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  source?: string;
+  city?: string;
+  budget?: string;
+  model?: string;
+  customFields?: Record<string, any>;
+  tags?: string[];
+  status: LeadStatus;
+  convertedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  pipeline?: {
+    id: string;
+    name: string;
+    color?: string;
+  };
+  stage?: {
+    id: string;
+    name: string;
+    color?: string;
+  };
+  assignedTo?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  creator?: {
+    id: string;
+    name: string;
+    email?: string;
+  };
+  _count?: {
+    notes?: number;
+    tasks?: number;
+  };
+}
+
+export interface LeadListResponse {
+  data: Lead[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
