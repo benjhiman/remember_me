@@ -109,9 +109,9 @@ export default function AdsPage() {
                   Estos endpoints deberían usar la Meta Marketing API:
                 </p>
                 <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
-                  <li><code>/act_{ad_account_id}/campaigns</code> - Listar campañas</li>
-                  <li><code>/act_{ad_account_id}/adsets</code> - Listar adsets</li>
-                  <li><code>/act_{ad_account_id}/ads</code> - Listar ads</li>
+                  <li><code>/act_&#123;ad_account_id&#125;/campaigns</code> - Listar campañas</li>
+                  <li><code>/act_&#123;ad_account_id&#125;/adsets</code> - Listar adsets</li>
+                  <li><code>/act_&#123;ad_account_id&#125;/ads</code> - Listar ads</li>
                 </ul>
                 <p className="text-xs text-gray-500 mt-2">
                   Ver: <code>apps/api/src/integrations/META_OAUTH.md</code> para detalles de OAuth y tokens.

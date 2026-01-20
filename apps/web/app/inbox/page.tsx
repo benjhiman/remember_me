@@ -54,7 +54,12 @@ export default function InboxPage() {
 
   // Sync provider with pathname
   useEffect(() => {
-    const pathProvider = getProviderFromPath();
+    const pathProvider = pathname.includes('/whatsapp') 
+      ? 'WHATSAPP' as IntegrationProvider
+      : pathname.includes('/instagram')
+      ? 'INSTAGRAM' as IntegrationProvider
+      : undefined;
+    
     if (pathProvider !== provider) {
       setProvider(pathProvider);
     }
