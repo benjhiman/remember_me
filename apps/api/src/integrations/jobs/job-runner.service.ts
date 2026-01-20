@@ -27,6 +27,8 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
   private readonly enabled = this.isWorkerMode
     ? process.env.JOB_RUNNER_ENABLED !== 'false'
     : process.env.JOB_RUNNER_ENABLED === 'true';
+  // Unified flag: only allow job processing in worker mode
+  private readonly isJobRunnerEnabled = this.isWorkerMode && this.enabled;
   private readonly intervalMs = parseInt(process.env.JOB_RUNNER_INTERVAL_MS || '5000', 10);
   private readonly noReplyScanEnabled = process.env.NO_REPLY_SCAN_ENABLED === 'true';
   private readonly noReplyScanIntervalMs = parseInt(process.env.NO_REPLY_SCAN_INTERVAL_MS || '300000', 10); // Default 5 minutes
@@ -55,9 +57,9 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit() {
-    if (this.enabled) {
-      const mode = this.isWorkerMode ? 'WORKER' : 'API';
-      this.logger.log(`Starting job runner in ${mode} mode with interval ${this.intervalMs}ms (queue mode: ${this.queueMode})`);
+    // Only start job runner if enabled AND in worker mode
+    if (this.isJobRunnerEnabled) {
+      this.logger.log(`Starting job runner in WORKER mode with interval ${this.intervalMs}ms (queue mode: ${this.queueMode})`);
       
       // Start BullMQ worker if queue mode is 'bullmq'
       if (this.queueMode === 'bullmq' && this.integrationQueueService.isBullMqEnabled()) {
@@ -70,42 +72,45 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       }
     } else {
       const mode = this.isWorkerMode ? 'WORKER' : 'API';
-      this.logger.log(`Job runner disabled in ${mode} mode (JOB_RUNNER_ENABLED=${process.env.JOB_RUNNER_ENABLED})`);
+      this.logger.log(`Job runner disabled in ${mode} mode (WORKER_MODE=${process.env.WORKER_MODE}, JOB_RUNNER_ENABLED=${process.env.JOB_RUNNER_ENABLED})`);
     }
 
-    // NO_REPLY scan should only run in Worker mode, not in API mode
-    if (this.noReplyScanEnabled && this.isWorkerMode) {
+    // NO_REPLY scan should ONLY run if job runner is enabled (worker mode + enabled)
+    if (this.noReplyScanEnabled && this.isJobRunnerEnabled) {
       this.logger.log(`NO_REPLY_24H scanner enabled. Scanning every ${this.noReplyScanIntervalMs}ms.`);
       this.noReplyIntervalId = setInterval(() => this.scanNoReply(), this.noReplyScanIntervalMs);
       // Run once immediately on startup
       this.scanNoReply();
-    } else if (this.noReplyScanEnabled && !this.isWorkerMode) {
-      this.logger.log('NO_REPLY_24H scanner disabled in API mode (only runs in Worker mode).');
+    } else if (this.noReplyScanEnabled && !this.isJobRunnerEnabled) {
+      const mode = this.isWorkerMode ? 'WORKER' : 'API';
+      this.logger.log(`NO_REPLY_24H scanner disabled in ${mode} mode (only runs when job runner is enabled in Worker mode).`);
     } else {
       this.logger.log('NO_REPLY_24H scanner disabled.');
     }
 
-    // Meta Spend and Token Refresh schedulers should only run in Worker mode
-    if (this.metaSpendEnabled && this.isWorkerMode) {
+    // Meta Spend and Token Refresh schedulers should ONLY run if job runner is enabled
+    if (this.metaSpendEnabled && this.isJobRunnerEnabled) {
       this.logger.log('Meta Spend fetch scheduler enabled. Scheduling daily jobs.');
       this.scheduleMetaSpendJobs();
       // Schedule daily at 6 AM (configurable via cron or interval)
       const cronExpression = process.env.META_SPEND_CRON || '0 6 * * *'; // Default: 6 AM daily
       this.scheduleMetaSpendCron(cronExpression);
-    } else if (this.metaSpendEnabled && !this.isWorkerMode) {
-      this.logger.log('Meta Spend fetch scheduler disabled in API mode (only runs in Worker mode).');
+    } else if (this.metaSpendEnabled && !this.isJobRunnerEnabled) {
+      const mode = this.isWorkerMode ? 'WORKER' : 'API';
+      this.logger.log(`Meta Spend fetch scheduler disabled in ${mode} mode (only runs when job runner is enabled in Worker mode).`);
     } else {
       this.logger.log('Meta Spend fetch scheduler disabled.');
     }
 
-    if (this.metaTokenRefreshEnabled && this.isWorkerMode) {
+    if (this.metaTokenRefreshEnabled && this.isJobRunnerEnabled) {
       this.logger.log('Meta Token refresh scheduler enabled. Scheduling daily jobs.');
       this.scheduleTokenRefreshJobs();
       // Schedule daily at 4 AM (configurable via cron)
       const cronExpression = process.env.META_TOKEN_REFRESH_CRON || '0 4 * * *'; // Default: 4 AM daily
       this.scheduleTokenRefreshCron(cronExpression);
-    } else if (this.metaTokenRefreshEnabled && !this.isWorkerMode) {
-      this.logger.log('Meta Token refresh scheduler disabled in API mode (only runs in Worker mode).');
+    } else if (this.metaTokenRefreshEnabled && !this.isJobRunnerEnabled) {
+      const mode = this.isWorkerMode ? 'WORKER' : 'API';
+      this.logger.log(`Meta Token refresh scheduler disabled in ${mode} mode (only runs when job runner is enabled in Worker mode).`);
     } else {
       this.logger.log('Meta Token refresh scheduler disabled.');
     }

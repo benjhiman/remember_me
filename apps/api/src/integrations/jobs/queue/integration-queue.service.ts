@@ -25,7 +25,13 @@ export class IntegrationQueueService implements OnModuleInit {
 
   async onModuleInit() {
     // Select adapter based on QUEUE_MODE
-    if (this.queueMode === 'bullmq') {
+    // In API mode, always use DB adapter (BullMQ should not be initialized)
+    const workerMode = this.configService.get<string>('WORKER_MODE', '0');
+    const jobRunnerEnabled = this.configService.get<string>('JOB_RUNNER_ENABLED', 'false');
+    const isWorkerMode = workerMode === '1' || workerMode === 'true';
+    const isJobRunnerEnabled = isWorkerMode && (jobRunnerEnabled === 'true' || jobRunnerEnabled !== 'false');
+
+    if (this.queueMode === 'bullmq' && isWorkerMode && isJobRunnerEnabled) {
       if (this.bullMqAdapter && this.bullMqAdapter.isEnabled()) {
         this.adapter = this.bullMqAdapter;
         this.logger.log('Using BullMQ queue adapter');
@@ -34,8 +40,13 @@ export class IntegrationQueueService implements OnModuleInit {
         this.adapter = this.dbAdapter;
       }
     } else {
+      // In API mode or if BullMQ not enabled, use DB adapter
+      if (this.queueMode === 'bullmq' && !isWorkerMode) {
+        this.logger.log('Using DB queue adapter (API mode - BullMQ skipped)');
+      } else {
+        this.logger.log('Using DB queue adapter');
+      }
       this.adapter = this.dbAdapter;
-      this.logger.log('Using DB queue adapter');
     }
   }
 

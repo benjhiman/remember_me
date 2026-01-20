@@ -21,15 +21,41 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
   private readonly logger = new Logger(BullMqQueueAdapter.name);
   private queue: Queue<BullMqJobData> | null = null;
   private readonly queueName: string;
-  private readonly redisConnection: ConnectionOptions | string;
-  private readonly enabled: boolean;
+  private redisConnection: ConnectionOptions | string;
+  private enabled: boolean;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly integrationJobsService: IntegrationJobsService,
   ) {
-    // Get Redis URL - use REDIS_URL as primary, fallback to RATE_LIMIT_REDIS_URL
+    // Don't initialize Redis connection in constructor - wait until onModuleInit
+    // This prevents unnecessary connections in API mode
+    this.queueName = this.configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
+    this.enabled = false; // Will be set to true in onModuleInit if conditions are met
+    this.redisConnection = ''; // Will be set in onModuleInit
+  }
+
+  async onModuleInit() {
+    // Only initialize BullMQ queue if QUEUE_MODE=bullmq AND we're in worker mode
+    // In API mode (WORKER_MODE=0, JOB_RUNNER_ENABLED=false), we should not initialize the queue
+    // to avoid unnecessary Redis connections
+    const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
+    const workerMode = this.configService.get<string>('WORKER_MODE', '0');
+    const jobRunnerEnabled = this.configService.get<string>('JOB_RUNNER_ENABLED', 'false');
+
+    // Only initialize if QUEUE_MODE is bullmq AND we're in worker mode (WORKER_MODE=1) AND job runner is enabled
+    const isWorkerMode = workerMode === '1' || workerMode === 'true';
+    const isJobRunnerEnabled = isWorkerMode && (jobRunnerEnabled === 'true' || jobRunnerEnabled !== 'false');
+    const shouldInitialize = queueMode === 'bullmq' && isWorkerMode && isJobRunnerEnabled;
+
+    if (!shouldInitialize) {
+      this.logger.log(`BullMQ queue adapter skipped (API mode - QUEUE_MODE=${queueMode}, WORKER_MODE=${workerMode}, JOB_RUNNER_ENABLED=${jobRunnerEnabled})`);
+      this.enabled = false;
+      return;
+    }
+
+    // Get Redis URL - use REDIS_URL as primary, fallback to other variants
     // NEVER default to localhost in production
     const redisUrl =
       this.configService.get<string>('REDIS_URL') ||
@@ -48,28 +74,6 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
       this.logger.warn('No REDIS_URL found, using localhost:6379 (development only)');
     } else {
       this.redisConnection = redisUrl;
-    }
-
-    this.queueName = this.configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
-    this.enabled = true; // This adapter is only instantiated when BullMQ is enabled
-  }
-
-  async onModuleInit() {
-    // Only initialize BullMQ queue if QUEUE_MODE=bullmq
-    // In API mode (WORKER_MODE=0, JOB_RUNNER_ENABLED=false), we should not initialize the queue
-    // to avoid unnecessary Redis connections
-    const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
-    const workerMode = this.configService.get<string>('WORKER_MODE', '0');
-    const jobRunnerEnabled = this.configService.get<string>('JOB_RUNNER_ENABLED', 'false');
-
-    // Only initialize if QUEUE_MODE is bullmq AND (we're in worker mode OR job runner is explicitly enabled)
-    const shouldInitialize = 
-      queueMode === 'bullmq' && 
-      (workerMode === '1' || workerMode === 'true' || jobRunnerEnabled === 'true');
-
-    if (!shouldInitialize) {
-      this.logger.log(`BullMQ queue adapter skipped (QUEUE_MODE=${queueMode}, WORKER_MODE=${workerMode}, JOB_RUNNER_ENABLED=${jobRunnerEnabled})`);
-      return;
     }
 
     try {
@@ -91,9 +95,11 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
       };
 
       this.queue = new Queue<BullMqJobData>(this.queueName, queueOptions);
+      this.enabled = true;
       this.logger.log(`BullMQ queue adapter initialized (queue: ${this.queueName})`);
     } catch (error) {
       this.logger.error(`Failed to initialize BullMQ queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.enabled = false;
       throw error;
     }
   }

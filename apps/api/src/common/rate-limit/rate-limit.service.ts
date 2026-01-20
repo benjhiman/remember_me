@@ -26,7 +26,23 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     this.enabled = this.configService.get<string>('RATE_LIMIT_ENABLED') === 'true';
-    this.redisUrl = this.configService.get<string>('RATE_LIMIT_REDIS_URL') || 'redis://localhost:6379';
+    // Get Redis URL - use RATE_LIMIT_REDIS_URL or fallback to REDIS_URL
+    // NEVER default to localhost in production
+    const rateLimitRedisUrl = this.configService.get<string>('RATE_LIMIT_REDIS_URL');
+    const redisUrl = this.configService.get<string>('REDIS_URL');
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    
+    if (rateLimitRedisUrl) {
+      this.redisUrl = rateLimitRedisUrl;
+    } else if (redisUrl) {
+      this.redisUrl = redisUrl;
+    } else {
+      if (nodeEnv === 'production') {
+        throw new Error('RATE_LIMIT_REDIS_URL or REDIS_URL is required for rate limiting in production. Set one of these environment variables.');
+      }
+      // Only allow localhost in development
+      this.redisUrl = 'redis://localhost:6379';
+    }
   }
 
   onModuleInit() {
