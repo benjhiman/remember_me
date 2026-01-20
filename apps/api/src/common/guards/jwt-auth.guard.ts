@@ -20,6 +20,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
 
+    // Call parent canActivate which may return a Promise or Observable
     return super.canActivate(context);
   }
 

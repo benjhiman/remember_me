@@ -29,18 +29,49 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly integrationJobsService: IntegrationJobsService,
   ) {
-    // Get Redis URL
+    // Get Redis URL - use REDIS_URL as primary, fallback to RATE_LIMIT_REDIS_URL
+    // NEVER default to localhost in production
     const redisUrl =
-      this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
       this.configService.get<string>('REDIS_URL') ||
-      'redis://localhost:6379';
+      this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
+      this.configService.get<string>('BULL_REDIS_URL') ||
+      this.configService.get<string>('QUEUE_REDIS_URL') ||
+      this.configService.get<string>('JOB_REDIS_URL');
 
-    this.redisConnection = redisUrl;
+    if (!redisUrl) {
+      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+      if (nodeEnv === 'production') {
+        throw new Error('REDIS_URL is required for BullMQ in production. Set REDIS_URL environment variable.');
+      }
+      // Only allow localhost in development
+      this.redisConnection = 'redis://localhost:6379';
+      this.logger.warn('No REDIS_URL found, using localhost:6379 (development only)');
+    } else {
+      this.redisConnection = redisUrl;
+    }
+
     this.queueName = this.configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
     this.enabled = true; // This adapter is only instantiated when BullMQ is enabled
   }
 
   async onModuleInit() {
+    // Only initialize BullMQ queue if QUEUE_MODE=bullmq
+    // In API mode (WORKER_MODE=0, JOB_RUNNER_ENABLED=false), we should not initialize the queue
+    // to avoid unnecessary Redis connections
+    const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
+    const workerMode = this.configService.get<string>('WORKER_MODE', '0');
+    const jobRunnerEnabled = this.configService.get<string>('JOB_RUNNER_ENABLED', 'false');
+
+    // Only initialize if QUEUE_MODE is bullmq AND (we're in worker mode OR job runner is explicitly enabled)
+    const shouldInitialize = 
+      queueMode === 'bullmq' && 
+      (workerMode === '1' || workerMode === 'true' || jobRunnerEnabled === 'true');
+
+    if (!shouldInitialize) {
+      this.logger.log(`BullMQ queue adapter skipped (QUEUE_MODE=${queueMode}, WORKER_MODE=${workerMode}, JOB_RUNNER_ENABLED=${jobRunnerEnabled})`);
+      return;
+    }
+
     try {
       const queueOptions: QueueOptions = {
         connection: this.redisConnection as ConnectionOptions,

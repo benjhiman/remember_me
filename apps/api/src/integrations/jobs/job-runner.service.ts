@@ -73,31 +73,39 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Job runner disabled in ${mode} mode (JOB_RUNNER_ENABLED=${process.env.JOB_RUNNER_ENABLED})`);
     }
 
-    if (this.noReplyScanEnabled) {
+    // NO_REPLY scan should only run in Worker mode, not in API mode
+    if (this.noReplyScanEnabled && this.isWorkerMode) {
       this.logger.log(`NO_REPLY_24H scanner enabled. Scanning every ${this.noReplyScanIntervalMs}ms.`);
       this.noReplyIntervalId = setInterval(() => this.scanNoReply(), this.noReplyScanIntervalMs);
       // Run once immediately on startup
       this.scanNoReply();
+    } else if (this.noReplyScanEnabled && !this.isWorkerMode) {
+      this.logger.log('NO_REPLY_24H scanner disabled in API mode (only runs in Worker mode).');
     } else {
       this.logger.log('NO_REPLY_24H scanner disabled.');
     }
 
-    if (this.metaSpendEnabled) {
+    // Meta Spend and Token Refresh schedulers should only run in Worker mode
+    if (this.metaSpendEnabled && this.isWorkerMode) {
       this.logger.log('Meta Spend fetch scheduler enabled. Scheduling daily jobs.');
       this.scheduleMetaSpendJobs();
       // Schedule daily at 6 AM (configurable via cron or interval)
       const cronExpression = process.env.META_SPEND_CRON || '0 6 * * *'; // Default: 6 AM daily
       this.scheduleMetaSpendCron(cronExpression);
+    } else if (this.metaSpendEnabled && !this.isWorkerMode) {
+      this.logger.log('Meta Spend fetch scheduler disabled in API mode (only runs in Worker mode).');
     } else {
       this.logger.log('Meta Spend fetch scheduler disabled.');
     }
 
-    if (this.metaTokenRefreshEnabled) {
+    if (this.metaTokenRefreshEnabled && this.isWorkerMode) {
       this.logger.log('Meta Token refresh scheduler enabled. Scheduling daily jobs.');
       this.scheduleTokenRefreshJobs();
       // Schedule daily at 4 AM (configurable via cron)
       const cronExpression = process.env.META_TOKEN_REFRESH_CRON || '0 4 * * *'; // Default: 4 AM daily
       this.scheduleTokenRefreshCron(cronExpression);
+    } else if (this.metaTokenRefreshEnabled && !this.isWorkerMode) {
+      this.logger.log('Meta Token refresh scheduler disabled in API mode (only runs in Worker mode).');
     } else {
       this.logger.log('Meta Token refresh scheduler disabled.');
     }
@@ -238,10 +246,24 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     // Import Worker dynamically to avoid initialization issues
     const { Worker } = require('bullmq');
     const configService = this.configService;
-    const redisUrl =
-      configService.get<string>('RATE_LIMIT_REDIS_URL') ||
+    // Get Redis URL - use REDIS_URL as primary, fallback to other variants
+    // NEVER default to localhost in production
+    let redisUrl =
       configService.get<string>('REDIS_URL') ||
-      'redis://localhost:6379';
+      configService.get<string>('RATE_LIMIT_REDIS_URL') ||
+      configService.get<string>('BULL_REDIS_URL') ||
+      configService.get<string>('QUEUE_REDIS_URL') ||
+      configService.get<string>('JOB_REDIS_URL');
+
+    if (!redisUrl) {
+      const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+      if (nodeEnv === 'production') {
+        throw new Error('REDIS_URL is required for BullMQ worker in production. Set REDIS_URL environment variable.');
+      }
+      // Only allow localhost in development
+      this.logger.warn('No REDIS_URL found, using localhost:6379 (development only)');
+      redisUrl = 'redis://localhost:6379';
+    }
     const queueName = configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
 
     const workerOptions = {
