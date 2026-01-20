@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSale } from '@/lib/api/hooks/use-sale';
 import { formatDate } from '@/lib/utils/lead-utils';
-import { getStatusColor, getStatusLabel } from '@/app/sales/page';
+import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
 
 export default function SaleDetailPage() {
   const router = useRouter();
