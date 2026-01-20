@@ -66,10 +66,12 @@ export class MetaIntegrationsController {
   }
 
   /**
-   * List available ad accounts for organization
+   * @deprecated Use MetaAdsController.listAdAccounts instead
+   * This endpoint only returns cached ad accounts from metadata.
+   * For real-time data from Meta API, use GET /api/integrations/meta/ad-accounts
    */
   @Get('ad-accounts')
-  async listAdAccounts(@CurrentOrganization() organizationId: string) {
+  async listAdAccountsLegacy(@CurrentOrganization() organizationId: string) {
     const accounts = await this.metaTokenService.listAdAccounts(organizationId);
     return accounts;
   }

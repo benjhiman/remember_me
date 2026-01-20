@@ -29,6 +29,8 @@ import { MetaMarketingService } from './meta/meta-marketing.service';
 import { MetaOAuthService } from './meta/meta-oauth.service';
 import { MetaOAuthController } from './meta/meta-oauth.controller';
 import { MetaIntegrationsController } from './meta/meta-integrations.controller';
+import { MetaAdsController } from './meta/meta-ads.controller';
+import { MetaAdsService } from './meta/meta-ads.service';
 import { MetaTokenService } from './meta/meta-token.service';
 import { TokenCryptoService } from '../common/crypto/token-crypto.service';
 import { MetaLeadAdsWebhookController } from './webhooks/meta-lead-ads.controller';
@@ -52,6 +54,7 @@ import { ConfigModule } from '@nestjs/config';
     MetaLeadAdsWebhookController,
     MetaOAuthController,
     MetaIntegrationsController,
+    MetaAdsController,
     InboxController,
     WhatsAppTemplatesController,
     WhatsAppAutomationsController,
@@ -72,6 +75,7 @@ import { ConfigModule } from '@nestjs/config';
     MetaMarketingService,
     MetaOAuthService,
     MetaTokenService,
+    MetaAdsService,
     TokenCryptoService,
     JobRunnerService,
     JobRunnerLockService,
