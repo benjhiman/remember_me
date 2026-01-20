@@ -24,6 +24,7 @@ const navItems = [
   { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
   { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
   { href: '/inbox', label: 'Inbox', icon: Inbox, permission: Permission.VIEW_INBOX },
+  { href: '/ads', label: 'Meta Ads', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
   { href: '/settings', label: 'Configuración', icon: Settings, permission: Permission.VIEW_DASHBOARD }, // Settings visible to all authenticated users
   { href: '/settings/integrations', label: 'Integraciones', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
 ];

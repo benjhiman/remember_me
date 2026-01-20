@@ -7,6 +7,7 @@ import { useConversation } from '@/lib/api/hooks/use-conversation';
 import { useMessages } from '@/lib/api/hooks/use-messages';
 import { useOrgUsers } from '@/lib/api/hooks/use-org-users';
 import { api } from '@/lib/api/client';
+import { Permission, userCan } from '@/lib/auth/permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -205,7 +206,9 @@ export default function ConversationPage() {
                   {conversation.assignedUser && (
                     <>
                       <span>•</span>
-                      <span>Asignado a {conversation.assignedUser.name}</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                        👤 {conversation.assignedUser.name}
+                      </span>
                     </>
                   )}
                 </div>
@@ -236,23 +239,25 @@ export default function ConversationPage() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2">
-                <label htmlFor="assign-select" className="text-xs font-medium">Asignar a:</label>
-                <select
-                  id="assign-select"
-                  value={conversation.assignedToId || ''}
-                  onChange={(e) => handleAssign(e.target.value)}
-                  className="text-xs border rounded px-2 py-1"
-                  disabled={isLoadingUsers}
-                >
-                  <option value="">Sin asignar</option>
-                  {orgUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {userCan(user, Permission.MANAGE_MEMBERS) && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="assign-select" className="text-xs font-medium">Asignar a:</label>
+                  <select
+                    id="assign-select"
+                    value={conversation.assignedToId || ''}
+                    onChange={(e) => handleAssign(e.target.value)}
+                    className="text-xs border rounded px-2 py-1"
+                    disabled={isLoadingUsers}
+                  >
+                    <option value="">Sin asignar</option>
+                    {orgUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <TagsPicker
                 conversationId={conversationId}

@@ -76,8 +76,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_SALES,
     Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
+    Permission.MANAGE_MEMBERS, // Managers can assign conversations
     // No MANAGE_INTEGRATIONS
-    // No MANAGE_MEMBERS
   ],
   [Role.SELLER]: [
     Permission.VIEW_DASHBOARD, // Read-only
