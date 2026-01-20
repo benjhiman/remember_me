@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 import type { LeadStatus } from '@/types/api';
 
 export default function LeadsPage() {
@@ -36,8 +37,7 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Leads</h1>
@@ -239,7 +239,6 @@ export default function LeadsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import { useEffect } from 'react';
 import { LeadForm } from '@/components/leads/lead-form';
 import { useLead } from '@/lib/api/hooks/use-lead';
 import { useUpdateLead } from '@/lib/api/hooks/use-lead-mutations';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export default function EditLeadPage() {
   const router = useRouter();
@@ -27,10 +29,11 @@ export default function EditLeadPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-2 text-gray-600">Cargando lead...</p>
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
@@ -38,23 +41,21 @@ export default function EditLeadPage() {
 
   if (error || !lead) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-3xl mx-auto p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold">Error</h1>
-          </div>
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600">
-              {(error as Error)?.message || 'Lead no encontrado'}
-            </p>
-            <button
-              onClick={() => router.push('/leads')}
-              className="mt-4 text-sm text-red-600 underline"
-            >
-              Volver a leads
-            </button>
-          </div>
-        </div>
+      <div className="max-w-3xl mx-auto p-6">
+        <Breadcrumb items={[{ label: 'Leads', href: '/leads' }, { label: 'Error' }]} />
+        <Card className="mt-4">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-red-600 font-medium mb-2">Error al cargar lead</p>
+              <p className="text-sm text-gray-600 mb-4">
+                {error ? getErrorMessage(error) : 'Lead no encontrado'}
+              </p>
+              <Button onClick={() => router.push('/leads')} variant="outline">
+                Volver a Leads
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -73,20 +74,12 @@ export default function EditLeadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Editar Lead</h1>
-          <p className="text-gray-600">Modificar información del lead</p>
-        </div>
-
-        {updateLead.isError && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">
-              Error: {(updateLead.error as Error)?.message || 'Error al actualizar el lead'}
-            </p>
-          </div>
-        )}
+    <div className="max-w-3xl mx-auto p-6">
+      <Breadcrumb items={[{ label: 'Leads', href: '/leads' }, { label: lead.name, href: `/leads/${leadId}` }, { label: 'Editar' }]} />
+      <div className="mb-6 mt-4">
+        <h1 className="text-3xl font-bold">Editar Lead</h1>
+        <p className="text-gray-600">Modificar información del lead</p>
+      </div>
 
         <LeadForm
           lead={lead}
@@ -94,7 +87,6 @@ export default function EditLeadPage() {
           onCancel={handleCancel}
           isLoading={updateLead.isPending}
         />
-      </div>
     </div>
   );
 }

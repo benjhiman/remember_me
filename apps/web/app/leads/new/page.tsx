@@ -5,6 +5,7 @@ import { useAuthStore } from '@/lib/store/auth-store';
 import { useEffect } from 'react';
 import { LeadForm } from '@/components/leads/lead-form';
 import { useCreateLead } from '@/lib/api/hooks/use-lead-mutations';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 
 export default function NewLeadPage() {
   const router = useRouter();
@@ -36,12 +37,12 @@ export default function NewLeadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Crear Lead</h1>
-          <p className="text-gray-600">Agregar un nuevo lead al CRM</p>
-        </div>
+    <div className="max-w-3xl mx-auto p-6">
+      <Breadcrumb items={[{ label: 'Leads', href: '/leads' }, { label: 'Crear Lead' }]} />
+      <div className="mb-6 mt-4">
+        <h1 className="text-3xl font-bold">Crear Lead</h1>
+        <p className="text-gray-600">Agregar un nuevo lead al CRM</p>
+      </div>
 
         {createLead.isError && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">

@@ -10,6 +10,8 @@ import { useLead } from '@/lib/api/hooks/use-lead';
 import { useLeadNotes, useCreateNote } from '@/lib/api/hooks/use-lead-notes';
 import { useLeadTasks, useCreateTask, useUpdateTask } from '@/lib/api/hooks/use-lead-tasks';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export default function LeadDetailPage() {
   const router = useRouter();
@@ -116,10 +118,10 @@ export default function LeadDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-6 flex items-start justify-between">
+    <div className="max-w-4xl mx-auto p-6">
+      <Breadcrumb items={[{ label: 'Leads', href: '/leads' }, { label: lead.name }]} />
+      {/* Header */}
+      <div className="mb-6 mt-4 flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-3xl font-bold">{lead.name}</h1>
@@ -306,7 +308,6 @@ export default function LeadDetailPage() {
             </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../client';
+import { useToast } from '@/components/ui/use-toast';
+import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export interface Note {
   id: string;
@@ -37,14 +39,25 @@ export function useLeadNotes(leadId: string | undefined, enabled: boolean = true
 
 export function useCreateNote() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: (data: CreateNoteData) => api.post<Note>('/leads/notes', data),
     onSuccess: (note) => {
-      // Invalidate notes for the lead
       queryClient.invalidateQueries({ queryKey: ['lead-notes', note.leadId] });
-      // Invalidate lead detail (to update _count.notes)
       queryClient.invalidateQueries({ queryKey: ['lead', note.leadId] });
+      toast({
+        variant: 'success',
+        title: 'Nota creada',
+        description: 'La nota se agregó exitosamente.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Error al crear nota',
+        description: getErrorMessage(error),
+      });
     },
   });
 }
