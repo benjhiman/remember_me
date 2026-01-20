@@ -12,7 +12,9 @@
     "docker:down": "docker-compose -f docker-compose.staging.yml --env-file .env.docker down",
     "docker:logs": "docker-compose -f docker-compose.staging.yml --env-file .env.docker logs -f",
     "docker:build": "docker-compose -f docker-compose.staging.yml --env-file .env.docker build",
-    "smoke:e2e": "cd apps/api && pnpm smoke:e2e"
+    "smoke:e2e": "cd apps/api && pnpm smoke:e2e",
+    "smoke:api": "npx tsx scripts/prod-smoke.ts",
+    "smoke:web": "npx tsx scripts/web-smoke.ts"
   },
   "devDependencies": {
     "@jest/test-sequencer": "29.7.0",
