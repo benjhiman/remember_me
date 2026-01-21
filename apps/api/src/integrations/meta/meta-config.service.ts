@@ -39,8 +39,8 @@ export class MetaConfigService {
     const connectedAccount = await this.prisma.connectedAccount.findFirst({
       where: {
         organizationId,
-        provider: { in: ['INSTAGRAM', 'FACEBOOK'] },
-        status: 'CONNECTED',
+        provider: { in: [IntegrationProvider.INSTAGRAM, IntegrationProvider.FACEBOOK] },
+        status: ConnectedAccountStatus.CONNECTED,
       },
     });
 
