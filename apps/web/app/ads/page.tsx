@@ -67,19 +67,6 @@ function AdsPageContent() {
     setAllCampaigns([]);
   }, [dateRange.from, dateRange.to, selectedAdAccountId]);
 
-  // Accumulate campaigns for pagination
-  useEffect(() => {
-    if (campaignsData?.data) {
-      if (paginationAfter) {
-        // Append new campaigns when loading more
-        setAllCampaigns((prev) => [...prev, ...campaignsData.data]);
-      } else {
-        // Reset when filters change
-        setAllCampaigns(campaignsData.data);
-      }
-    }
-  }, [campaignsData, paginationAfter]);
-
   // Fetch campaigns
   const {
     data: campaignsData,
@@ -94,6 +81,19 @@ function AdsPageContent() {
     adAccountId: selectedAdAccountId || undefined,
     enabled: !!user && !!selectedAdAccountId,
   });
+
+  // Accumulate campaigns for pagination
+  useEffect(() => {
+    if (campaignsData?.data) {
+      if (paginationAfter) {
+        // Append new campaigns when loading more
+        setAllCampaigns((prev) => [...prev, ...campaignsData.data]);
+      } else {
+        // Reset when filters change
+        setAllCampaigns(campaignsData.data);
+      }
+    }
+  }, [campaignsData, paginationAfter]);
 
   // Handle ad account selection
   const handleAdAccountChange = async (adAccountId: string) => {
@@ -329,13 +329,13 @@ function AdsPageContent() {
                 </div>
 
                 {/* Pagination */}
-                {campaignsData.paging.after && (
+                {campaignsData?.paging.after && (
                   <div className="flex justify-center pt-4">
                     <Button
                       onClick={() => {
-                        // TODO: Implement pagination with 'after' cursor
-                        // For now, just refetch with the same params
-                        refetchCampaigns();
+                        if (campaignsData?.paging.after) {
+                          setPaginationAfter(campaignsData.paging.after);
+                        }
                       }}
                       variant="outline"
                       disabled={campaignsLoading}
