@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer, forwardRef } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { IntegrationsController } from './integrations.controller';
+import { IntegrationsSettingsController } from './integrations-settings.controller';
 import { WebhooksController } from './webhooks/webhooks.controller';
 import { WebhooksService } from './webhooks/webhooks.service';
 import { WhatsAppWebhookController } from './webhooks/whatsapp-webhook.controller';
@@ -55,6 +56,7 @@ import { ConfigModule } from '@nestjs/config';
   imports: [PrismaModule, forwardRef(() => LeadsModule), ExternalHttpClientModule],
   controllers: [
     IntegrationsController,
+    IntegrationsSettingsController,
     WebhooksController,
     WhatsAppWebhookController,
     InstagramWebhookController,
