@@ -29,7 +29,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "smoke:e2e": "jest --config ./test/jest-smoke-e2e.json",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "seed:owner": "ts-node -r tsconfig-paths/register src/scripts/seed-owner.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",

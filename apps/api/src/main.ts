@@ -3,6 +3,8 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from './prisma/prisma.service';
+import { seedOwnerOnBoot } from './bootstrap/seed-owner-on-boot';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -50,6 +52,10 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix('api');
+
+  // Seed OWNER on boot (si SEED_OWNER_ON_BOOT === 'true')
+  const prismaService = app.get(PrismaService);
+  await seedOwnerOnBoot(prismaService);
 
   const port = process.env.PORT || 4000;
   await app.listen(port);
