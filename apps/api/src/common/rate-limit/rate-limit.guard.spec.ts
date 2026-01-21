@@ -13,7 +13,10 @@ describe('RateLimitGuard', () => {
 
   const mockRateLimitService = {
     checkLimit: jest.fn(),
-    enabled: true,
+    get isEnabled() {
+      return this._enabled !== false;
+    },
+    _enabled: true,
   };
 
   const mockReflector = {
@@ -91,7 +94,7 @@ describe('RateLimitGuard', () => {
       windowSec: 60,
       skipIfDisabled: true,
     });
-    mockRateLimitService.enabled = false;
+    mockRateLimitService._enabled = false;
 
     const handler = () => {};
     const context = createMockContext({}, handler);

@@ -21,113 +21,132 @@ export interface RateLimitConfig {
 export class RateLimitService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RateLimitService.name);
   private redis: Redis | null = null;
-  private readonly enabled: boolean;
-  private readonly redisUrl: string;
+  private _isEnabled: boolean = false;
+  private hasLoggedWarning: boolean = false;
 
-  constructor(private configService: ConfigService) {
-    this.enabled = this.configService.get<string>('RATE_LIMIT_ENABLED') === 'true';
-    
-    // If rate limiting is disabled, we don't need Redis URL
-    if (!this.enabled) {
-      this.redisUrl = '';
-      return;
-    }
+  constructor(private configService: ConfigService) {}
 
-    // Get Redis URL - use RATE_LIMIT_REDIS_URL or fallback to REDIS_URL
-    // NEVER default to localhost in production
-    const rateLimitRedisUrl = this.configService.get<string>('RATE_LIMIT_REDIS_URL');
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-    
-    if (rateLimitRedisUrl) {
-      this.redisUrl = rateLimitRedisUrl;
-    } else if (redisUrl) {
-      this.redisUrl = redisUrl;
-    } else {
-      if (nodeEnv === 'production') {
-        throw new Error(
-          'RATE_LIMIT_REDIS_URL or REDIS_URL is required for rate limiting in production. ' +
-          'Set one of these environment variables, or disable rate limiting with RATE_LIMIT_ENABLED=false'
-        );
-      }
-      // Only allow localhost in development
-      this.redisUrl = 'redis://localhost:6379';
-      this.logger.warn('No REDIS_URL found, using localhost:6379 for rate limiting (development only)');
-    }
-
-    // Validate Redis URL format (must be redis:// or rediss://)
-    if (this.redisUrl && !this.redisUrl.match(/^rediss?:\/\//)) {
-      throw new Error(
-        `Invalid Redis URL format: ${this.redisUrl}. ` +
-        'Expected format: redis://[password@]host:port or rediss://[password@]host:port'
-      );
-    }
+  /**
+   * Public getter to check if rate limiting is enabled and Redis is available
+   */
+  get isEnabled(): boolean {
+    return this._isEnabled && this.redis !== null;
   }
 
   async onModuleInit() {
-    if (!this.enabled) {
+    // Check if rate limiting is explicitly disabled
+    const rateLimitEnabled = this.configService.get<string>('RATE_LIMIT_ENABLED') === 'true';
+    if (!rateLimitEnabled) {
       this.logger.log('Rate limiting disabled (RATE_LIMIT_ENABLED=false)');
+      this._isEnabled = false;
       return;
     }
 
-    if (!this.redisUrl) {
-      this.logger.warn('Rate limiting enabled but no Redis URL configured. Rate limiting will be disabled.');
+    // Get Redis URL - ONLY use RATE_LIMIT_REDIS_URL if it exists
+    const rateLimitRedisUrl = this.configService.get<string>('RATE_LIMIT_REDIS_URL');
+    
+    if (!rateLimitRedisUrl) {
+      this.logWarnOnce('Rate limiting disabled: RATE_LIMIT_REDIS_URL not set');
+      this._isEnabled = false;
       return;
     }
 
+    // Validate URL format
+    if (!rateLimitRedisUrl.match(/^rediss?:\/\//)) {
+      this.logWarnOnce(`Rate limiting disabled: Invalid Redis URL format: ${rateLimitRedisUrl}`);
+      this._isEnabled = false;
+      return;
+    }
+
+    // CRITICAL: Only use URLs with authentication (must contain @)
+    // This prevents NOAUTH errors
+    if (!rateLimitRedisUrl.includes('@')) {
+      this.logWarnOnce('Rate limiting disabled: Redis URL must include password (format: redis://password@host:port)');
+      this._isEnabled = false;
+      return;
+    }
+
+    // CRITICAL: Never use localhost or redis://redis in production
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    if (nodeEnv === 'production') {
+      if (rateLimitRedisUrl.includes('localhost') || 
+          rateLimitRedisUrl.includes('127.0.0.1') || 
+          rateLimitRedisUrl.includes('redis://redis:') ||
+          rateLimitRedisUrl === 'redis://redis:6379') {
+        this.logWarnOnce('Rate limiting disabled: Cannot use localhost/redis://redis in production');
+        this._isEnabled = false;
+        return;
+      }
+    }
+
+    // Attempt to initialize Redis connection
     try {
-      this.redis = new Redis(this.redisUrl, {
-        retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        },
-        maxRetriesPerRequest: 3,
+      this.redis = new Redis(rateLimitRedisUrl, {
+        retryStrategy: () => null, // Disable automatic retries - fail fast
+        maxRetriesPerRequest: 1, // Only 1 retry
         lazyConnect: true,
         enableOfflineQueue: false, // Don't queue commands if disconnected
-        connectTimeout: 5000, // 5 second timeout
+        connectTimeout: 3000, // 3 second timeout
+        commandTimeout: 2000, // 2 second command timeout
       });
 
-      this.redis.on('connect', () => {
-        this.logger.log(`Redis connected for rate limiting (${this.redisUrl?.replace(/:[^:@]+@/, ':****@') || 'unknown'})`);
-      });
-
-      this.redis.on('ready', () => {
-        this.logger.log('Redis ready for rate limiting');
-      });
-
+      // Set up error handlers BEFORE connecting
       this.redis.on('error', (error) => {
-        this.logger.error(`Redis error for rate limiting: ${error.message}`);
-        // Don't set redis to null on error - let retry strategy handle reconnection
+        const errorMsg = error.message || String(error);
+        
+        // Handle NOAUTH and connection errors
+        if (errorMsg.includes('NOAUTH') || 
+            errorMsg.includes('ECONNREFUSED') || 
+            errorMsg.includes('ENOTFOUND')) {
+          this.logWarnOnce(`Rate limiting disabled: Redis connection failed (${errorMsg})`);
+          this.disableRateLimit();
+        }
       });
 
       this.redis.on('close', () => {
-        this.logger.warn('Redis connection closed for rate limiting');
+        if (this._isEnabled) {
+          this.logWarnOnce('Rate limiting disabled: Redis connection closed');
+          this.disableRateLimit();
+        }
       });
 
-      // Attempt connection
-      await this.redis.connect();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to connect to Redis for rate limiting: ${errorMessage}`);
-      this.logger.error(`Redis URL: ${this.redisUrl?.replace(/:[^:@]+@/, ':****@') || 'not set'}`);
+      // Attempt connection with timeout
+      await Promise.race([
+        this.redis.connect(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout')), 3000)
+        ),
+      ]);
+
+      // Test connection with a simple command
+      await this.redis.ping();
       
-      // In production, this is critical - log but don't crash (fail open)
-      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-      if (nodeEnv === 'production') {
-        this.logger.error(
-          'Rate limiting Redis connection failed in production. ' +
-          'Requests will be allowed (fail open). ' +
-          'Please check REDIS_URL or RATE_LIMIT_REDIS_URL configuration.'
-        );
+      this.logger.log(`Rate limiting enabled: Redis connected (${this.sanitizeUrl(rateLimitRedisUrl)})`);
+      this._isEnabled = true;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      // Handle specific errors
+      if (errorMsg.includes('NOAUTH') || 
+          errorMsg.includes('ECONNREFUSED') || 
+          errorMsg.includes('ENOTFOUND') ||
+          errorMsg.includes('timeout')) {
+        this.logWarnOnce(`Rate limiting disabled: Redis unavailable (${errorMsg})`);
+      } else {
+        this.logWarnOnce(`Rate limiting disabled: Redis connection failed (${errorMsg})`);
       }
       
-      this.redis = null;
+      this.disableRateLimit();
     }
   }
 
   onModuleDestroy() {
     if (this.redis) {
-      this.redis.disconnect();
+      try {
+        this.redis.disconnect();
+      } catch (error) {
+        // Ignore errors on shutdown
+      }
       this.redis = null;
     }
   }
@@ -135,10 +154,11 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
   /**
    * Check rate limit using sliding window log algorithm
    * Key format: rate_limit:{orgId}:{action}:{windowStart}
+   * Returns allow=true if rate limiting is disabled or Redis unavailable (fail-open)
    */
   async checkLimit(config: RateLimitConfig): Promise<RateLimitResult> {
-    if (!this.enabled || !this.redis) {
-      // If disabled or Redis unavailable, allow all requests
+    if (!this.isEnabled || !this.redis) {
+      // Fail-open: allow all requests if rate limiting is disabled
       return {
         allowed: true,
         limit: config.limit,
@@ -170,7 +190,7 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
       const results = await pipeline.exec();
       
       if (!results || results.length < 3) {
-        this.logger.warn('Redis pipeline failed, allowing request');
+        // Pipeline failed - fail-open
         return {
           allowed: true,
           limit,
@@ -193,8 +213,18 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
         retryAfterSec,
       };
     } catch (error) {
-      this.logger.error(`Rate limit check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      // On error, allow the request (fail open)
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      // Handle connection errors - disable rate limiting and fail-open
+      if (errorMsg.includes('NOAUTH') || 
+          errorMsg.includes('ECONNREFUSED') || 
+          errorMsg.includes('ENOTFOUND') ||
+          errorMsg.includes('Connection is closed')) {
+        this.logWarnOnce(`Rate limiting disabled: Redis error during check (${errorMsg})`);
+        this.disableRateLimit();
+      }
+      
+      // Fail-open: allow request on any error
       return {
         allowed: true,
         limit,
@@ -208,7 +238,7 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
    * Get rate limit info without incrementing (for headers)
    */
   async getLimitInfo(config: RateLimitConfig): Promise<RateLimitResult> {
-    if (!this.enabled || !this.redis) {
+    if (!this.isEnabled || !this.redis) {
       return {
         allowed: true,
         limit: config.limit,
@@ -237,7 +267,16 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
         resetAt: new Date(windowEnd),
       };
     } catch (error) {
-      this.logger.error(`Get rate limit info failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      if (errorMsg.includes('NOAUTH') || 
+          errorMsg.includes('ECONNREFUSED') || 
+          errorMsg.includes('ENOTFOUND') ||
+          errorMsg.includes('Connection is closed')) {
+        this.logWarnOnce(`Rate limiting disabled: Redis error during getLimitInfo (${errorMsg})`);
+        this.disableRateLimit();
+      }
+      
       return {
         allowed: true,
         limit,
@@ -251,7 +290,7 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
    * Reset rate limit for an organization and action (admin function)
    */
   async resetLimit(organizationId: string, action: string): Promise<void> {
-    if (!this.enabled || !this.redis) {
+    if (!this.isEnabled || !this.redis) {
       return;
     }
 
@@ -263,7 +302,39 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(`Reset rate limit for org ${organizationId}, action ${action}`);
       }
     } catch (error) {
-      this.logger.error(`Reset rate limit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Silently fail - don't log errors for admin operations
     }
+  }
+
+  /**
+   * Disable rate limiting and close Redis connection
+   */
+  private disableRateLimit(): void {
+    this._isEnabled = false;
+    if (this.redis) {
+      try {
+        this.redis.disconnect();
+      } catch (error) {
+        // Ignore errors
+      }
+      this.redis = null;
+    }
+  }
+
+  /**
+   * Log warning only once to prevent log spam
+   */
+  private logWarnOnce(message: string): void {
+    if (!this.hasLoggedWarning) {
+      this.logger.warn(message);
+      this.hasLoggedWarning = true;
+    }
+  }
+
+  /**
+   * Sanitize Redis URL for logging (hide password)
+   */
+  private sanitizeUrl(url: string): string {
+    return url.replace(/:[^:@]+@/, ':****@');
   }
 }

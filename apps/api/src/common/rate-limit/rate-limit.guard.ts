@@ -30,7 +30,7 @@ export class RateLimitGuard implements CanActivate {
       return true;
     }
 
-    if (options.skipIfDisabled && !this.rateLimitService['enabled']) {
+    if (options.skipIfDisabled && !this.rateLimitService.isEnabled) {
       // Rate limiting disabled, allow
       return true;
     }
