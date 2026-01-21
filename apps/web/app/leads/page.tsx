@@ -214,10 +214,10 @@ export default function LeadsPage() {
                     </div>
 
                     {/* Pagination */}
-                    {data.meta.totalPages > 1 && (
+                    {data?.meta?.totalPages && data.meta.totalPages > 1 && (
                       <div className="p-4 border-t flex items-center justify-between bg-muted/30">
                         <div className="text-sm text-muted-foreground">
-                          Mostrando {data.data.length} de {data.meta.total} leads
+                          Mostrando {data?.data?.length ?? 0} de {data?.meta?.total ?? 0} leads
                         </div>
                         <div className="flex gap-2">
                           <Button

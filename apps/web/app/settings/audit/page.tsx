@@ -176,10 +176,10 @@ export default function AuditLogPage() {
                   </tbody>
                 </table>
               </div>
-              {data && data.meta.totalPages > 1 && (
+              {data?.meta?.totalPages && data.meta.totalPages > 1 && (
                 <div className="p-4 border-t flex items-center justify-between bg-gray-50">
                   <div className="text-sm text-gray-600">
-                    Mostrando {data.data.length} de {data.meta.total} registros
+                    Mostrando {data?.data?.length ?? 0} de {data?.meta?.totalItems ?? 0} registros
                   </div>
                   <div className="flex gap-2">
                     <Button
