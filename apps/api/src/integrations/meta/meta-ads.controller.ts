@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { MetaAdsService } from './meta-ads.service';
-import { MetaCampaignsService } from './meta-campaigns.service';
+import { MetaCampaignsService, CampaignsListResponse } from './meta-campaigns.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 
