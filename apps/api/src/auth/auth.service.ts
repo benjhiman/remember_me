@@ -17,6 +17,7 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { SelectOrganizationDto } from './dto/select-organization.dto';
 import { Role, InviteStatus } from '@remember-me/prisma';
+import { ORG_SETTINGS_DEFAULTS } from '../settings/org-settings.defaults';
 
 @Injectable()
 export class AuthService {
@@ -367,6 +368,101 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({
       where: { token: refreshToken },
     });
+  }
+
+  /**
+   * Dev Quick Login - Creates or logs in test user
+   * Only works if DEV_QUICK_LOGIN_ENABLED === 'true'
+   * Idempotent: creates user/org if they don't exist, otherwise logs in
+   */
+  async devLogin(): Promise<AuthResponseDto> {
+    const testEmail = 'test@iphonealcosto.com';
+    const testPassword = 'Test1234!!';
+    const testName = 'Test User';
+    const orgName = 'iPhone al costo';
+    const orgSlug = 'iphone-al-costo';
+
+    // Find or create user and organization
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Find or create user
+      let user = await tx.user.findUnique({
+        where: { email: testEmail },
+      });
+
+      if (!user) {
+        const passwordHash = await bcrypt.hash(testPassword, 10);
+        user = await tx.user.create({
+          data: {
+            email: testEmail,
+            passwordHash,
+            name: testName,
+          },
+        });
+      }
+
+      // Find or create organization
+      let organization = await tx.organization.findUnique({
+        where: { slug: orgSlug },
+      });
+
+      if (!organization) {
+        organization = await tx.organization.create({
+          data: {
+            name: orgName,
+            slug: orgSlug,
+            settings: {
+              crm: {
+                ...ORG_SETTINGS_DEFAULTS.crm,
+                branding: {
+                  ...(ORG_SETTINGS_DEFAULTS.crm as any).branding,
+                  name: `${orgName} CRM`,
+                },
+              },
+            } as any,
+          },
+        });
+      }
+
+      // Ensure membership exists
+      let membership = await tx.membership.findFirst({
+        where: {
+          userId: user.id,
+          organizationId: organization.id,
+        },
+      });
+
+      if (!membership) {
+        membership = await tx.membership.create({
+          data: {
+            userId: user.id,
+            organizationId: organization.id,
+            role: Role.OWNER,
+          },
+        });
+      }
+
+      return { user, organization, membership };
+    });
+
+    // Generate tokens
+    const tokens = await this.generateTokens(
+      result.user.id,
+      result.user.email,
+      result.organization.id,
+      result.membership.role
+    );
+
+    return {
+      ...tokens,
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        organizationId: result.organization.id,
+        organizationName: result.organization.name,
+        role: result.membership.role,
+      },
+    };
   }
 
   private generateTempToken(userId: string): string {

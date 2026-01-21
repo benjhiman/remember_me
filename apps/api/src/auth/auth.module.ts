@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TempTokenStrategy } from './strategies/temp-token.strategy';
+import { DevLoginGuard } from '../common/guards/dev-login.guard';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { TempTokenStrategy } from './strategies/temp-token.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, TempTokenStrategy],
+  providers: [AuthService, JwtStrategy, TempTokenStrategy, DevLoginGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

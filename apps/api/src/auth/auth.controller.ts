@@ -9,6 +9,7 @@ import { TempTokenGuard } from '../common/guards/temp-token.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import { RateLimitGuard } from '../common/rate-limit/rate-limit.guard';
+import { DevLoginGuard } from '../common/guards/dev-login.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -58,5 +59,13 @@ export class AuthController {
   async logout(@Body('refreshToken') refreshToken: string) {
     await this.authService.logout(refreshToken);
     return { message: 'Logged out successfully' };
+  }
+
+  @Public()
+  @UseGuards(DevLoginGuard)
+  @Post('dev-login')
+  @HttpCode(HttpStatus.OK)
+  async devLogin() {
+    return this.authService.devLogin();
   }
 }
