@@ -29,6 +29,7 @@ export default function InboxPage() {
   const [provider, setProvider] = useState<IntegrationProvider | undefined>(providerFromPath);
   const [status, setStatus] = useState<ConversationStatus | undefined>();
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
 
   // Enforce SELLER sees only their chats
@@ -45,11 +46,16 @@ export default function InboxPage() {
       ? 'unassigned'
       : undefined;
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const { data, isLoading, error } = useConversations({
     provider,
     status,
     assignedToId,
-    q: search || undefined,
+    q: debouncedSearch || undefined,
     page,
     limit: 20,
     enabled: !!user,

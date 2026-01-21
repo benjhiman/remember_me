@@ -73,12 +73,14 @@ export class InboxController {
     @Param('id') conversationId: string,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '50',
+    @Query('before') before?: string,
   ) {
     return this.inboxService.getConversationMessages(
       organizationId,
       conversationId,
       parseInt(page, 10),
       parseInt(limit, 10),
+      before,
     );
   }
 
@@ -117,6 +119,7 @@ export class InboxController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER, Role.SELLER)
   async updateConversationStatus(
     @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: { id: string; role: Role },
     @Param('id') conversationId: string,
     @Body() body: { status: ConversationStatus },
   ) {
@@ -124,6 +127,8 @@ export class InboxController {
       organizationId,
       conversationId,
       body.status,
+      user.id,
+      user.role,
     );
   }
 

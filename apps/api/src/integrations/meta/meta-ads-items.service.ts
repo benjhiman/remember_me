@@ -6,6 +6,9 @@ import {
   BadGatewayException,
 } from '@nestjs/common';
 import { MetaTokenService } from './meta-token.service';
+import { MetaAdsCacheService } from './meta-ads-cache.service';
+import { MetaBulkInsightsService } from './meta-bulk-insights.service';
+import { MetaConfigService } from './meta-config.service';
 
 interface MetaAd {
   id: string;
@@ -61,7 +64,12 @@ export class MetaAdsItemsService {
   private readonly logger = new Logger(MetaAdsItemsService.name);
   private readonly baseUrl = 'https://graph.facebook.com/v21.0';
 
-  constructor(private readonly metaTokenService: MetaTokenService) {}
+  constructor(
+    private readonly metaTokenService: MetaTokenService,
+    private readonly metaConfigService: MetaConfigService,
+    private readonly cache: MetaAdsCacheService,
+    private readonly bulkInsights: MetaBulkInsightsService,
+  ) {}
 
   async listAds(
     organizationId: string,
@@ -71,6 +79,7 @@ export class MetaAdsItemsService {
       to?: string; // ISO date string
       limit?: number;
       after?: string; // pagination cursor
+      refresh?: boolean;
     },
   ): Promise<AdsListResponse> {
     if (!options.adsetId) {
@@ -94,6 +103,11 @@ export class MetaAdsItemsService {
     const toStr = toDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
     const limit = Math.min(options.limit || 25, 100);
+    const cacheKey = `meta:ads:${organizationId}:adset=${options.adsetId}:${fromStr}:${toStr}:limit=${limit}:after=${options.after || ''}`;
+    if (!options.refresh) {
+      const cached = await this.cache.getJson<AdsListResponse>(cacheKey);
+      if (cached) return cached;
+    }
 
     try {
       const adsUrl = `${this.baseUrl}/${options.adsetId}/ads`;
@@ -138,92 +152,67 @@ export class MetaAdsItemsService {
       const adsData = (await adsResponse.json()) as MetaAdsResponse;
       const ads = adsData.data || [];
 
-      const data: AdWithInsights[] = await Promise.all(
-        ads.map(async (ad) => {
-          const insightsUrl = `${this.baseUrl}/${ad.id}/insights`;
-          const timeRange = JSON.stringify({ since: fromStr, until: toStr });
-          const insightsParams = new URLSearchParams({
-            fields: 'spend,impressions,clicks,ctr,cpc',
-            time_range: timeRange,
-            access_token: accessToken,
+      let adAccountId: string | null = null;
+      try {
+        const cfg = await this.metaConfigService.getConfig(organizationId);
+        adAccountId = cfg.adAccountId;
+      } catch {
+        adAccountId = null;
+      }
+
+      const ids = ads.map((a) => a.id);
+      let insightsMap: Map<string, any> | null = null;
+      if (adAccountId && ids.length) {
+        try {
+          insightsMap = await this.bulkInsights.getInsightsMap({
+            organizationId,
+            adAccountId,
+            level: 'ad',
+            ids,
+            fromYYYYMMDD: fromStr,
+            toYYYYMMDD: toStr,
           });
+        } catch {
+          insightsMap = null;
+        }
+      }
 
-          let insights = {
-            spend: '0.00',
-            impressions: 0,
-            clicks: 0,
-            ctr: '0.00',
-            cpc: '0.00',
-          };
-
-          try {
-            const insightsResponse = await fetch(
-              `${insightsUrl}?${insightsParams.toString()}`,
-              {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-              },
-            );
-
-            if (insightsResponse.ok) {
-              const insightsData =
-                (await insightsResponse.json()) as MetaInsightsResponse;
-              if (insightsData.data && insightsData.data.length > 0) {
-                const aggregated = insightsData.data.reduce(
-                  (acc, item) => ({
-                    spend: (
-                      parseFloat(acc.spend) + parseFloat(item.spend || '0')
-                    ).toFixed(2),
-                    impressions:
-                      acc.impressions + parseInt(item.impressions || '0', 10),
-                    clicks: acc.clicks + parseInt(item.clicks || '0', 10),
-                    ctr: item.ctr || acc.ctr,
-                    cpc: item.cpc || acc.cpc,
-                  }),
-                  {
-                    spend: '0',
-                    impressions: 0,
-                    clicks: 0,
-                    ctr: '0.00',
-                    cpc: '0.00',
-                  },
-                );
-                insights = {
-                  spend: aggregated.spend,
-                  impressions: aggregated.impressions,
-                  clicks: aggregated.clicks,
-                  ctr: aggregated.ctr || '0.00',
-                  cpc: aggregated.cpc || '0.00',
-                };
-              }
-            } else {
-              this.logger.warn(
-                `Meta API error listing ad insights (ad=${ad.id}) status=${insightsResponse.status}`,
-              );
+      const data: AdWithInsights[] = ads.map((ad) => {
+        const insight = insightsMap?.get(ad.id);
+        const insights = insight
+          ? {
+              spend: insight.spend,
+              impressions: insight.impressions,
+              clicks: insight.clicks,
+              ctr: insight.ctr,
+              cpc: insight.cpc,
             }
-          } catch (e) {
-            this.logger.warn(
-              `Error fetching insights for ad ${ad.id}: ${e instanceof Error ? e.message : 'Unknown error'}`,
-            );
-          }
+          : {
+              spend: '0.00',
+              impressions: 0,
+              clicks: 0,
+              ctr: '0.00',
+              cpc: '0.00',
+            };
 
-          return {
-            id: ad.id,
-            name: ad.name || 'Unnamed Ad',
-            status: ad.status || 'UNKNOWN',
-            insights,
-          };
-        }),
-      );
+        return {
+          id: ad.id,
+          name: ad.name || 'Unnamed Ad',
+          status: ad.status || 'UNKNOWN',
+          insights,
+        };
+      });
 
       const afterCursor =
         adsData.paging?.cursors?.after ||
         (adsData.paging?.next ? 'has_more' : null);
 
-      return {
+      const result = {
         data,
         paging: { after: afterCursor || null },
       };
+      await this.cache.setJson(cacheKey, result);
+      return result;
     } catch (error) {
       if (error instanceof BadRequestException) {
         if (error.message.includes('No valid access token')) {

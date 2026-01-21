@@ -83,6 +83,7 @@ interface UseMetaCampaignsParams {
   limit?: number;
   after?: string;
   adAccountId?: string;
+  refreshNonce?: number;
   enabled?: boolean;
 }
 
@@ -92,6 +93,7 @@ interface UseMetaAdsetsParams {
   to?: string;
   limit?: number;
   after?: string;
+  refreshNonce?: number;
   enabled?: boolean;
 }
 
@@ -101,6 +103,7 @@ interface UseMetaAdsParams {
   to?: string;
   limit?: number;
   after?: string;
+  refreshNonce?: number;
   enabled?: boolean;
 }
 
@@ -136,7 +139,7 @@ export function useUpdateMetaConfig() {
 }
 
 export function useMetaCampaigns(params: UseMetaCampaignsParams = {}) {
-  const { from, to, limit, after, adAccountId, enabled = true } = params;
+  const { from, to, limit, after, adAccountId, refreshNonce, enabled = true } = params;
 
   const queryParams = new URLSearchParams();
   if (from) queryParams.set('from', from);
@@ -144,16 +147,17 @@ export function useMetaCampaigns(params: UseMetaCampaignsParams = {}) {
   if (limit) queryParams.set('limit', limit.toString());
   if (after) queryParams.set('after', after);
   if (adAccountId) queryParams.set('adAccountId', adAccountId);
+  if (refreshNonce !== undefined) queryParams.set('refresh', '1');
 
   return useQuery({
-    queryKey: ['meta-campaigns', { from, to, limit, after, adAccountId }],
+    queryKey: ['meta-campaigns', { from, to, limit, after, adAccountId, refreshNonce }],
     queryFn: () => api.get<CampaignsListResponse>(`/integrations/meta/campaigns?${queryParams.toString()}`),
     enabled,
   });
 }
 
 export function useMetaAdsets(params: UseMetaAdsetsParams) {
-  const { campaignId, from, to, limit, after, enabled = true } = params;
+  const { campaignId, from, to, limit, after, refreshNonce, enabled = true } = params;
 
   const queryParams = new URLSearchParams();
   queryParams.set('campaignId', campaignId);
@@ -161,16 +165,17 @@ export function useMetaAdsets(params: UseMetaAdsetsParams) {
   if (to) queryParams.set('to', to);
   if (limit) queryParams.set('limit', limit.toString());
   if (after) queryParams.set('after', after);
+  if (refreshNonce !== undefined) queryParams.set('refresh', '1');
 
   return useQuery({
-    queryKey: ['meta-adsets', { campaignId, from, to, limit, after }],
+    queryKey: ['meta-adsets', { campaignId, from, to, limit, after, refreshNonce }],
     queryFn: () => api.get<AdsetsListResponse>(`/integrations/meta/adsets?${queryParams.toString()}`),
     enabled: enabled && !!campaignId,
   });
 }
 
 export function useMetaAds(params: UseMetaAdsParams) {
-  const { adsetId, from, to, limit, after, enabled = true } = params;
+  const { adsetId, from, to, limit, after, refreshNonce, enabled = true } = params;
 
   const queryParams = new URLSearchParams();
   queryParams.set('adsetId', adsetId);
@@ -178,9 +183,10 @@ export function useMetaAds(params: UseMetaAdsParams) {
   if (to) queryParams.set('to', to);
   if (limit) queryParams.set('limit', limit.toString());
   if (after) queryParams.set('after', after);
+  if (refreshNonce !== undefined) queryParams.set('refresh', '1');
 
   return useQuery({
-    queryKey: ['meta-ads', { adsetId, from, to, limit, after }],
+    queryKey: ['meta-ads', { adsetId, from, to, limit, after, refreshNonce }],
     queryFn: () => api.get<AdsListResponse>(`/integrations/meta/ads?${queryParams.toString()}`),
     enabled: enabled && !!adsetId,
   });

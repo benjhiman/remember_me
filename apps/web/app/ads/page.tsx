@@ -37,6 +37,8 @@ function AdsPageContent() {
   const [campaignsAfter, setCampaignsAfter] = useState<string | null>(null);
   const [adsetsAfter, setAdsetsAfter] = useState<string | null>(null);
   const [adsAfter, setAdsAfter] = useState<string | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState<number | undefined>(undefined);
 
   const [allCampaigns, setAllCampaigns] = useState<
     Array<{
@@ -101,6 +103,7 @@ function AdsPageContent() {
     limit: 25,
     after: campaignsAfter || undefined,
     adAccountId: selectedAdAccountId || undefined,
+    refreshNonce,
     enabled: !!user && !!selectedAdAccountId && view === 'campaigns',
   });
 
@@ -128,6 +131,7 @@ function AdsPageContent() {
     to: dateRange.to,
     limit: 25,
     after: adsetsAfter || undefined,
+    refreshNonce,
     enabled: !!user && view === 'adsets' && !!selectedCampaign?.id,
   });
 
@@ -153,6 +157,7 @@ function AdsPageContent() {
     to: dateRange.to,
     limit: 25,
     after: adsAfter || undefined,
+    refreshNonce,
     enabled: !!user && view === 'ads' && !!selectedAdset?.id,
   });
 
@@ -163,8 +168,21 @@ function AdsPageContent() {
       } else {
         setAllAds(adsData.data);
       }
+      setLastSyncedAt(new Date().toISOString());
     }
   }, [adsData, adsAfter]);
+
+  useEffect(() => {
+    if (campaignsData?.data && view === 'campaigns') {
+      setLastSyncedAt(new Date().toISOString());
+    }
+  }, [campaignsData?.data, view]);
+
+  useEffect(() => {
+    if (adsetsData?.data && view === 'adsets') {
+      setLastSyncedAt(new Date().toISOString());
+    }
+  }, [adsetsData?.data, view]);
 
   // Handle ad account selection
   const handleAdAccountChange = async (adAccountId: string) => {
@@ -236,9 +254,23 @@ function AdsPageContent() {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Meta Ads</h1>
-        <p className="text-gray-600">Gestión de campañas y métricas de Meta Ads</p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Meta Ads</h1>
+          <p className="text-gray-600">Gestión de campañas y métricas de Meta Ads</p>
+          {lastSyncedAt && (
+            <p className="text-xs text-gray-500 mt-1">
+              Last synced: {new Date(lastSyncedAt).toLocaleString('es-AR')}
+            </p>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setRefreshNonce(Date.now())}
+          disabled={!hasAdAccount}
+        >
+          Refresh
+        </Button>
       </div>
 
       {/* Ad Account Selector */}

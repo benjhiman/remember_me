@@ -15,27 +15,33 @@ import { TagsPicker } from '@/components/inbox/tags-picker';
 import { TemplatePicker } from '@/components/inbox/template-picker';
 import { env } from '@/lib/config/env';
 import type { ConversationStatus, MessageStatus } from '@/types/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function ConversationPage() {
   const router = useRouter();
   const params = useParams();
   const conversationId = params.conversationId as string;
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [isOpen, setIsOpen] = useState(true); // Track if conversation view is open
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'document'>('image');
   const [caption, setCaption] = useState('');
+  const [beforeCursor, setBeforeCursor] = useState<string | undefined>(undefined);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   const { data: conversation, refetch: refetchConversation } = useConversation(conversationId, !!user);
   const { data: orgUsers = [], isLoading: isLoadingUsers } = useOrgUsers(!!user);
   
   // Smart polling: configurable via env vars
-  const { data: messagesData, refetch: refetchMessages } = useMessages({
+  const { data: messagesData, refetch: refetchMessages, isFetching: messagesFetching } = useMessages({
     conversationId,
     page: 1,
     limit: 50,
+    before: beforeCursor,
     enabled: !!user && !!conversationId,
     refetchInterval: isOpen
       ? env.NEXT_PUBLIC_POLLING_INTERVAL_MESSAGES_OPEN
@@ -44,15 +50,31 @@ export default function ConversationPage() {
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const lastMessageId = useMemo(() => {
-    const msgs = messagesData?.data || [];
+    const msgs = messages;
     return msgs.length ? msgs[msgs.length - 1]?.id : null;
   }, [messagesData?.data]);
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
-    // Scroll to bottom when new messages arrive
+    if (!isAtBottom) return;
     messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
   }, [lastMessageId]);
+
+  useEffect(() => {
+    if (!messagesData?.data) return;
+    // Merge messages without duplicates, keeping ascending order
+    setMessages((prev) => {
+      const map = new Map<string, any>();
+      const merged = [...messagesData.data, ...prev];
+      for (const m of merged) map.set(m.id, m);
+      const arr = Array.from(map.values());
+      arr.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      return arr;
+    });
+  }, [messagesData?.data]);
+
+  const nextBefore = (messagesData as any)?.nextBefore as string | null | undefined;
+  const canLoadOlder = !!nextBefore && messages.length > 0;
 
   useEffect(() => {
     if (!user) {
@@ -121,6 +143,7 @@ export default function ConversationPage() {
     try {
       await api.patch(`/inbox/conversations/${conversationId}/assign`, { assignedToId: userId });
       refetchConversation();
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     }
@@ -128,8 +151,11 @@ export default function ConversationPage() {
 
   const handleStatusChange = async (status: ConversationStatus) => {
     try {
+      // SELLER can only change status on assigned conversations (backend enforced too)
+      if (user?.role === 'SELLER' && conversation?.assignedToId !== user?.id) return;
       await api.patch(`/inbox/conversations/${conversationId}/status`, { status });
       refetchConversation();
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch (error: any) {
       alert(`Error: ${error.message}`);
     }
@@ -197,6 +223,9 @@ export default function ConversationPage() {
     return null;
   }
 
+  const canChangeStatus =
+    user.role !== 'SELLER' || (conversation?.assignedToId && conversation.assignedToId === user.id);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto p-6">
@@ -240,15 +269,19 @@ export default function ConversationPage() {
             <div className="flex flex-wrap gap-2 items-center border-t pt-3">
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium">Estado:</label>
-                <select
-                  value={conversation.status}
-                  onChange={(e) => handleStatusChange(e.target.value as ConversationStatus)}
-                  className="text-xs border rounded px-2 py-1"
-                >
-                  <option value="OPEN">Abierto</option>
-                  <option value="PENDING">Pendiente</option>
-                  <option value="CLOSED">Cerrado</option>
-                </select>
+                {canChangeStatus ? (
+                  <select
+                    value={conversation.status}
+                    onChange={(e) => handleStatusChange(e.target.value as ConversationStatus)}
+                    className="text-xs border rounded px-2 py-1"
+                  >
+                    <option value="OPEN">Abierto</option>
+                    <option value="PENDING">Pendiente</option>
+                    <option value="CLOSED">Cerrado</option>
+                  </select>
+                ) : (
+                  <span className="text-xs text-gray-500">Solo asignado</span>
+                )}
               </div>
 
               {userCan(user, Permission.MANAGE_MEMBERS) && (
@@ -294,11 +327,31 @@ export default function ConversationPage() {
           ref={messagesContainerRef}
           className="mb-4 p-4"
           style={{ minHeight: '400px', maxHeight: '600px', overflowY: 'auto' }}
+          onScroll={() => {
+            const el = messagesContainerRef.current;
+            if (!el) return;
+            const threshold = 24;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+            setIsAtBottom(atBottom);
+          }}
         >
-          {messagesData?.data.length === 0 ? (
+          <div className="mb-4 flex justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (nextBefore) setBeforeCursor(nextBefore);
+              }}
+              disabled={!canLoadOlder || messagesFetching}
+            >
+              {messagesFetching ? 'Cargando…' : canLoadOlder ? 'Cargar anteriores' : 'No hay más'}
+            </Button>
+          </div>
+
+          {messages.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No hay mensajes</div>
           ) : (
-            messagesData?.data.map((msg) => (
+            messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`mb-4 flex ${msg.direction === 'OUTBOUND' ? 'justify-end' : 'justify-start'}`}

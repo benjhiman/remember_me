@@ -1,5 +1,8 @@
 import { Injectable, Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MetaTokenService } from './meta-token.service';
+import { MetaAdsCacheService } from './meta-ads-cache.service';
+import { MetaBulkInsightsService } from './meta-bulk-insights.service';
+import { MetaConfigService } from './meta-config.service';
 
 interface MetaAdset {
   id: string;
@@ -66,6 +69,9 @@ export class MetaAdsetsService {
 
   constructor(
     private readonly metaTokenService: MetaTokenService,
+    private readonly metaConfigService: MetaConfigService,
+    private readonly cache: MetaAdsCacheService,
+    private readonly bulkInsights: MetaBulkInsightsService,
   ) {}
 
   /**
@@ -79,6 +85,7 @@ export class MetaAdsetsService {
       to?: string; // ISO date string
       limit?: number;
       after?: string; // pagination cursor
+      refresh?: boolean;
     },
   ): Promise<AdsetsListResponse> {
     try {
@@ -106,6 +113,11 @@ export class MetaAdsetsService {
       const toStr = toDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
       const limit = Math.min(options.limit || 25, 100); // Max 100 per Meta API
+      const cacheKey = `meta:adsets:${organizationId}:campaign=${options.campaignId}:${fromStr}:${toStr}:limit=${limit}:after=${options.after || ''}`;
+      if (!options.refresh) {
+        const cached = await this.cache.getJson<AdsetsListResponse>(cacheKey);
+        if (cached) return cached;
+      }
 
       // Build adsets URL
       const adsetsUrl = `${this.baseUrl}/${options.campaignId}/adsets`;
@@ -159,34 +171,42 @@ export class MetaAdsetsService {
         return { data: [], paging: { after: null } };
       }
 
-      // Fetch insights for each adset (can be optimized with batch request later)
-      const adsetsWithInsights: AdsetWithInsights[] = await Promise.all(
-        adsetsData.data.map(async (adset) => {
-          try {
-            // Fetch insights for this adset
-            const insightsUrl = `${this.baseUrl}/${adset.id}/insights`;
-            // Meta API requires time_range as JSON string in the URL
-            const timeRange = JSON.stringify({
-              since: fromStr,
-              until: toStr,
-            });
-            const insightsParams = new URLSearchParams({
-              fields: 'spend,impressions,clicks,ctr,cpc',
-              time_range: timeRange,
-              access_token: accessToken,
-            });
+      let adAccountId: string | null = null;
+      try {
+        const cfg = await this.metaConfigService.getConfig(organizationId);
+        adAccountId = cfg.adAccountId;
+      } catch {
+        adAccountId = null;
+      }
 
-            const insightsResponse = await fetch(
-              `${insightsUrl}?${insightsParams.toString()}`,
-              {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              },
-            );
+      const ids = adsetsData.data.map((a) => a.id);
+      let insightsMap: Map<string, any> | null = null;
+      if (adAccountId) {
+        try {
+          insightsMap = await this.bulkInsights.getInsightsMap({
+            organizationId,
+            adAccountId,
+            level: 'adset',
+            ids,
+            fromYYYYMMDD: fromStr,
+            toYYYYMMDD: toStr,
+          });
+        } catch {
+          insightsMap = null;
+        }
+      }
 
-            let insights = {
+      const adsetsWithInsights: AdsetWithInsights[] = adsetsData.data.map((adset) => {
+        const insight = insightsMap?.get(adset.id);
+        const insights = insight
+          ? {
+              spend: insight.spend,
+              impressions: insight.impressions,
+              clicks: insight.clicks,
+              ctr: insight.ctr,
+              cpc: insight.cpc,
+            }
+          : {
               spend: '0.00',
               impressions: 0,
               clicks: 0,
@@ -194,95 +214,30 @@ export class MetaAdsetsService {
               cpc: '0.00',
             };
 
-            if (insightsResponse.ok) {
-              const insightsData =
-                (await insightsResponse.json()) as MetaInsightsResponse;
-              if (insightsData.data && insightsData.data.length > 0) {
-                // Aggregate insights if multiple date ranges
-                const aggregated = insightsData.data.reduce(
-                  (acc, item) => {
-                    return {
-                      spend:
-                        (
-                          parseFloat(acc.spend) +
-                          parseFloat(item.spend || '0')
-                        ).toFixed(2),
-                      impressions:
-                        acc.impressions +
-                        parseInt(item.impressions || '0', 10),
-                      clicks: acc.clicks + parseInt(item.clicks || '0', 10),
-                      ctr: item.ctr || acc.ctr,
-                      cpc: item.cpc || acc.cpc,
-                    };
-                  },
-                  {
-                    spend: '0',
-                    impressions: 0,
-                    clicks: 0,
-                    ctr: '0.00',
-                    cpc: '0.00',
-                  },
-                );
-                insights = {
-                  spend: aggregated.spend,
-                  impressions: aggregated.impressions,
-                  clicks: aggregated.clicks,
-                  ctr: aggregated.ctr || '0.00',
-                  cpc: aggregated.cpc || '0.00',
-                };
-              }
-            } else {
-              this.logger.warn(
-                `Failed to fetch insights for adset ${adset.id}`,
-              );
-            }
-
-            return {
-              id: adset.id,
-              name: adset.name || 'Unnamed Adset',
-              status: adset.status || 'UNKNOWN',
-              dailyBudget: adset.daily_budget || null,
-              lifetimeBudget: adset.lifetime_budget || null,
-              startTime: adset.start_time,
-              endTime: adset.end_time || null,
-              campaignId: adset.campaign_id || options.campaignId,
-              insights,
-            };
-          } catch (error) {
-            this.logger.warn(
-              `Error fetching insights for adset ${adset.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-            // Return adset without insights
-            return {
-              id: adset.id,
-              name: adset.name || 'Unnamed Adset',
-              status: adset.status || 'UNKNOWN',
-              dailyBudget: adset.daily_budget || null,
-              lifetimeBudget: adset.lifetime_budget || null,
-              startTime: adset.start_time,
-              endTime: adset.end_time || null,
-              campaignId: adset.campaign_id || options.campaignId,
-              insights: {
-                spend: '0.00',
-                impressions: 0,
-                clicks: 0,
-                ctr: '0.00',
-                cpc: '0.00',
-              },
-            };
-          }
-        }),
-      );
+        return {
+          id: adset.id,
+          name: adset.name || 'Unnamed Adset',
+          status: adset.status || 'UNKNOWN',
+          dailyBudget: adset.daily_budget || null,
+          lifetimeBudget: adset.lifetime_budget || null,
+          startTime: adset.start_time,
+          endTime: adset.end_time || null,
+          campaignId: adset.campaign_id || options.campaignId,
+          insights,
+        };
+      });
 
       // Extract pagination cursor
       const afterCursor =
         adsetsData.paging?.cursors?.after ||
         (adsetsData.paging?.next ? 'has_more' : null);
 
-      return {
+      const result = {
         data: adsetsWithInsights,
         paging: { after: afterCursor || null },
       };
+      await this.cache.setJson(cacheKey, result);
+      return result;
     } catch (error) {
       // Handle specific error cases
       if (error instanceof BadRequestException) {

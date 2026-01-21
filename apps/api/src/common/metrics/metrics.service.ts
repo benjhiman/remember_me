@@ -26,10 +26,15 @@ export class MetricsService implements OnModuleInit {
   // Messaging Metrics
   public messagesOutboundTotal!: Counter<string>;
   public messageStatusTransitionsTotal!: Counter<string>;
+  public inboxMessagesCreatedTotal!: Counter<string>;
 
   // Rate Limit Metrics
   public rateLimitHitsTotal!: Counter<string>;
   public rateLimitRejectedTotal!: Counter<string>;
+
+  // Meta Ads Metrics
+  public metaRequestsTotal!: Counter<string>;
+  public metaLatencyMs!: Histogram<string>;
 
   constructor(private configService: ConfigService) {
     this.registry = new Registry();
@@ -138,6 +143,13 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.inboxMessagesCreatedTotal = new Counter({
+      name: 'inbox_messages_created_total',
+      help: 'Total number of inbound messages created (after idempotency)',
+      labelNames: ['provider'],
+      registers: [this.registry],
+    });
+
     // Rate Limit Metrics
     this.rateLimitHitsTotal = new Counter({
       name: 'rate_limit_hits_total',
@@ -150,6 +162,22 @@ export class MetricsService implements OnModuleInit {
       name: 'rate_limit_rejected_total',
       help: 'Total number of rate limit rejections',
       labelNames: ['action'],
+      registers: [this.registry],
+    });
+
+    // Meta Ads Metrics
+    this.metaRequestsTotal = new Counter({
+      name: 'meta_requests_total',
+      help: 'Total number of Meta Graph/Marketing API requests',
+      labelNames: ['endpoint', 'status'],
+      registers: [this.registry],
+    });
+
+    this.metaLatencyMs = new Histogram({
+      name: 'meta_latency_ms',
+      help: 'Meta Graph/Marketing API request latency in milliseconds',
+      labelNames: ['endpoint', 'status'],
+      buckets: [25, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
       registers: [this.registry],
     });
   }
@@ -217,6 +245,16 @@ export class MetricsService implements OnModuleInit {
     if (durationMs !== undefined) {
       this.webhookProcessingDurationMs.observe({ provider }, durationMs);
     }
+  }
+
+  recordInboxMessageCreated(provider: string) {
+    this.inboxMessagesCreatedTotal.inc({ provider });
+  }
+
+  recordMetaRequest(endpoint: string, status: number, durationMs: number) {
+    const statusLabel = status.toString();
+    this.metaRequestsTotal.inc({ endpoint, status: statusLabel });
+    this.metaLatencyMs.observe({ endpoint, status: statusLabel }, durationMs);
   }
 
   /**

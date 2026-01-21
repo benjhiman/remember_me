@@ -4,6 +4,8 @@ import { IntegrationQueueService } from '../jobs/queue/integration-queue.service
 import { IntegrationProvider, WebhookEventStatus, IntegrationJobType, MessageDirection } from '@remember-me/prisma';
 import { InboxService } from '../inbox/inbox.service';
 import { ConfigService } from '@nestjs/config';
+import { MetricsService } from '../../common/metrics/metrics.service';
+import { Prisma } from '@remember-me/prisma';
 
 @Injectable()
 export class InstagramWebhookService {
@@ -15,6 +17,7 @@ export class InstagramWebhookService {
     private readonly integrationQueueService: IntegrationQueueService,
     private readonly inboxService: InboxService,
     private readonly configService: ConfigService,
+    private readonly metricsService?: MetricsService,
   ) {}
 
   /**
@@ -154,23 +157,6 @@ export class InstagramWebhookService {
       return;
     }
 
-    // Check for duplicate message (idempotency)
-    const existingMessage = await this.prisma.messageLog.findFirst({
-      where: {
-        provider: IntegrationProvider.INSTAGRAM,
-        metaJson: {
-          path: ['messageId'],
-          equals: messageId,
-        },
-      },
-    });
-
-    if (existingMessage) {
-      // Duplicate message, skip
-      this.logger.debug(`Duplicate Instagram message ${messageId}, skipping`);
-      return;
-    }
-
     // Save webhook event
     const webhookEvent = await this.prisma.webhookEvent.create({
       data: {
@@ -203,27 +189,36 @@ export class InstagramWebhookService {
       timestamp ? new Date(parseInt(timestamp) * 1000) : new Date(),
     );
 
-    // Save message log (INBOUND)
-    await this.prisma.messageLog.create({
-      data: {
-        provider: IntegrationProvider.INSTAGRAM,
-        direction: MessageDirection.INBOUND,
-        to: recipient?.id || pageId,
-        from: handle,
-        text,
-        conversationId,
-        externalMessageId: messageId,
-        metaJson: {
-          messageId,
-          senderId: sender.id,
-          recipientId: recipient?.id,
-          timestamp,
-          type: messageType,
-          threadId: messagingEvent.thread_id || null,
-          organizationId,
+    // Save message log (INBOUND) with idempotency via externalMessageId unique constraint
+    try {
+      await this.prisma.messageLog.create({
+        data: {
+          provider: IntegrationProvider.INSTAGRAM,
+          direction: MessageDirection.INBOUND,
+          to: recipient?.id || pageId,
+          from: handle,
+          text,
+          conversationId,
+          externalMessageId: messageId,
+          metaJson: {
+            messageId,
+            senderId: sender.id,
+            recipientId: recipient?.id,
+            timestamp,
+            type: messageType,
+            threadId: messagingEvent.thread_id || null,
+            organizationId,
+          },
         },
-      },
-    });
+      });
+      this.metricsService?.recordInboxMessageCreated(IntegrationProvider.INSTAGRAM);
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        this.logger.debug(`Duplicate Instagram message ${messageId}, skipping`);
+        return;
+      }
+      throw e;
+    }
 
     // Create integration job to process webhook (create/update Lead)
     await this.integrationQueueService.enqueue({

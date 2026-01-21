@@ -31,6 +31,8 @@ import { MetaOAuthController } from './meta/meta-oauth.controller';
 import { MetaIntegrationsController } from './meta/meta-integrations.controller';
 import { MetaAdsController } from './meta/meta-ads.controller';
 import { MetaAdsService } from './meta/meta-ads.service';
+import { MetaAdsCacheService } from './meta/meta-ads-cache.service';
+import { MetaBulkInsightsService } from './meta/meta-bulk-insights.service';
 import { MetaConfigController } from './meta/meta-config.controller';
 import { MetaConfigService } from './meta/meta-config.service';
 import { MetaCampaignsService } from './meta/meta-campaigns.service';
@@ -82,6 +84,8 @@ import { ConfigModule } from '@nestjs/config';
     MetaOAuthService,
     MetaTokenService,
     MetaAdsService,
+    MetaAdsCacheService,
+    MetaBulkInsightsService,
     MetaConfigService,
     MetaCampaignsService,
     MetaAdsetsService,

@@ -4,6 +4,7 @@ import { IntegrationQueueService } from '../jobs/queue/integration-queue.service
 import { IntegrationProvider, WebhookEventStatus, IntegrationJobType, MessageStatus, MessageDirection } from '@remember-me/prisma';
 import { InboxService } from '../inbox/inbox.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
+import { Prisma } from '@remember-me/prisma';
 
 @Injectable()
 export class WhatsAppWebhookService {
@@ -90,22 +91,6 @@ export class WhatsAppWebhookService {
             continue;
           }
 
-          // Check for duplicate message (idempotency)
-          const existingMessage = await this.prisma.messageLog.findFirst({
-            where: {
-              provider: IntegrationProvider.WHATSAPP,
-              metaJson: {
-                path: ['messageId'],
-                equals: messageId,
-              },
-            },
-          });
-
-          if (existingMessage) {
-            // Duplicate message, skip
-            continue;
-          }
-
           // Save webhook event
           const webhookEvent = await this.prisma.webhookEvent.create({
             data: {
@@ -122,21 +107,31 @@ export class WhatsAppWebhookService {
             },
           });
 
-          // Save message log (INBOUND)
-          await this.prisma.messageLog.create({
-            data: {
-              provider: IntegrationProvider.WHATSAPP,
-              direction: 'INBOUND',
-              to: value.metadata?.phone_number_id || 'unknown',
-              from,
-              text,
-              metaJson: {
-                messageId,
-                timestamp,
-                type,
+          // Save message log (INBOUND) with idempotency via externalMessageId unique constraint
+          try {
+            await this.prisma.messageLog.create({
+              data: {
+                provider: IntegrationProvider.WHATSAPP,
+                direction: 'INBOUND',
+                to: value.metadata?.phone_number_id || 'unknown',
+                from,
+                text,
+                externalMessageId: messageId,
+                metaJson: {
+                  messageId,
+                  timestamp,
+                  type,
+                },
               },
-            },
-          });
+            });
+            this.metricsService?.recordInboxMessageCreated(IntegrationProvider.WHATSAPP);
+          } catch (e) {
+            // Duplicate inbound message -> ignore (idempotency)
+            if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+              continue;
+            }
+            throw e;
+          }
 
           // Create integration job to process webhook (create/update Lead)
           await this.integrationQueueService.enqueue({

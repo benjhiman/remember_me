@@ -2,6 +2,8 @@ import { Injectable, Logger, BadRequestException, UnauthorizedException } from '
 import { PrismaService } from '../../prisma/prisma.service';
 import { MetaTokenService } from './meta-token.service';
 import { MetaConfigService } from './meta-config.service';
+import { MetaAdsCacheService } from './meta-ads-cache.service';
+import { MetaBulkInsightsService } from './meta-bulk-insights.service';
 
 interface MetaCampaign {
   id: string;
@@ -66,6 +68,8 @@ export class MetaCampaignsService {
     private readonly prisma: PrismaService,
     private readonly metaTokenService: MetaTokenService,
     private readonly metaConfigService: MetaConfigService,
+    private readonly cache: MetaAdsCacheService,
+    private readonly bulkInsights: MetaBulkInsightsService,
   ) {}
 
   /**
@@ -79,6 +83,7 @@ export class MetaCampaignsService {
       to?: string; // ISO date string
       limit?: number;
       after?: string; // pagination cursor
+      refresh?: boolean;
     },
   ): Promise<CampaignsListResponse> {
     try {
@@ -118,6 +123,11 @@ export class MetaCampaignsService {
       const toStr = toDate.toISOString().split('T')[0]; // YYYY-MM-DD
 
       const limit = Math.min(options.limit || 25, 100); // Max 100 per Meta API
+      const cacheKey = `meta:campaigns:${organizationId}:${normalizedAdAccountId}:${fromStr}:${toStr}:limit=${limit}:after=${options.after || ''}`;
+      if (!options.refresh) {
+        const cached = await this.cache.getJson<CampaignsListResponse>(cacheKey);
+        if (cached) return cached;
+      }
 
       // Build campaigns URL
       const campaignsUrl = `${this.baseUrl}/${normalizedAdAccountId}/campaigns`;
@@ -171,32 +181,32 @@ export class MetaCampaignsService {
         return { data: [], paging: { after: null } };
       }
 
-      // Fetch insights for each campaign (can be optimized with batch request later)
-      const campaignsWithInsights: CampaignWithInsights[] = await Promise.all(
-        campaignsData.data.map(async (campaign) => {
-          try {
-            // Fetch insights for this campaign
-            const insightsUrl = `${this.baseUrl}/${campaign.id}/insights`;
-            const insightsParams = new URLSearchParams({
-              fields: 'spend,impressions,clicks,ctr,cpc',
-              time_range: JSON.stringify({
-                since: fromStr,
-                until: toStr,
-              }),
-              access_token: accessToken,
-            });
+      const ids = campaignsData.data.map((c) => c.id);
+      let insightsMap: Map<string, any> | null = null;
+      try {
+        insightsMap = await this.bulkInsights.getInsightsMap({
+          organizationId,
+          adAccountId: normalizedAdAccountId,
+          level: 'campaign',
+          ids,
+          fromYYYYMMDD: fromStr,
+          toYYYYMMDD: toStr,
+        });
+      } catch {
+        insightsMap = null;
+      }
 
-            const insightsResponse = await fetch(
-              `${insightsUrl}?${insightsParams.toString()}`,
-              {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              },
-            );
-
-            let insights = {
+      const campaignsWithInsights: CampaignWithInsights[] = campaignsData.data.map((campaign) => {
+        const insight = insightsMap?.get(campaign.id);
+        const insights = insight
+          ? {
+              spend: insight.spend,
+              impressions: insight.impressions,
+              clicks: insight.clicks,
+              ctr: insight.ctr,
+              cpc: insight.cpc,
+            }
+          : {
               spend: '0.00',
               impressions: 0,
               clicks: 0,
@@ -204,85 +214,28 @@ export class MetaCampaignsService {
               cpc: '0.00',
             };
 
-            if (insightsResponse.ok) {
-              const insightsData =
-                (await insightsResponse.json()) as MetaInsightsResponse;
-              if (insightsData.data && insightsData.data.length > 0) {
-                // Aggregate insights if multiple date ranges
-                const aggregated = insightsData.data.reduce(
-                  (acc, item) => {
-                    return {
-                      spend:
-                        (
-                          parseFloat(acc.spend) +
-                          parseFloat(item.spend || '0')
-                        ).toFixed(2),
-                      impressions:
-                        acc.impressions +
-                        parseInt(item.impressions || '0', 10),
-                      clicks: acc.clicks + parseInt(item.clicks || '0', 10),
-                      ctr: item.ctr || acc.ctr,
-                      cpc: item.cpc || acc.cpc,
-                    };
-                  },
-                  { spend: '0', impressions: 0, clicks: 0, ctr: '0.00', cpc: '0.00' },
-                );
-                insights = {
-                  spend: aggregated.spend,
-                  impressions: aggregated.impressions,
-                  clicks: aggregated.clicks,
-                  ctr: aggregated.ctr || '0.00',
-                  cpc: aggregated.cpc || '0.00',
-                };
-              }
-            } else {
-              this.logger.warn(
-                `Failed to fetch insights for campaign ${campaign.id}`,
-              );
-            }
-
-            return {
-              id: campaign.id,
-              name: campaign.name || 'Unnamed Campaign',
-              status: campaign.status || 'UNKNOWN',
-              objective: campaign.objective,
-              createdTime: campaign.created_time,
-              updatedTime: campaign.updated_time,
-              insights,
-            };
-          } catch (error) {
-            this.logger.warn(
-              `Error fetching insights for campaign ${campaign.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
-            // Return campaign without insights
-            return {
-              id: campaign.id,
-              name: campaign.name || 'Unnamed Campaign',
-              status: campaign.status || 'UNKNOWN',
-              objective: campaign.objective,
-              createdTime: campaign.created_time,
-              updatedTime: campaign.updated_time,
-              insights: {
-                spend: '0.00',
-                impressions: 0,
-                clicks: 0,
-                ctr: '0.00',
-                cpc: '0.00',
-              },
-            };
-          }
-        }),
-      );
+        return {
+          id: campaign.id,
+          name: campaign.name || 'Unnamed Campaign',
+          status: campaign.status || 'UNKNOWN',
+          objective: campaign.objective,
+          createdTime: campaign.created_time,
+          updatedTime: campaign.updated_time,
+          insights,
+        };
+      });
 
       // Extract pagination cursor
       const afterCursor =
         campaignsData.paging?.cursors?.after ||
         (campaignsData.paging?.next ? 'has_more' : null);
 
-      return {
+      const result = {
         data: campaignsWithInsights,
         paging: { after: afterCursor || null },
       };
+      await this.cache.setJson(cacheKey, result);
+      return result;
     } catch (error) {
       // Handle specific error cases
       if (error instanceof BadRequestException) {

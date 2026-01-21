@@ -84,6 +84,7 @@ export class MetaAdsController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('after') after?: string,
+    @Query('refresh') refresh?: string,
   ): Promise<CampaignsListResponse> {
     return this.metaCampaignsService.listCampaigns(organizationId, {
       adAccountId,
@@ -91,6 +92,7 @@ export class MetaAdsController {
       to,
       limit: limit ? parseInt(limit, 10) : undefined,
       after,
+      refresh: refresh === '1' || refresh === 'true',
     });
   }
 
@@ -137,6 +139,7 @@ export class MetaAdsController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('after') after?: string,
+    @Query('refresh') refresh?: string,
   ): Promise<AdsetsListResponse> {
     return this.metaAdsetsService.listAdsets(organizationId, {
       campaignId: campaignId || '',
@@ -144,6 +147,7 @@ export class MetaAdsController {
       to,
       limit: limit ? parseInt(limit, 10) : undefined,
       after,
+      refresh: refresh === '1' || refresh === 'true',
     });
   }
 
@@ -159,6 +163,7 @@ export class MetaAdsController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('after') after?: string,
+    @Query('refresh') refresh?: string,
   ): Promise<AdsListResponse> {
     return this.metaAdsItemsService.listAds(organizationId, {
       adsetId,
@@ -166,6 +171,7 @@ export class MetaAdsController {
       to,
       limit: limit ? parseInt(limit, 10) : undefined,
       after,
+      refresh: refresh === '1' || refresh === 'true',
     });
   }
 }

@@ -153,6 +153,7 @@ export class InboxService {
         { phone: { contains: filters.q, mode: 'insensitive' } },
         { handle: { contains: filters.q, mode: 'insensitive' } },
         { lead: { name: { contains: filters.q, mode: 'insensitive' } } },
+        { messages: { some: { text: { contains: filters.q, mode: 'insensitive' } } } },
       ];
     }
 
@@ -388,6 +389,7 @@ export class InboxService {
     conversationId: string,
     page: number = 1,
     limit: number = 50,
+    before?: string,
   ) {
     // Verify conversation exists and belongs to organization
     const conversation = await this.prisma.conversation.findFirst({
@@ -402,27 +404,38 @@ export class InboxService {
       throw new NotFoundException('Conversation not found');
     }
 
-    const skip = (page - 1) * limit;
-
     const where: any = {
       conversationId,
     };
 
+    // Cursor-style pagination for messages: fetch older messages with createdAt < before
+    if (before) {
+      const beforeDate = new Date(before);
+      if (!Number.isNaN(beforeDate.getTime())) {
+        where.createdAt = { lt: beforeDate };
+      }
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.messageLog.findMany({
         where,
-        orderBy: { createdAt: 'asc' },
-        skip,
+        // Fetch newest first, then we reverse so UI shows ascending
+        orderBy: { createdAt: 'desc' },
         take: limit,
       }),
       this.prisma.messageLog.count({ where }),
     ]);
 
+    const ascending = [...data].reverse();
+    const nextBefore =
+      ascending.length > 0 ? ascending[0].createdAt.toISOString() : null;
+
     return {
-      data,
+      data: ascending,
       total,
       page,
       limit,
+      nextBefore,
     };
   }
 
@@ -517,6 +530,8 @@ export class InboxService {
     organizationId: string,
     conversationId: string,
     status: ConversationStatus,
+    userId: string,
+    userRole: Role,
   ) {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
@@ -528,6 +543,15 @@ export class InboxService {
 
     if (!conversation) {
       throw new NotFoundException('Conversation not found');
+    }
+
+    // SELLER can only change status if assigned to them
+    if (userRole === Role.SELLER) {
+      if (!conversation.assignedToId || conversation.assignedToId !== userId) {
+        throw new ForbiddenException(
+          'SELLER can only change status for conversations assigned to them',
+        );
+      }
     }
 
     return this.prisma.conversation.update({
