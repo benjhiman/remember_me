@@ -80,7 +80,7 @@ export class MetaAdsController {
     @Query('to') to?: string,
     @Query('limit') limit?: string,
     @Query('after') after?: string,
-  ) {
+  ): Promise<CampaignsListResponse> {
     return this.metaCampaignsService.listCampaigns(organizationId, {
       adAccountId,
       from,

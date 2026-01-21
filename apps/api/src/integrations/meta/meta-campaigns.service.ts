@@ -36,7 +36,7 @@ interface MetaInsightsResponse {
   }>;
 }
 
-interface CampaignWithInsights {
+export interface CampaignWithInsights {
   id: string;
   name: string;
   status: string;
@@ -50,6 +50,11 @@ interface CampaignWithInsights {
     ctr: string;
     cpc: string;
   };
+}
+
+export interface CampaignsListResponse {
+  data: CampaignWithInsights[];
+  paging: { after: string | null };
 }
 
 @Injectable()
@@ -75,10 +80,7 @@ export class MetaCampaignsService {
       limit?: number;
       after?: string; // pagination cursor
     },
-  ): Promise<{
-    data: CampaignWithInsights[];
-    paging: { after: string | null };
-  }> {
+  ): Promise<CampaignsListResponse> {
     try {
       // Get valid access token
       const accessToken = await this.metaTokenService.ensureValidToken(
