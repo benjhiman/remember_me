@@ -35,6 +35,7 @@ export class InboxController {
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER, Role.SELLER)
   async listConversations(
     @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: { id: string; role: Role },
     @Query('provider') provider?: IntegrationProvider,
     @Query('status') status?: ConversationStatus,
     @Query('assignedToId') assignedToId?: string,
@@ -44,6 +45,8 @@ export class InboxController {
     @Query('limit') limit: string = '20',
   ) {
     return this.inboxService.listConversations(organizationId, {
+      userId: user.id,
+      userRole: user.role,
       provider,
       status,
       assignedToId,

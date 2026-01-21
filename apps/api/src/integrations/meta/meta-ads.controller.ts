@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { MetaAdsService } from './meta-ads.service';
 import { MetaCampaignsService, CampaignsListResponse } from './meta-campaigns.service';
 import { MetaAdsetsService, AdsetsListResponse } from './meta-adsets.service';
+import { MetaAdsItemsService, AdsListResponse } from './meta-ads-items.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentOrganization } from '../../common/decorators/current-organization.decorator';
 
@@ -12,6 +13,7 @@ export class MetaAdsController {
     private readonly metaAdsService: MetaAdsService,
     private readonly metaCampaignsService: MetaCampaignsService,
     private readonly metaAdsetsService: MetaAdsetsService,
+    private readonly metaAdsItemsService: MetaAdsItemsService,
   ) {}
 
   /**
@@ -138,6 +140,28 @@ export class MetaAdsController {
   ): Promise<AdsetsListResponse> {
     return this.metaAdsetsService.listAdsets(organizationId, {
       campaignId: campaignId || '',
+      from,
+      to,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      after,
+    });
+  }
+
+  /**
+   * List ads for an adset
+   * GET /api/integrations/meta/ads
+   */
+  @Get('ads')
+  async listAds(
+    @CurrentOrganization() organizationId: string,
+    @Query('adsetId') adsetId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+    @Query('after') after?: string,
+  ): Promise<AdsListResponse> {
+    return this.metaAdsItemsService.listAds(organizationId, {
+      adsetId,
       from,
       to,
       limit: limit ? parseInt(limit, 10) : undefined,

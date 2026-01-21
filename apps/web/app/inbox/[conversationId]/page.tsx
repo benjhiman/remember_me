@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useConversation } from '@/lib/api/hooks/use-conversation';
@@ -41,6 +41,18 @@ export default function ConversationPage() {
       ? env.NEXT_PUBLIC_POLLING_INTERVAL_MESSAGES_OPEN
       : env.NEXT_PUBLIC_POLLING_INTERVAL_MESSAGES_CLOSED,
   });
+
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageId = useMemo(() => {
+    const msgs = messagesData?.data || [];
+    return msgs.length ? msgs[msgs.length - 1]?.id : null;
+  }, [messagesData?.data]);
+
+  useEffect(() => {
+    if (!messagesContainerRef.current) return;
+    // Scroll to bottom when new messages arrive
+    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+  }, [lastMessageId]);
 
   useEffect(() => {
     if (!user) {
@@ -278,7 +290,11 @@ export default function ConversationPage() {
         )}
 
         {/* Messages */}
-        <Card className="mb-4 p-4" style={{ minHeight: '400px', maxHeight: '600px', overflowY: 'auto' }}>
+        <Card
+          ref={messagesContainerRef}
+          className="mb-4 p-4"
+          style={{ minHeight: '400px', maxHeight: '600px', overflowY: 'auto' }}
+        >
           {messagesData?.data.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No hay mensajes</div>
           ) : (

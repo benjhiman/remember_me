@@ -29,10 +29,26 @@ export default function InboxPage() {
   const [provider, setProvider] = useState<IntegrationProvider | undefined>(providerFromPath);
   const [status, setStatus] = useState<ConversationStatus | undefined>();
   const [search, setSearch] = useState('');
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all');
+
+  // Enforce SELLER sees only their chats
+  useEffect(() => {
+    if (user?.role === 'SELLER') {
+      setAssignmentFilter('mine');
+    }
+  }, [user?.role]);
+
+  const assignedToId =
+    assignmentFilter === 'mine'
+      ? user?.id
+      : assignmentFilter === 'unassigned'
+      ? 'unassigned'
+      : undefined;
 
   const { data, isLoading, error } = useConversations({
     provider,
     status,
+    assignedToId,
     q: search || undefined,
     page,
     limit: 20,
@@ -117,7 +133,7 @@ export default function InboxPage() {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Búsqueda</label>
               <Input
@@ -128,6 +144,27 @@ export default function InboxPage() {
                   setPage(1);
                 }}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Asignación</label>
+              {user?.role === 'SELLER' ? (
+                <div className="h-10 rounded-md border border-input bg-gray-50 px-3 py-2 text-sm text-gray-700 flex items-center">
+                  Mis chats
+                </div>
+              ) : (
+                <select
+                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={assignmentFilter}
+                  onChange={(e) => {
+                    setAssignmentFilter(e.target.value as any);
+                    setPage(1);
+                  }}
+                >
+                  <option value="all">Todos</option>
+                  <option value="mine">Mis chats</option>
+                  <option value="unassigned">Sin asignar</option>
+                </select>
+              )}
             </div>
             {/* Provider filter removed - using tabs instead */}
             <div>
@@ -152,6 +189,7 @@ export default function InboxPage() {
                 onClick={() => {
                   setStatus(undefined);
                   setSearch('');
+                  setAssignmentFilter(user?.role === 'SELLER' ? 'mine' : 'all');
                   setPage(1);
                 }}
                 className="w-full"

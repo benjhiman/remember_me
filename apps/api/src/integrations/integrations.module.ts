@@ -35,6 +35,7 @@ import { MetaConfigController } from './meta/meta-config.controller';
 import { MetaConfigService } from './meta/meta-config.service';
 import { MetaCampaignsService } from './meta/meta-campaigns.service';
 import { MetaAdsetsService } from './meta/meta-adsets.service';
+import { MetaAdsItemsService } from './meta/meta-ads-items.service';
 import { MetaTokenService } from './meta/meta-token.service';
 import { TokenCryptoService } from '../common/crypto/token-crypto.service';
 import { MetaLeadAdsWebhookController } from './webhooks/meta-lead-ads.controller';
@@ -84,6 +85,7 @@ import { ConfigModule } from '@nestjs/config';
     MetaConfigService,
     MetaCampaignsService,
     MetaAdsetsService,
+    MetaAdsItemsService,
     TokenCryptoService,
     JobRunnerService,
     JobRunnerLockService,

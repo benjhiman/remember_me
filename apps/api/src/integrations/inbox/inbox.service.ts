@@ -99,6 +99,8 @@ export class InboxService {
   async listConversations(
     organizationId: string,
     filters: {
+      userId?: string;
+      userRole?: Role;
       provider?: IntegrationProvider;
       status?: ConversationStatus;
       assignedToId?: string;
@@ -111,6 +113,11 @@ export class InboxService {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
+
+    // Enforce SELLER can only see their assigned conversations
+    if (filters.userRole === Role.SELLER && filters.userId) {
+      filters.assignedToId = filters.userId;
+    }
 
     const where: any = {
       organizationId,
@@ -126,7 +133,11 @@ export class InboxService {
     }
 
     if (filters.assignedToId) {
-      where.assignedToId = filters.assignedToId;
+      if (filters.assignedToId === 'unassigned') {
+        where.assignedToId = null;
+      } else {
+        where.assignedToId = filters.assignedToId;
+      }
     }
 
     if (filters.tagId) {

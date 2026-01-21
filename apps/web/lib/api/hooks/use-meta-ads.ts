@@ -63,6 +63,20 @@ export interface AdsetsListResponse {
   };
 }
 
+export interface Ad {
+  id: string;
+  name: string;
+  status: string;
+  insights: CampaignInsights;
+}
+
+export interface AdsListResponse {
+  data: Ad[];
+  paging: {
+    after: string | null;
+  };
+}
+
 interface UseMetaCampaignsParams {
   from?: string;
   to?: string;
@@ -74,6 +88,15 @@ interface UseMetaCampaignsParams {
 
 interface UseMetaAdsetsParams {
   campaignId: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  after?: string;
+  enabled?: boolean;
+}
+
+interface UseMetaAdsParams {
+  adsetId: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -143,5 +166,22 @@ export function useMetaAdsets(params: UseMetaAdsetsParams) {
     queryKey: ['meta-adsets', { campaignId, from, to, limit, after }],
     queryFn: () => api.get<AdsetsListResponse>(`/integrations/meta/adsets?${queryParams.toString()}`),
     enabled: enabled && !!campaignId,
+  });
+}
+
+export function useMetaAds(params: UseMetaAdsParams) {
+  const { adsetId, from, to, limit, after, enabled = true } = params;
+
+  const queryParams = new URLSearchParams();
+  queryParams.set('adsetId', adsetId);
+  if (from) queryParams.set('from', from);
+  if (to) queryParams.set('to', to);
+  if (limit) queryParams.set('limit', limit.toString());
+  if (after) queryParams.set('after', after);
+
+  return useQuery({
+    queryKey: ['meta-ads', { adsetId, from, to, limit, after }],
+    queryFn: () => api.get<AdsListResponse>(`/integrations/meta/ads?${queryParams.toString()}`),
+    enabled: enabled && !!adsetId,
   });
 }
