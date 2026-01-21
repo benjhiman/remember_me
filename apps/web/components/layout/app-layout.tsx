@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
+import { CommandPalette } from '@/components/command-palette';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -191,6 +192,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </main>
       </div>
+      <CommandPalette />
     </div>
   );
 }

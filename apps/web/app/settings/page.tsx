@@ -91,6 +91,9 @@ export default function SettingsPage() {
           <TabsTrigger value="permisos">Permisos</TabsTrigger>
           <TabsTrigger value="inbox">Inbox</TabsTrigger>
           <TabsTrigger value="apariencia">Apariencia</TabsTrigger>
+          {userCan(user, Permission.MANAGE_MEMBERS) && (
+            <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="general">
@@ -454,6 +457,25 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {userCan(user, Permission.MANAGE_MEMBERS) && (
+          <TabsContent value="audit">
+            <Card>
+              <CardHeader>
+                <CardTitle>Audit Log</CardTitle>
+                <CardDescription>
+                  Registro completo de actividades del sistema. Solo visible para ADMIN/OWNER/MANAGER.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/settings/audit">
+                  <Button variant="outline" className="w-full">
+                    Ver Audit Log completo
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
@@ -119,10 +119,41 @@ function InboxWhatsAppInner() {
   }, [user, router]);
 
   const [draft, setDraft] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canSend =
     !!conversation &&
     conversation.canReply &&
     (user?.role !== 'SELLER' || conversation.assignedToId === user.id);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl+F → focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      // Esc → close conversation
+      if (e.key === 'Escape' && conversationId) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('conversationId');
+        router.push(`/inbox/whatsapp?${params.toString()}`);
+      }
+      // Cmd/Ctrl+Enter → send
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canSend && draft.trim()) {
+        e.preventDefault();
+        onSend();
+      }
+      // ↑ → edit draft (UX only, no actual message editing)
+      if (e.key === 'ArrowUp' && !draft && textareaRef.current === document.activeElement) {
+        e.preventDefault();
+        // Could implement draft history here
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [conversationId, canSend, draft, searchParams, router]);
 
   const canChangeStatus =
     !!conversation &&
@@ -150,11 +181,14 @@ function InboxWhatsAppInner() {
     refetchConversation();
   };
 
-  const onSend = async () => {
+  const onSend = useCallback(async () => {
     if (!draft.trim() || !conversationId) return;
     await api.post(`/inbox/conversations/${conversationId}/send-text`, { text: draft.trim() });
     setDraft('');
-  };
+    setBeforeCursor(undefined);
+    setMessages([]);
+    setIsAtBottom(true);
+  }, [draft, conversationId]);
 
   const grouped = useMemo(() => groupByDay(messages), [messages]);
 
@@ -173,7 +207,8 @@ function InboxWhatsAppInner() {
             <div className="text-sm font-semibold">WhatsApp</div>
             <div className="mt-2 flex gap-2">
               <Input
-                placeholder="Buscar chats…"
+                ref={searchInputRef}
+                placeholder="Buscar chats… (⌘F)"
                 value={q}
                 onChange={(e) => {
                   setQ(e.target.value);
@@ -343,8 +378,9 @@ function InboxWhatsAppInner() {
           <div className="bg-background border-t p-3">
             <div className="flex items-center gap-2">
               <textarea
-                className="flex-1 min-h-[40px] max-h-28 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-                placeholder={canSend ? 'Escribí un mensaje…' : 'No se puede responder'}
+                ref={textareaRef}
+                className="flex-1 min-h-[40px] max-h-28 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring transition-colors"
+                placeholder={canSend ? 'Escribí un mensaje… (Enter para enviar, Shift+Enter para nueva línea)' : 'No se puede responder'}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {

@@ -82,4 +82,30 @@
   [data-density='comfortable'] .crm-table td {
     @apply py-2.5;
   }
+
+  /* Micro-interactions */
+  .crm-table tbody tr {
+    @apply transition-colors duration-150;
+  }
+  .crm-table tbody tr:hover {
+    @apply bg-muted/60;
+  }
+
+  /* Smooth pane resize */
+  .resize-handle {
+    @apply transition-colors duration-150;
+  }
+  .resize-handle:hover {
+    @apply bg-primary/20;
+  }
+
+  /* Badge transitions */
+  [class*='badge'] {
+    @apply transition-all duration-200;
+  }
+
+  /* Dropdown smooth */
+  [role='menu'] {
+    @apply transition-opacity duration-150;
+  }
 }

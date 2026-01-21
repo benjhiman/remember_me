@@ -12,8 +12,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5000, // 5 seconds (matches polling interval)
+            staleTime: 30 * 1000, // 30s default
+            gcTime: 5 * 60 * 1000, // 5min garbage collection
             refetchOnWindowFocus: false,
+            retry: 1,
           },
         },
       })
