@@ -27,6 +27,7 @@ import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { WhatsAppAutomationsService } from '../integrations/whatsapp/whatsapp-automations.service';
 import { AttributionService } from '../dashboard/attribution.service';
+import { OrgSettingsService } from '../settings/org-settings.service';
 
 @Injectable({ scope: Scope.REQUEST })
 export class SalesService {
@@ -39,6 +40,7 @@ export class SalesService {
     @Inject(forwardRef(() => WhatsAppAutomationsService))
     private automationsService?: WhatsAppAutomationsService,
     private attributionService?: AttributionService,
+    private orgSettings?: OrgSettingsService,
   ) {}
 
   // Helper: Get request metadata for audit log
@@ -263,7 +265,13 @@ export class SalesService {
   }
 
   async createSale(organizationId: string, userId: string, dto: CreateSaleDto) {
-    await this.verifyMembership(organizationId, userId);
+    const { role } = await this.verifyMembership(organizationId, userId);
+    const settings = this.orgSettings
+      ? await this.orgSettings.getSettings(organizationId)
+      : null;
+    if (role === Role.SELLER && settings && !settings.crm.permissions.sellerCanEditSales) {
+      throw new ForbiddenException('Seller cannot create sales (disabled by organization settings)');
+    }
 
     if (!dto.stockReservationIds || dto.stockReservationIds.length === 0) {
       throw new BadRequestException('Sale must have at least one stock reservation');
@@ -636,6 +644,12 @@ export class SalesService {
 
   async updateSale(organizationId: string, userId: string, saleId: string, dto: UpdateSaleDto) {
     const { role } = await this.verifyMembership(organizationId, userId);
+    const settings = this.orgSettings
+      ? await this.orgSettings.getSettings(organizationId)
+      : null;
+    if (role === Role.SELLER && settings && !settings.crm.permissions.sellerCanEditSales) {
+      throw new ForbiddenException('Seller cannot edit sales (disabled by organization settings)');
+    }
 
     const sale = await this.prisma.sale.findFirst({
       where: {

@@ -23,13 +23,14 @@ const navItems = [
   { href: '/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
   { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
   { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
-  { href: '/inbox', label: 'Inbox', icon: Inbox, permission: Permission.VIEW_INBOX },
+  { href: '/inbox/whatsapp', label: 'WhatsApp', icon: Inbox, permission: Permission.VIEW_INBOX },
+  { href: '/inbox/instagram', label: 'Instagram', icon: Inbox, permission: Permission.VIEW_INBOX },
   { href: '/ads', label: 'Meta Ads', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
   { href: '/settings', label: 'Configuración', icon: Settings, permission: Permission.VIEW_DASHBOARD }, // Settings visible to all authenticated users
   { href: '/settings/integrations', label: 'Integraciones', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
 ];
 
-export function AppNav() {
+export function AppNav({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const { user } = useAuthStore();
 
@@ -37,7 +38,7 @@ export function AppNav() {
   const visibleItems = navItems.filter((item) => userCan(user, item.permission));
 
   return (
-    <nav className="space-y-1">
+    <nav className={cn('space-y-1', collapsed && 'space-y-2')}>
       {visibleItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
@@ -46,15 +47,16 @@ export function AppNav() {
           <Link
             key={item.href}
             href={item.href}
+            title={collapsed ? item.label : undefined}
             className={cn(
               'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               isActive
                 ? 'bg-primary text-primary-foreground'
-                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             )}
           >
             <Icon className="h-5 w-5" />
-            <span>{item.label}</span>
+            {!collapsed && <span className="truncate">{item.label}</span>}
           </Link>
         );
       })}

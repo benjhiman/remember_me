@@ -9,12 +9,14 @@ import {
   IntegrationJobType,
 } from '@remember-me/prisma';
 import { IntegrationQueueService } from '../jobs/queue/integration-queue.service';
+import { OrgSettingsService } from '../../settings/org-settings.service';
 
 @Injectable()
 export class InboxService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrationQueueService: IntegrationQueueService,
+    private readonly orgSettings: OrgSettingsService,
   ) {}
 
   /**
@@ -34,6 +36,8 @@ export class InboxService {
       return null; // Cannot create conversation without identifier
     }
 
+    const settings = await this.orgSettings.getSettings(organizationId);
+
     // Find or create conversation
     const conversation = await this.prisma.conversation.upsert({
       where: {
@@ -49,7 +53,7 @@ export class InboxService {
         phone: phone || null,
         handle: handle || null,
         externalThreadId: externalThreadId || null,
-        status: ConversationStatus.OPEN,
+        status: (settings.crm.inbox.defaultConversationStatus as any) || ConversationStatus.OPEN,
         lastMessageAt: messageCreatedAt,
         lastInboundAt: direction === MessageDirection.INBOUND ? messageCreatedAt : null,
         lastOutboundAt: direction === MessageDirection.OUTBOUND ? messageCreatedAt : null,
@@ -114,8 +118,14 @@ export class InboxService {
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
 
-    // Enforce SELLER can only see their assigned conversations
-    if (filters.userRole === Role.SELLER && filters.userId) {
+    const settings = await this.orgSettings.getSettings(organizationId);
+
+    // Enforce SELLER visibility based on org settings
+    if (
+      filters.userRole === Role.SELLER &&
+      filters.userId &&
+      settings.crm.inbox.sellerSeesOnlyAssigned
+    ) {
       filters.assignedToId = filters.userId;
     }
 
@@ -449,10 +459,20 @@ export class InboxService {
     userId: string,
     userRole: Role,
   ) {
-    // Only ADMIN/MANAGER/OWNER can assign
+    const settings = await this.orgSettings.getSettings(organizationId);
+
+    // Assignment rules depend on org settings:
+    // - ADMIN/MANAGER/OWNER: always
+    // - SELLER: only if sellerCanReassignConversation=true and only to themselves
     const allowedRoles: Role[] = [Role.ADMIN, Role.MANAGER, Role.OWNER];
-    if (!allowedRoles.includes(userRole)) {
-      throw new ForbiddenException('Only admins and managers can assign conversations');
+    if (allowedRoles.includes(userRole)) {
+      // ok
+    } else if (userRole === Role.SELLER && settings.crm.permissions.sellerCanReassignConversation) {
+      if (assignedToId !== userId) {
+        throw new ForbiddenException('SELLER can only assign conversations to themselves');
+      }
+    } else {
+      throw new ForbiddenException('Not allowed to assign conversations');
     }
 
     const conversation = await this.prisma.conversation.findFirst({
@@ -545,8 +565,12 @@ export class InboxService {
       throw new NotFoundException('Conversation not found');
     }
 
-    // SELLER can only change status if assigned to them
+    const settings = await this.orgSettings.getSettings(organizationId);
+
     if (userRole === Role.SELLER) {
+      if (!settings.crm.permissions.sellerCanChangeConversationStatus) {
+        throw new ForbiddenException('SELLER cannot change conversation status (disabled by organization settings)');
+      }
       if (!conversation.assignedToId || conversation.assignedToId !== userId) {
         throw new ForbiddenException(
           'SELLER can only change status for conversations assigned to them',
@@ -946,6 +970,7 @@ export class InboxService {
     mediaType?: 'image' | 'document',
     caption?: string,
   ) {
+    const settings = await this.orgSettings.getSettings(organizationId);
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
@@ -974,6 +999,14 @@ export class InboxService {
     // Instagram doesn't support attachments yet
     if (mediaUrl && conversation.provider === IntegrationProvider.INSTAGRAM) {
       throw new BadRequestException('Attachments are not supported for Instagram yet');
+    }
+
+    // Auto-assign on reply (outbound): if enabled and conversation unassigned, assign to sender
+    if (settings.crm.inbox.autoAssignOnReply && !conversation.assignedToId) {
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { assignedToId: userId },
+      });
     }
 
     // Prepare job payload

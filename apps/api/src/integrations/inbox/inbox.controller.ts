@@ -85,7 +85,7 @@ export class InboxController {
   }
 
   @Patch('conversations/:id/assign')
-  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER, Role.SELLER)
   async assignConversation(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: { id: string; role: Role },

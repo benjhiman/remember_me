@@ -13,6 +13,7 @@ import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { Role, InviteStatus } from '@remember-me/prisma';
 import * as crypto from 'crypto';
+import { ORG_SETTINGS_DEFAULTS } from '../settings/org-settings.defaults';
 
 @Injectable()
 export class OrganizationsService {
@@ -43,6 +44,9 @@ export class OrganizationsService {
         data: {
           name: dto.name,
           slug: slug!,
+          settings: {
+            crm: ORG_SETTINGS_DEFAULTS.crm,
+          } as any,
         },
       });
 

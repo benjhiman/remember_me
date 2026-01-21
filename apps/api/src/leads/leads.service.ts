@@ -23,6 +23,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { AssignLeadDto } from './dto/assign-lead.dto';
 import { Role, LeadStatus, AuditAction, AuditEntityType, WhatsAppAutomationTrigger } from '@remember-me/prisma';
 import { WhatsAppAutomationsService } from '../integrations/whatsapp/whatsapp-automations.service';
+import { OrgSettingsService } from '../settings/org-settings.service';
 
 @Injectable({ scope: Scope.REQUEST })
 export class LeadsService {
@@ -32,6 +33,7 @@ export class LeadsService {
     @Inject(REQUEST) private request: Request,
     @Inject(forwardRef(() => WhatsAppAutomationsService))
     private automationsService?: WhatsAppAutomationsService,
+    private orgSettings?: OrgSettingsService,
   ) {}
 
   // Helper: Verify user membership and get role
@@ -407,7 +409,14 @@ export class LeadsService {
   }
 
   async createLead(organizationId: string, userId: string, dto: CreateLeadDto) {
-    await this.verifyMembership(organizationId, userId);
+    const { role } = await this.verifyMembership(organizationId, userId);
+    const settings = this.orgSettings
+      ? await this.orgSettings.getSettings(organizationId)
+      : null;
+
+    if (role === Role.SELLER && settings && !settings.crm.permissions.sellerCanEditLeads) {
+      throw new ForbiddenException('Seller cannot create leads (disabled by organization settings)');
+    }
 
     // Verify pipeline and stage belong to organization
     const pipeline = await this.prisma.pipeline.findFirst({
@@ -537,6 +546,13 @@ export class LeadsService {
 
   async updateLead(organizationId: string, userId: string, leadId: string, dto: UpdateLeadDto) {
     const { role } = await this.verifyMembership(organizationId, userId);
+    const settings = this.orgSettings
+      ? await this.orgSettings.getSettings(organizationId)
+      : null;
+
+    if (role === Role.SELLER && settings && !settings.crm.permissions.sellerCanEditLeads) {
+      throw new ForbiddenException('Seller cannot edit leads (disabled by organization settings)');
+    }
 
     const lead = await this.prisma.lead.findFirst({
       where: {
@@ -556,6 +572,13 @@ export class LeadsService {
 
     if (!this.canAccessLead(role, lead.assignedToId, lead.createdById, userId)) {
       throw new ForbiddenException('You do not have access to update this lead');
+    }
+
+    // Kanban move guardrail (stageId / pipelineId changes)
+    if (role === Role.SELLER && settings && !settings.crm.permissions.sellerCanMoveKanban) {
+      if (dto.stageId !== undefined || dto.pipelineId !== undefined) {
+        throw new ForbiddenException('Seller cannot move Kanban stages (disabled by organization settings)');
+      }
     }
 
     // Verify pipeline and stage if provided

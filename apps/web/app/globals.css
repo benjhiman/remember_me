@@ -47,6 +47,20 @@
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
   }
+
+  /* Accent presets (CRM-style) */
+  [data-accent='blue'] {
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+  }
+  [data-accent='violet'] {
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 40% 98%;
+  }
+  [data-accent='green'] {
+    --primary: 142 72% 29%;
+    --primary-foreground: 210 40% 98%;
+  }
 }
 
 @layer base {
@@ -55,5 +69,17 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* Enterprise density helpers */
+  [data-density='compact'] .crm-table th,
+  [data-density='compact'] .crm-table td {
+    @apply py-1.5;
+  }
+  [data-density='comfortable'] .crm-table th,
+  [data-density='comfortable'] .crm-table td {
+    @apply py-2.5;
   }
 }

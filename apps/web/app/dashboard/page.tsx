@@ -9,6 +9,7 @@ import { useLeads } from '@/lib/api/hooks/use-leads';
 import { useStockReservations } from '@/lib/api/hooks/use-stock-reservations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getDateRange, formatCurrency, formatNumber } from '@/lib/utils/date-range';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
@@ -91,12 +92,12 @@ export default function DashboardPage() {
   const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div>
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600">Vista general del negocio</p>
+            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground">Vista general del negocio</p>
           </div>
           <Button variant="outline" onClick={() => router.push('/dashboard/roas')}>
             Ver ROAS
@@ -165,7 +166,7 @@ export default function DashboardPage() {
             {[...Array(6)].map((_, i) => (
               <Card key={i}>
                 <CardContent className="p-4">
-                  <div className="h-20 bg-gray-200 animate-pulse rounded"></div>
+                  <Skeleton className="h-20 w-full" />
                 </CardContent>
               </Card>
             ))}
@@ -174,30 +175,30 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Ventas Totales</div>
+                <div className="text-sm text-muted-foreground mb-1">Ventas Totales</div>
                 <div className="text-2xl font-bold">{formatCurrency(totalRevenue)}</div>
-                <div className="text-xs text-gray-500 mt-1">{totalSales} ventas</div>
+                <div className="text-xs text-muted-foreground mt-1">{totalSales} ventas</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Ticket Promedio</div>
+                <div className="text-sm text-muted-foreground mb-1">Ticket Promedio</div>
                 <div className="text-2xl font-bold">{formatCurrency(avgTicket)}</div>
-                <div className="text-xs text-gray-500 mt-1">Por venta</div>
+                <div className="text-xs text-muted-foreground mt-1">Por venta</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Leads Nuevos</div>
+                <div className="text-sm text-muted-foreground mb-1">Leads Nuevos</div>
                 <div className="text-2xl font-bold">{formatNumber(totalLeads)}</div>
-                <div className="text-xs text-gray-500 mt-1">En el período</div>
+                <div className="text-xs text-muted-foreground mt-1">En el período</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="text-sm text-gray-600 mb-1">Leads Convertidos</div>
+                <div className="text-sm text-muted-foreground mb-1">Leads Convertidos</div>
                 <div className="text-2xl font-bold">{formatNumber(convertedLeads)}</div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-muted-foreground mt-1">
                   {conversionRate.toFixed(1)}% tasa de conversión
                 </div>
               </CardContent>
@@ -206,18 +207,18 @@ export default function DashboardPage() {
               <>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="text-sm text-gray-600 mb-1">Stock Disponible</div>
+                    <div className="text-sm text-muted-foreground mb-1">Stock Disponible</div>
                     <div className="text-2xl font-bold">{formatNumber(overview.stockAvailableCount)}</div>
-                    <div className="text-xs text-gray-500 mt-1">Items disponibles</div>
+                    <div className="text-xs text-muted-foreground mt-1">Items disponibles</div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="p-4">
-                    <div className="text-sm text-gray-600 mb-1">Stock Reservado</div>
+                    <div className="text-sm text-muted-foreground mb-1">Stock Reservado</div>
                     <div className="text-2xl font-bold text-yellow-600">
                       {formatNumber(overview.stockReservedCount)}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">Items reservados</div>
+                    <div className="text-xs text-muted-foreground mt-1">Items reservados</div>
                   </CardContent>
                 </Card>
               </>

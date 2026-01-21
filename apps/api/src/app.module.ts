@@ -28,6 +28,7 @@ import { IntegrationsModule } from './integrations/integrations.module';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { ExternalHttpClientModule } from './common/http/external-http-client.module';
+import { SettingsModule } from './settings/settings.module';
 
 // Resolve .env path relative to apps/api directory
 // Works from any CWD: finds apps/api/.env whether running from root or apps/api
@@ -102,6 +103,7 @@ const envFilePath = (() => {
     AuditLogModule,
     IdempotencyModule,
     IntegrationsModule,
+    SettingsModule,
     RateLimitModule,
     MetricsModule,
     ExternalHttpClientModule,

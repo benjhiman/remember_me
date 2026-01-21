@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { StockStatus, ItemCondition } from '@/types/stock';
 
 export default function StockPage() {
@@ -96,11 +97,11 @@ export default function StockPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div>
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Stock</h1>
-            <p className="text-gray-600">Gestión de inventario</p>
+            <h1 className="text-3xl font-bold text-foreground">Stock</h1>
+            <p className="text-muted-foreground">Gestión de inventario</p>
           </div>
           <Button onClick={() => router.push('/stock/reservations')}>
             Ver Reservas
@@ -182,7 +183,12 @@ export default function StockPage() {
         <Card>
           <CardContent className="p-0">
             {isLoading && (
-              <div className="p-8 text-center text-gray-500">Cargando stock...</div>
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
             )}
 
             {error && (

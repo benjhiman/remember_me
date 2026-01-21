@@ -15,10 +15,9 @@ import {
   type Ad,
 } from '@/lib/api/hooks/use-meta-ads';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { getDateRange, formatCurrency, formatNumber, type DateRangePreset } from '@/lib/utils/date-range';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
 type AdsView = 'campaigns' | 'adsets' | 'ads';
@@ -230,6 +229,11 @@ function AdsPageContent() {
     setAllAds([]);
   };
 
+  const handleBack = () => {
+    if (view === 'ads') return handleBackToAdsets();
+    if (view === 'adsets') return handleBackToCampaigns();
+  };
+
   const formatBudget = (value: string | null) => {
     if (!value) return '-';
     const num = Number(value);
@@ -253,156 +257,126 @@ function AdsPageContent() {
   const hasAdAccount = !!selectedAdAccountId;
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Meta Ads</h1>
-          <p className="text-gray-600">Gestión de campañas y métricas de Meta Ads</p>
-          {lastSyncedAt && (
-            <p className="text-xs text-gray-500 mt-1">
-              Last synced: {new Date(lastSyncedAt).toLocaleString('es-AR')}
-            </p>
-          )}
+    <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+      {/* Sidebar (Ads Manager) */}
+      <div className="rounded-xl border bg-background h-fit">
+        <div className="p-4 border-b">
+          <div className="text-sm font-semibold">Ads Manager</div>
+          <div className="text-xs text-muted-foreground">Meta Ads</div>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setRefreshNonce(Date.now())}
-          disabled={!hasAdAccount}
-        >
-          Refresh
-        </Button>
+        <div className="p-4 space-y-4">
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">Ad Account</div>
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Cargando…
+              </div>
+            ) : (
+              <select
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selectedAdAccountId}
+                onChange={(e) => handleAdAccountChange(e.target.value)}
+                disabled={updateConfigMutation.isPending}
+              >
+                <option value="">-- Seleccionar --</option>
+                {adAccountsData?.data.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {!hasAdAccount && (
+              <div className="mt-2 flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-900">
+                <AlertCircle className="h-4 w-4 mt-0.5" />
+                <span>Seleccioná una Ad Account para ver datos.</span>
+              </div>
+            )}
+            {!configData?.connected && (
+              <div className="mt-2 flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900">
+                <AlertCircle className="h-4 w-4 mt-0.5" />
+                <span>
+                  Meta no conectado.{' '}
+                  <Link href="/settings/integrations" className="underline">
+                    Ir a Integraciones
+                  </Link>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">Date Range</div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant={datePreset === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('today')}>
+                Hoy
+              </Button>
+              <Button variant={datePreset === '7d' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('7d')}>
+                7d
+              </Button>
+              <Button variant={datePreset === '30d' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('30d')}>
+                30d
+              </Button>
+              <Button variant={datePreset === 'custom' ? 'default' : 'outline'} size="sm" onClick={() => setDatePreset('custom')}>
+                Custom
+              </Button>
+            </div>
+            {datePreset === 'custom' && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+                <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">
+              {lastSyncedAt ? `Last synced: ${new Date(lastSyncedAt).toLocaleString('es-AR')}` : '—'}
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setRefreshNonce(Date.now())} disabled={!hasAdAccount}>
+              Refresh
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Ad Account Selector */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Ad Account</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-gray-600">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Cargando cuentas de anuncios...</span>
+      {/* Main */}
+      <div className="min-w-0">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm text-muted-foreground">
+              Campaigns {selectedCampaign ? `> ${selectedCampaign.name}` : ''}{selectedAdset ? ` > ${selectedAdset.name}` : ''}{' '}
+              {view === 'ads' ? '> Ads' : view === 'adsets' ? '> Adsets' : ''}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Seleccionar Ad Account</label>
-                <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={selectedAdAccountId}
-                  onChange={(e) => handleAdAccountChange(e.target.value)}
-                  disabled={updateConfigMutation.isPending}
-                >
-                  <option value="">-- Seleccionar Ad Account --</option>
-                  {adAccountsData?.data.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.name} ({account.id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {!hasAdAccount && (
-                <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Seleccioná una Ad Account para ver campañas</span>
-                </div>
-              )}
-              {!configData?.connected && (
-                <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>
-                    Meta no está conectado.{' '}
-                    <Link href="/settings/integrations" className="underline">
-                      Conectar cuenta Meta
-                    </Link>
-                  </span>
-                </div>
-              )}
-            </div>
+            <h1 className="text-2xl font-semibold truncate">Resultados</h1>
+          </div>
+          {view !== 'campaigns' && (
+            <Button variant="outline" size="sm" onClick={handleBack}>
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Date Range Filter */}
+      {/* Table */}
       {hasAdAccount && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Rango de Fechas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant={datePreset === 'today' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setDatePreset('today')}
-                >
-                  Hoy
-                </Button>
-                <Button
-                  variant={datePreset === '7d' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setDatePreset('7d')}
-                >
-                  7 días
-                </Button>
-                <Button
-                  variant={datePreset === '30d' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setDatePreset('30d')}
-                >
-                  30 días
-                </Button>
-                <Button
-                  variant={datePreset === 'custom' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setDatePreset('custom')}
-                >
-                  Personalizado
-                </Button>
-              </div>
-              {datePreset === 'custom' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Desde</label>
-                    <Input
-                      type="date"
-                      value={customFrom}
-                      onChange={(e) => setCustomFrom(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Hasta</label>
-                    <Input
-                      type="date"
-                      value={customTo}
-                      onChange={(e) => setCustomTo(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Campaigns Table */}
-      {hasAdAccount && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
+        <div className="rounded-xl border bg-background overflow-hidden">
+          <div className="px-4 py-3 border-b flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold">
               {view === 'campaigns'
-                ? 'Campañas'
+                ? 'Campaigns'
                 : view === 'adsets'
-                ? `Campaigns > ${selectedCampaign?.name || ''}`
-                : `Campaigns > ${selectedCampaign?.name || ''} > ${selectedAdset?.name || ''}`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+                ? `Adsets de ${selectedCampaign?.name || ''}`
+                : `Ads de ${selectedAdset?.name || ''}`}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Columns: Name · Status · Spend · Impressions · Clicks · CTR · CPC
+            </div>
+          </div>
+          <div className="p-0">
             {view === 'campaigns' ? (
               campaignsLoading ? (
-              <div className="flex items-center justify-center py-8 text-gray-600">
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
                 <span>Cargando campañas...</span>
               </div>
@@ -416,13 +390,13 @@ function AdsPageContent() {
                 </Button>
               </div>
               ) : !allCampaigns || allCampaigns.length === 0 ? (
-              <div className="text-center py-8 text-gray-600">
+              <div className="text-center py-8 text-muted-foreground">
                 No hay campañas disponibles para el rango de fechas seleccionado
               </div>
               ) : (
               <div className="space-y-4">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="w-full border-collapse crm-table">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-2 font-semibold text-sm">Name</th>
@@ -439,7 +413,7 @@ function AdsPageContent() {
                     </thead>
                     <tbody>
                       {allCampaigns.map((campaign) => (
-                        <tr key={campaign.id} className="border-b hover:bg-gray-50">
+                        <tr key={campaign.id} className="border-b hover:bg-muted/60 cursor-pointer" onClick={() => handleSelectCampaign({ id: campaign.id, name: campaign.name })}>
                           <td className="p-2 text-sm font-medium">{campaign.name}</td>
                           <td className="p-2 text-sm">
                             <span
@@ -454,7 +428,7 @@ function AdsPageContent() {
                               {campaign.status}
                             </span>
                           </td>
-                          <td className="p-2 text-sm text-gray-600">{campaign.objective || '-'}</td>
+                          <td className="p-2 text-sm text-muted-foreground">{campaign.objective || '-'}</td>
                           <td className="p-2 text-sm text-right font-medium">
                             {formatCurrency(parseFloat(campaign.insights.spend))}
                           </td>
@@ -470,20 +444,12 @@ function AdsPageContent() {
                           <td className="p-2 text-sm text-right">
                             {formatCurrency(parseFloat(campaign.insights.cpc))}
                           </td>
-                          <td className="p-2 text-sm text-gray-600">
+                          <td className="p-2 text-sm text-muted-foreground">
                             {campaign.updatedTime
                               ? new Date(campaign.updatedTime).toLocaleDateString('es-AR')
                               : '-'}
                           </td>
-                          <td className="p-2 text-sm text-right">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleSelectCampaign({ id: campaign.id, name: campaign.name })}
-                            >
-                              Ver adsets
-                            </Button>
-                          </td>
+                          <td className="p-2 text-sm text-right"></td>
                         </tr>
                       ))}
                     </tbody>
@@ -518,7 +484,7 @@ function AdsPageContent() {
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-muted-foreground">
                     {view === 'adsets' ? (
                       <>
                         Campaigns &gt;{' '}
@@ -545,7 +511,7 @@ function AdsPageContent() {
 
                 {view === 'adsets' ? (
                   adsetsLoading ? (
-                  <div className="flex items-center justify-center py-8 text-gray-600">
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin mr-2" />
                     <span>Cargando adsets...</span>
                   </div>
@@ -559,13 +525,13 @@ function AdsPageContent() {
                     </Button>
                   </div>
                   ) : allAdsets.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600">
+                  <div className="text-center py-8 text-muted-foreground">
                     No hay adsets disponibles para el rango de fechas seleccionado
                   </div>
                   ) : (
                   <div className="space-y-4">
                     <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
+                      <table className="w-full border-collapse crm-table">
                         <thead>
                           <tr className="border-b">
                             <th className="text-left p-2 font-semibold text-sm">Name</th>
@@ -584,7 +550,7 @@ function AdsPageContent() {
                         </thead>
                         <tbody>
                           {allAdsets.map((adset) => (
-                            <tr key={adset.id} className="border-b hover:bg-gray-50">
+                            <tr key={adset.id} className="border-b hover:bg-muted/60 cursor-pointer" onClick={() => handleSelectAdset({ id: adset.id, name: adset.name })}>
                               <td className="p-2 text-sm font-medium">{adset.name}</td>
                               <td className="p-2 text-sm">
                                 <span
@@ -616,21 +582,13 @@ function AdsPageContent() {
                               <td className="p-2 text-sm text-right">
                                 {formatCurrency(parseFloat(adset.insights.cpc))}
                               </td>
-                              <td className="p-2 text-sm text-gray-600">
+                              <td className="p-2 text-sm text-muted-foreground">
                                 {adset.startTime ? new Date(adset.startTime).toLocaleDateString('es-AR') : '-'}
                               </td>
-                              <td className="p-2 text-sm text-gray-600">
+                              <td className="p-2 text-sm text-muted-foreground">
                                 {adset.endTime ? new Date(adset.endTime).toLocaleDateString('es-AR') : '-'}
                               </td>
-                              <td className="p-2 text-sm text-right">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleSelectAdset({ id: adset.id, name: adset.name })}
-                                >
-                                  Ver ads
-                                </Button>
-                              </td>
+                              <td className="p-2 text-sm text-right"></td>
                             </tr>
                           ))}
                         </tbody>
@@ -665,7 +623,7 @@ function AdsPageContent() {
                   // ADS VIEW
                   <>
                     {adsLoading ? (
-                      <div className="flex items-center justify-center py-8 text-gray-600">
+                      <div className="flex items-center justify-center py-8 text-muted-foreground">
                         <Loader2 className="h-6 w-6 animate-spin mr-2" />
                         <span>Cargando ads...</span>
                       </div>
@@ -679,13 +637,13 @@ function AdsPageContent() {
                         </Button>
                       </div>
                     ) : allAds.length === 0 ? (
-                      <div className="text-center py-8 text-gray-600">
+                      <div className="text-center py-8 text-muted-foreground">
                         No hay ads disponibles para el rango de fechas seleccionado
                       </div>
                     ) : (
                       <div className="space-y-4">
                         <div className="overflow-x-auto">
-                          <table className="w-full border-collapse">
+                          <table className="w-full border-collapse crm-table">
                             <thead>
                               <tr className="border-b">
                                 <th className="text-left p-2 font-semibold text-sm">Name</th>
@@ -699,7 +657,7 @@ function AdsPageContent() {
                             </thead>
                             <tbody>
                               {allAds.map((ad) => (
-                                <tr key={ad.id} className="border-b hover:bg-gray-50">
+                                <tr key={ad.id} className="border-b hover:bg-muted/60">
                                   <td className="p-2 text-sm font-medium">{ad.name}</td>
                                   <td className="p-2 text-sm">
                                     <span
@@ -763,9 +721,10 @@ function AdsPageContent() {
                 )}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
+      </div>
     </div>
   );
 }

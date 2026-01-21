@@ -7,6 +7,7 @@ import { useLeads } from '@/lib/api/hooks/use-leads';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 import { Permission, userCan } from '@/lib/auth/permissions';
@@ -38,11 +39,11 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div>
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Leads</h1>
-            <p className="text-gray-600">Gestión de leads y oportunidades</p>
+            <p className="text-muted-foreground">Gestión de leads y oportunidades</p>
           </div>
           <div className="flex gap-2">
             {userCan(user, Permission.VIEW_LEADS) && (
@@ -112,9 +113,11 @@ export default function LeadsPage() {
         <Card>
           <CardContent className="p-0">
             {isLoading && (
-              <div className="p-8 text-center text-gray-500">
-                <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                <p className="mt-2">Cargando leads...</p>
+              <div className="p-4 space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
               </div>
             )}
 
@@ -133,31 +136,31 @@ export default function LeadsPage() {
               <>
                 {data.data.length === 0 ? (
                   <div className="p-8 text-center">
-                    <p className="text-gray-500 mb-4">No hay leads que coincidan con los filtros</p>
+                    <p className="text-muted-foreground mb-4">No hay leads que coincidan con los filtros</p>
                     <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
                   </div>
                 ) : (
                   <>
                     <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 border-b">
+                      <table className="w-full crm-table">
+                        <thead className="bg-muted/40 border-b">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Lead
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Estado
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Pipeline / Stage
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Origen
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Asignado
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                               Última actualización
                             </th>
                           </tr>
@@ -170,12 +173,12 @@ export default function LeadsPage() {
                               onClick={() => router.push(`/leads/${lead.id}`)}
                             >
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">{lead.name}</div>
+                                <div className="text-sm font-medium text-foreground">{lead.name}</div>
                                 {lead.email && (
-                                  <div className="text-sm text-gray-500">{lead.email}</div>
+                                  <div className="text-sm text-muted-foreground">{lead.email}</div>
                                 )}
                                 {lead.phone && (
-                                  <div className="text-sm text-gray-500">{lead.phone}</div>
+                                  <div className="text-sm text-muted-foreground">{lead.phone}</div>
                                 )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
@@ -188,20 +191,20 @@ export default function LeadsPage() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
+                                <div className="text-sm text-foreground">
                                   {lead.pipeline?.name || '—'}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-muted-foreground">
                                   {lead.stage?.name || '—'}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {lead.source || '—'}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {lead.assignedTo?.name || '—'}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                                 {formatDate(lead.updatedAt)}
                               </td>
                             </tr>
@@ -212,8 +215,8 @@ export default function LeadsPage() {
 
                     {/* Pagination */}
                     {data.meta.totalPages > 1 && (
-                      <div className="p-4 border-t flex items-center justify-between bg-gray-50">
-                        <div className="text-sm text-gray-600">
+                      <div className="p-4 border-t flex items-center justify-between bg-muted/30">
+                        <div className="text-sm text-muted-foreground">
                           Mostrando {data.data.length} de {data.meta.total} leads
                         </div>
                         <div className="flex gap-2">
