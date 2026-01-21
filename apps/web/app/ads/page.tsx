@@ -9,6 +9,8 @@ import {
   useMetaConfig,
   useUpdateMetaConfig,
   useMetaCampaigns,
+  useMetaAdsets,
+  type Adset,
 } from '@/lib/api/hooks/use-meta-ads';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +19,8 @@ import { getDateRange, formatCurrency, formatNumber, type DateRangePreset } from
 import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
+type AdsView = 'campaigns' | 'adsets';
+
 function AdsPageContent() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -24,22 +28,31 @@ function AdsPageContent() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
-  const [paginationAfter, setPaginationAfter] = useState<string | null>(null);
-  const [allCampaigns, setAllCampaigns] = useState<Array<{
-    id: string;
-    name: string;
-    status: string;
-    objective?: string;
-    createdTime?: string;
-    updatedTime?: string;
-    insights: {
-      spend: string;
-      impressions: number;
-      clicks: number;
-      ctr: string;
-      cpc: string;
-    };
-  }>>([]);
+  const [view, setView] = useState<AdsView>('campaigns');
+  const [selectedCampaign, setSelectedCampaign] = useState<{ id: string; name: string } | null>(null);
+
+  const [campaignsAfter, setCampaignsAfter] = useState<string | null>(null);
+  const [adsetsAfter, setAdsetsAfter] = useState<string | null>(null);
+
+  const [allCampaigns, setAllCampaigns] = useState<
+    Array<{
+      id: string;
+      name: string;
+      status: string;
+      objective?: string;
+      createdTime?: string;
+      updatedTime?: string;
+      insights: {
+        spend: string;
+        impressions: number;
+        clicks: number;
+        ctr: string;
+        cpc: string;
+      };
+    }>
+  >([]);
+
+  const [allAdsets, setAllAdsets] = useState<Adset[]>([]);
 
   // Get date range
   const dateRange = getDateRange(
@@ -61,10 +74,12 @@ function AdsPageContent() {
     }
   }, [configData, selectedAdAccountId]);
 
-  // Reset pagination when filters change
+  // Reset pagination when filters change (affects both views)
   useEffect(() => {
-    setPaginationAfter(null);
+    setCampaignsAfter(null);
+    setAdsetsAfter(null);
     setAllCampaigns([]);
+    setAllAdsets([]);
   }, [dateRange.from, dateRange.to, selectedAdAccountId]);
 
   // Fetch campaigns
@@ -77,15 +92,15 @@ function AdsPageContent() {
     from: dateRange.from,
     to: dateRange.to,
     limit: 25,
-    after: paginationAfter || undefined,
+    after: campaignsAfter || undefined,
     adAccountId: selectedAdAccountId || undefined,
-    enabled: !!user && !!selectedAdAccountId,
+    enabled: !!user && !!selectedAdAccountId && view === 'campaigns',
   });
 
   // Accumulate campaigns for pagination
   useEffect(() => {
     if (campaignsData?.data) {
-      if (paginationAfter) {
+      if (campaignsAfter) {
         // Append new campaigns when loading more
         setAllCampaigns((prev) => [...prev, ...campaignsData.data]);
       } else {
@@ -93,7 +108,32 @@ function AdsPageContent() {
         setAllCampaigns(campaignsData.data);
       }
     }
-  }, [campaignsData, paginationAfter]);
+  }, [campaignsData, campaignsAfter]);
+
+  const {
+    data: adsetsData,
+    isLoading: adsetsLoading,
+    error: adsetsError,
+    refetch: refetchAdsets,
+  } = useMetaAdsets({
+    campaignId: selectedCampaign?.id || '',
+    from: dateRange.from,
+    to: dateRange.to,
+    limit: 25,
+    after: adsetsAfter || undefined,
+    enabled: !!user && view === 'adsets' && !!selectedCampaign?.id,
+  });
+
+  // Accumulate adsets for pagination
+  useEffect(() => {
+    if (adsetsData?.data) {
+      if (adsetsAfter) {
+        setAllAdsets((prev) => [...prev, ...adsetsData.data]);
+      } else {
+        setAllAdsets(adsetsData.data);
+      }
+    }
+  }, [adsetsData, adsetsAfter]);
 
   // Handle ad account selection
   const handleAdAccountChange = async (adAccountId: string) => {
@@ -105,6 +145,28 @@ function AdsPageContent() {
     } catch (error) {
       console.error('Error updating ad account config:', error);
     }
+  };
+
+  const handleSelectCampaign = (campaign: { id: string; name: string }) => {
+    setSelectedCampaign(campaign);
+    setView('adsets');
+    setAdsetsAfter(null);
+    setAllAdsets([]);
+  };
+
+  const handleBackToCampaigns = () => {
+    setView('campaigns');
+    setSelectedCampaign(null);
+    setAdsetsAfter(null);
+    setAllAdsets([]);
+  };
+
+  const formatBudget = (value: string | null) => {
+    if (!value) return '-';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return value;
+    // Meta budgets are in minor units (cents)
+    return formatCurrency(num / 100);
   };
 
   useEffect(() => {
@@ -246,15 +308,20 @@ function AdsPageContent() {
       {hasAdAccount && (
         <Card>
           <CardHeader>
-            <CardTitle>Campañas</CardTitle>
+            <CardTitle>
+              {view === 'campaigns'
+                ? 'Campañas'
+                : `Campaigns > ${selectedCampaign?.name || ''}`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {campaignsLoading ? (
+            {view === 'campaigns' ? (
+              campaignsLoading ? (
               <div className="flex items-center justify-center py-8 text-gray-600">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
                 <span>Cargando campañas...</span>
               </div>
-            ) : campaignsError ? (
+              ) : campaignsError ? (
               <div className="text-center py-8">
                 <div className="text-red-600 mb-4">
                   Error al cargar campañas: {(campaignsError as Error).message}
@@ -263,11 +330,11 @@ function AdsPageContent() {
                   Reintentar
                 </Button>
               </div>
-            ) : !allCampaigns || allCampaigns.length === 0 ? (
+              ) : !allCampaigns || allCampaigns.length === 0 ? (
               <div className="text-center py-8 text-gray-600">
                 No hay campañas disponibles para el rango de fechas seleccionado
               </div>
-            ) : (
+              ) : (
               <div className="space-y-4">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
@@ -282,6 +349,7 @@ function AdsPageContent() {
                         <th className="text-right p-2 font-semibold text-sm">CTR</th>
                         <th className="text-right p-2 font-semibold text-sm">CPC</th>
                         <th className="text-left p-2 font-semibold text-sm">Updated</th>
+                        <th className="text-right p-2 font-semibold text-sm"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -322,6 +390,15 @@ function AdsPageContent() {
                               ? new Date(campaign.updatedTime).toLocaleDateString('es-AR')
                               : '-'}
                           </td>
+                          <td className="p-2 text-sm text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSelectCampaign({ id: campaign.id, name: campaign.name })}
+                            >
+                              Ver adsets
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -334,7 +411,7 @@ function AdsPageContent() {
                     <Button
                       onClick={() => {
                         if (campaignsData?.paging.after) {
-                          setPaginationAfter(campaignsData.paging.after);
+                          setCampaignsAfter(campaignsData.paging.after);
                         }
                       }}
                       variant="outline"
@@ -349,6 +426,126 @@ function AdsPageContent() {
                         'Cargar más'
                       )}
                     </Button>
+                  </div>
+                )}
+              </div>
+              )
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Campaigns &gt; <span className="font-medium text-gray-900">{selectedCampaign?.name}</span>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleBackToCampaigns}>
+                    Volver
+                  </Button>
+                </div>
+
+                {adsetsLoading ? (
+                  <div className="flex items-center justify-center py-8 text-gray-600">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span>Cargando adsets...</span>
+                  </div>
+                ) : adsetsError ? (
+                  <div className="text-center py-8">
+                    <div className="text-red-600 mb-4">
+                      Error al cargar adsets: {(adsetsError as Error).message}
+                    </div>
+                    <Button onClick={() => refetchAdsets()} variant="outline">
+                      Reintentar
+                    </Button>
+                  </div>
+                ) : allAdsets.length === 0 ? (
+                  <div className="text-center py-8 text-gray-600">
+                    No hay adsets disponibles para el rango de fechas seleccionado
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-2 font-semibold text-sm">Name</th>
+                            <th className="text-left p-2 font-semibold text-sm">Status</th>
+                            <th className="text-right p-2 font-semibold text-sm">Daily Budget</th>
+                            <th className="text-right p-2 font-semibold text-sm">Lifetime Budget</th>
+                            <th className="text-right p-2 font-semibold text-sm">Spend</th>
+                            <th className="text-right p-2 font-semibold text-sm">Impressions</th>
+                            <th className="text-right p-2 font-semibold text-sm">Clicks</th>
+                            <th className="text-right p-2 font-semibold text-sm">CTR</th>
+                            <th className="text-right p-2 font-semibold text-sm">CPC</th>
+                            <th className="text-left p-2 font-semibold text-sm">Start</th>
+                            <th className="text-left p-2 font-semibold text-sm">End</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allAdsets.map((adset) => (
+                            <tr key={adset.id} className="border-b hover:bg-gray-50">
+                              <td className="p-2 text-sm font-medium">{adset.name}</td>
+                              <td className="p-2 text-sm">
+                                <span
+                                  className={`px-2 py-1 rounded text-xs ${
+                                    adset.status === 'ACTIVE'
+                                      ? 'bg-green-100 text-green-800'
+                                      : adset.status === 'PAUSED'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}
+                                >
+                                  {adset.status}
+                                </span>
+                              </td>
+                              <td className="p-2 text-sm text-right">{formatBudget(adset.dailyBudget)}</td>
+                              <td className="p-2 text-sm text-right">{formatBudget(adset.lifetimeBudget)}</td>
+                              <td className="p-2 text-sm text-right font-medium">
+                                {formatCurrency(parseFloat(adset.insights.spend))}
+                              </td>
+                              <td className="p-2 text-sm text-right">
+                                {formatNumber(adset.insights.impressions)}
+                              </td>
+                              <td className="p-2 text-sm text-right">
+                                {formatNumber(adset.insights.clicks)}
+                              </td>
+                              <td className="p-2 text-sm text-right">
+                                {parseFloat(adset.insights.ctr).toFixed(2)}%
+                              </td>
+                              <td className="p-2 text-sm text-right">
+                                {formatCurrency(parseFloat(adset.insights.cpc))}
+                              </td>
+                              <td className="p-2 text-sm text-gray-600">
+                                {adset.startTime ? new Date(adset.startTime).toLocaleDateString('es-AR') : '-'}
+                              </td>
+                              <td className="p-2 text-sm text-gray-600">
+                                {adset.endTime ? new Date(adset.endTime).toLocaleDateString('es-AR') : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {adsetsData?.paging.after && (
+                      <div className="flex justify-center pt-4">
+                        <Button
+                          onClick={() => {
+                            if (adsetsData?.paging.after) {
+                              setAdsetsAfter(adsetsData.paging.after);
+                            }
+                          }}
+                          variant="outline"
+                          disabled={adsetsLoading}
+                        >
+                          {adsetsLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Cargando...
+                            </>
+                          ) : (
+                            'Cargar más'
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

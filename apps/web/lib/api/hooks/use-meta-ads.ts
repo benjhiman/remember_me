@@ -44,12 +44,40 @@ export interface CampaignsListResponse {
   };
 }
 
+export interface Adset {
+  id: string;
+  name: string;
+  status: string;
+  dailyBudget: string | null;
+  lifetimeBudget: string | null;
+  startTime?: string;
+  endTime?: string | null;
+  campaignId: string;
+  insights: CampaignInsights;
+}
+
+export interface AdsetsListResponse {
+  data: Adset[];
+  paging: {
+    after: string | null;
+  };
+}
+
 interface UseMetaCampaignsParams {
   from?: string;
   to?: string;
   limit?: number;
   after?: string;
   adAccountId?: string;
+  enabled?: boolean;
+}
+
+interface UseMetaAdsetsParams {
+  campaignId: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+  after?: string;
   enabled?: boolean;
 }
 
@@ -98,5 +126,22 @@ export function useMetaCampaigns(params: UseMetaCampaignsParams = {}) {
     queryKey: ['meta-campaigns', { from, to, limit, after, adAccountId }],
     queryFn: () => api.get<CampaignsListResponse>(`/integrations/meta/campaigns?${queryParams.toString()}`),
     enabled,
+  });
+}
+
+export function useMetaAdsets(params: UseMetaAdsetsParams) {
+  const { campaignId, from, to, limit, after, enabled = true } = params;
+
+  const queryParams = new URLSearchParams();
+  queryParams.set('campaignId', campaignId);
+  if (from) queryParams.set('from', from);
+  if (to) queryParams.set('to', to);
+  if (limit) queryParams.set('limit', limit.toString());
+  if (after) queryParams.set('after', after);
+
+  return useQuery({
+    queryKey: ['meta-adsets', { campaignId, from, to, limit, after }],
+    queryFn: () => api.get<AdsetsListResponse>(`/integrations/meta/adsets?${queryParams.toString()}`),
+    enabled: enabled && !!campaignId,
   });
 }
