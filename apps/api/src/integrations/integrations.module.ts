@@ -50,10 +50,11 @@ import { BullMqQueueAdapter } from './jobs/queue/bullmq-queue.adapter';
 import { ExternalHttpClientModule } from '../common/http/external-http-client.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { LeadsModule } from '../leads/leads.module';
+import { SettingsModule } from '../settings/settings.module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [PrismaModule, forwardRef(() => LeadsModule), ExternalHttpClientModule],
+  imports: [PrismaModule, SettingsModule, forwardRef(() => LeadsModule), ExternalHttpClientModule],
   controllers: [
     IntegrationsController,
     IntegrationsSettingsController,
