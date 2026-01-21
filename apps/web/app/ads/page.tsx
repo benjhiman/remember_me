@@ -25,6 +25,21 @@ function AdsPageContent() {
   const [customTo, setCustomTo] = useState('');
   const [selectedAdAccountId, setSelectedAdAccountId] = useState<string>('');
   const [paginationAfter, setPaginationAfter] = useState<string | null>(null);
+  const [allCampaigns, setAllCampaigns] = useState<Array<{
+    id: string;
+    name: string;
+    status: string;
+    objective?: string;
+    createdTime?: string;
+    updatedTime?: string;
+    insights: {
+      spend: string;
+      impressions: number;
+      clicks: number;
+      ctr: string;
+      cpc: string;
+    };
+  }>>([]);
 
   // Get date range
   const dateRange = getDateRange(
@@ -49,7 +64,21 @@ function AdsPageContent() {
   // Reset pagination when filters change
   useEffect(() => {
     setPaginationAfter(null);
+    setAllCampaigns([]);
   }, [dateRange.from, dateRange.to, selectedAdAccountId]);
+
+  // Accumulate campaigns for pagination
+  useEffect(() => {
+    if (campaignsData?.data) {
+      if (paginationAfter) {
+        // Append new campaigns when loading more
+        setAllCampaigns((prev) => [...prev, ...campaignsData.data]);
+      } else {
+        // Reset when filters change
+        setAllCampaigns(campaignsData.data);
+      }
+    }
+  }, [campaignsData, paginationAfter]);
 
   // Fetch campaigns
   const {
