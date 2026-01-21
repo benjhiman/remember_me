@@ -264,7 +264,7 @@ function AdsPageContent() {
           <div className="text-sm font-semibold">Ads Manager</div>
           <div className="text-xs text-muted-foreground">Meta Ads</div>
         </div>
-        <div className="p-4 space-y-4">
+          <div className="p-4 space-y-4">
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-2">Ad Account</div>
             {isLoading ? (
@@ -331,7 +331,7 @@ function AdsPageContent() {
 
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-muted-foreground">
-              {lastSyncedAt ? `Last synced: ${new Date(lastSyncedAt).toLocaleString('es-AR')}` : '—'}
+              {lastSyncedAt ? `Last updated: ${new Date(lastSyncedAt).toLocaleString('es-AR')}` : '—'}
             </div>
             <Button variant="outline" size="sm" onClick={() => setRefreshNonce(Date.now())} disabled={!hasAdAccount}>
               Refresh
@@ -395,9 +395,9 @@ function AdsPageContent() {
               </div>
               ) : (
               <div className="space-y-4">
-                <div className="overflow-x-auto">
+                <div className="overflow-auto max-h-[calc(100vh-260px)]">
                   <table className="w-full border-collapse crm-table">
-                    <thead>
+                    <thead className="sticky top-0 bg-background z-10">
                       <tr className="border-b">
                         <th className="text-left p-2 font-semibold text-sm">Name</th>
                         <th className="text-left p-2 font-semibold text-sm">Status</th>
@@ -530,9 +530,9 @@ function AdsPageContent() {
                   </div>
                   ) : (
                   <div className="space-y-4">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto max-h-[calc(100vh-260px)]">
                       <table className="w-full border-collapse crm-table">
-                        <thead>
+                        <thead className="sticky top-0 bg-background z-10">
                           <tr className="border-b">
                             <th className="text-left p-2 font-semibold text-sm">Name</th>
                             <th className="text-left p-2 font-semibold text-sm">Status</th>
@@ -642,9 +642,9 @@ function AdsPageContent() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="overflow-x-auto">
+                        <div className="overflow-auto max-h-[calc(100vh-260px)]">
                           <table className="w-full border-collapse crm-table">
-                            <thead>
+                            <thead className="sticky top-0 bg-background z-10">
                               <tr className="border-b">
                                 <th className="text-left p-2 font-semibold text-sm">Name</th>
                                 <th className="text-left p-2 font-semibold text-sm">Status</th>

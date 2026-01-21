@@ -16,6 +16,10 @@ import {
   IsIn,
   IsObject,
   IsOptional,
+  IsString,
+  MaxLength,
+  ValidateIf,
+  IsUrl,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -59,7 +63,40 @@ class UiDto {
   accentColor?: 'blue' | 'violet' | 'green';
 }
 
+class BrandingDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUrl({ require_protocol: true }, { message: 'logoUrl debe ser una URL válida con https:// o http://' })
+  @MaxLength(500)
+  logoUrl?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUrl({ require_protocol: true }, { message: 'faviconUrl debe ser una URL válida con https:// o http://' })
+  @MaxLength(500)
+  faviconUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  accentColor?: string;
+
+  @IsOptional()
+  @IsIn(['comfortable', 'compact'])
+  density?: 'comfortable' | 'compact';
+}
+
 class CrmDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BrandingDto)
+  branding?: BrandingDto;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => PermissionsDto)

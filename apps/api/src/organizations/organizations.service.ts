@@ -45,7 +45,13 @@ export class OrganizationsService {
           name: dto.name,
           slug: slug!,
           settings: {
-            crm: ORG_SETTINGS_DEFAULTS.crm,
+            crm: {
+              ...ORG_SETTINGS_DEFAULTS.crm,
+              branding: {
+                ...(ORG_SETTINGS_DEFAULTS.crm as any).branding,
+                name: `${dto.name} CRM`,
+              },
+            },
           } as any,
         },
       });

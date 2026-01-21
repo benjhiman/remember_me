@@ -32,11 +32,36 @@ function InboxWhatsAppInner() {
   const [debouncedQ, setDebouncedQ] = useState('');
   const [status, setStatus] = useState<ConversationStatus | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [leftWidth, setLeftWidth] = useState<number>(380);
+  const resizingRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const min = 320;
+      const max = 520;
+      setLeftWidth((prev) => {
+        const next = Math.min(max, Math.max(min, e.clientX - 24));
+        return Number.isFinite(next) ? next : prev;
+      });
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   const assignedToId =
     user?.role === 'SELLER' && settings?.crm.inbox.sellerSeesOnlyAssigned ? user.id : undefined;
@@ -94,7 +119,10 @@ function InboxWhatsAppInner() {
   }, [user, router]);
 
   const [draft, setDraft] = useState('');
-  const canSend = !!conversation && conversation.canReply;
+  const canSend =
+    !!conversation &&
+    conversation.canReply &&
+    (user?.role !== 'SELLER' || conversation.assignedToId === user.id);
 
   const canChangeStatus =
     !!conversation &&
@@ -135,9 +163,12 @@ function InboxWhatsAppInner() {
 
   return (
     <div className="h-[calc(100vh-140px)] rounded-xl border bg-background overflow-hidden">
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] h-full">
+      <div className="flex h-full">
         {/* LEFT: chat list */}
-        <div className="border-r bg-background flex flex-col">
+        <div
+          className="border-r bg-background flex flex-col"
+          style={{ width: leftWidth }}
+        >
           <div className="p-3 border-b">
             <div className="text-sm font-semibold">WhatsApp</div>
             <div className="mt-2 flex gap-2">
@@ -150,17 +181,23 @@ function InboxWhatsAppInner() {
                 }}
               />
             </div>
-            <div className="mt-2 flex gap-2">
-              <select
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={status || ''}
-                onChange={(e) => setStatus((e.target.value || undefined) as any)}
-              >
-                <option value="">Todos</option>
-                <option value="OPEN">OPEN</option>
-                <option value="PENDING">PENDING</option>
-                <option value="CLOSED">CLOSED</option>
-              </select>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(['OPEN', 'PENDING', 'CLOSED'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={cn(
+                    'text-[11px] font-semibold px-3 py-1 rounded-full border transition-colors',
+                    status === s ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-background hover:bg-muted border-border text-muted-foreground',
+                  )}
+                  onClick={() => {
+                    setStatus(status === s ? undefined : (s as any));
+                    setPage(1);
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
@@ -179,6 +216,16 @@ function InboxWhatsAppInner() {
             )}
           </div>
         </div>
+
+        {/* Resizer */}
+        <div
+          className="hidden lg:block w-1 cursor-col-resize bg-border/60 hover:bg-border"
+          onMouseDown={() => {
+            resizingRef.current = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+          }}
+        />
 
         {/* RIGHT: chat */}
         <div className="flex flex-col h-full bg-[#ECE5DD]">
@@ -295,7 +342,8 @@ function InboxWhatsAppInner() {
           {/* Footer */}
           <div className="bg-background border-t p-3">
             <div className="flex items-center gap-2">
-              <Input
+              <textarea
+                className="flex-1 min-h-[40px] max-h-28 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
                 placeholder={canSend ? 'Escribí un mensaje…' : 'No se puede responder'}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}

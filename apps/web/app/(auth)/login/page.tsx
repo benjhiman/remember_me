@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,6 +22,18 @@ export default function LoginPage() {
   const { setTokens, setTempToken } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [branding, setBranding] = useState<{ name: string; logoUrl: string | null } | null>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('crm-branding');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.name) setBranding({ name: parsed.name, logoUrl: parsed.logoUrl || null });
+    } catch {}
+  }, []);
+
+  const brandName = useMemo(() => branding?.name || 'CRM', [branding?.name]);
 
   const {
     register,
@@ -59,11 +71,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Remember Me</CardTitle>
-          <CardDescription>Inicia sesión en tu cuenta</CardDescription>
+          <div className="flex items-center gap-3">
+            {branding?.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt="Logo"
+                className="h-10 w-10 rounded-md border bg-white object-contain"
+              />
+            ) : (
+              <div className="h-10 w-10 rounded-md border bg-muted flex items-center justify-center text-xs font-semibold">
+                {brandName.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <CardTitle className="truncate">{brandName}</CardTitle>
+              <CardDescription>Ingresá a tu cuenta</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

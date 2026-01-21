@@ -5,6 +5,13 @@ export type UiAccentColor = 'blue' | 'violet' | 'green';
 export type ConversationStatus = 'OPEN' | 'PENDING' | 'CLOSED';
 
 export interface OrgCrmSettings {
+  branding: {
+    name: string;
+    logoUrl: string | null;
+    faviconUrl: string | null;
+    accentColor: string;
+    density: UiDensity;
+  };
   permissions: {
     sellerCanChangeConversationStatus: boolean;
     sellerCanReassignConversation: boolean;
@@ -30,6 +37,13 @@ export interface OrgSettings {
 
 export const ORG_SETTINGS_DEFAULTS: OrgSettings = {
   crm: {
+    branding: {
+      name: 'CRM',
+      logoUrl: null,
+      faviconUrl: null,
+      accentColor: 'blue',
+      density: 'comfortable',
+    },
     permissions: {
       sellerCanChangeConversationStatus: true,
       sellerCanReassignConversation: true,

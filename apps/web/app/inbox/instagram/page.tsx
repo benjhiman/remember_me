@@ -32,11 +32,36 @@ function InboxInstagramInner() {
   const [q, setQ] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [page, setPage] = useState(1);
+  const [leftWidth, setLeftWidth] = useState<number>(380);
+  const resizingRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const min = 320;
+      const max = 520;
+      setLeftWidth((prev) => {
+        const next = Math.min(max, Math.max(min, e.clientX - 24));
+        return Number.isFinite(next) ? next : prev;
+      });
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   const assignedToId =
     user?.role === 'SELLER' && settings?.crm.inbox.sellerSeesOnlyAssigned ? user.id : undefined;
@@ -93,7 +118,10 @@ function InboxInstagramInner() {
   }, [user, router]);
 
   const [draft, setDraft] = useState('');
-  const canSend = !!conversation && conversation.canReply;
+  const canSend =
+    !!conversation &&
+    conversation.canReply &&
+    (user?.role !== 'SELLER' || conversation.assignedToId === user.id);
 
   const canChangeStatus =
     !!conversation &&
@@ -126,9 +154,9 @@ function InboxInstagramInner() {
 
   return (
     <div className="h-[calc(100vh-140px)] rounded-xl border bg-background overflow-hidden">
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] h-full">
+      <div className="flex h-full">
         {/* LEFT */}
-        <div className="border-r bg-background flex flex-col">
+        <div className="border-r bg-background flex flex-col" style={{ width: leftWidth }}>
           <div className="p-3 border-b">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Instagram className="h-4 w-4" /> Instagram
@@ -160,6 +188,16 @@ function InboxInstagramInner() {
             )}
           </div>
         </div>
+
+        {/* Resizer */}
+        <div
+          className="hidden lg:block w-1 cursor-col-resize bg-border/60 hover:bg-border"
+          onMouseDown={() => {
+            resizingRef.current = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+          }}
+        />
 
         {/* RIGHT */}
         <div className="flex flex-col h-full bg-white">
@@ -271,15 +309,15 @@ function InboxInstagramInner() {
 
           <div className="bg-background border-t p-3">
             <div className="flex items-center gap-2">
-              <Input
+              <textarea
+                className="flex-1 min-h-[40px] max-h-28 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
                 placeholder={canSend ? 'Mensaje…' : 'No se puede responder'}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    // IG send-text soporta solo texto (backend lo mantiene)
-                    if (!conversationId || !canSend) return;
+                    if (!conversationId || !canSend || !draft.trim()) return;
                     api.post(`/inbox/conversations/${conversationId}/send-text`, { text: draft.trim() }).then(() => setDraft(''));
                   }
                 }}

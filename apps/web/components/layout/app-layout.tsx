@@ -9,6 +9,7 @@ import { LogOut, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { data: settings } = useOrgSettings(!!user);
 
   useEffect(() => {
     if (!user) {
@@ -65,7 +67,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <div className="lg:hidden bg-background border-b px-4 py-3 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">CRM</h1>
+        <h1 className="text-lg font-semibold truncate">
+          {settings?.crm?.branding?.name || user.organizationName || 'CRM'}
+        </h1>
         <Button
           variant="ghost"
           size="sm"
@@ -84,9 +88,24 @@ export function AppLayout({ children }: AppLayoutProps) {
           )}
         >
           <div className="px-4 py-4 border-b flex items-center justify-between gap-2">
-            <div className={cn('min-w-0', sidebarCollapsed && 'hidden')}>
-              <h2 className="text-base font-semibold truncate">{user.organizationName || 'CRM'}</h2>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            <div className={cn('min-w-0 flex items-center gap-3', sidebarCollapsed && 'hidden')}>
+              {settings?.crm?.branding?.logoUrl ? (
+                <img
+                  src={settings.crm.branding.logoUrl}
+                  alt="Logo"
+                  className="h-9 w-9 rounded-md border bg-white object-contain"
+                />
+              ) : (
+                <div className="h-9 w-9 rounded-md border bg-muted flex items-center justify-center text-xs font-semibold">
+                  {(settings?.crm?.branding?.name || user.organizationName || 'CRM').slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold truncate">
+                  {settings?.crm?.branding?.name || user.organizationName || 'CRM'}
+                </h2>
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              </div>
             </div>
             <Button
               variant="ghost"
@@ -157,6 +176,11 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <Breadcrumb items={breadcrumbs} />
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {sidebarCollapsed && (
+                  <span className="hidden xl:inline-flex max-w-[360px] truncate">
+                    {settings?.crm?.branding?.name || user.organizationName || 'CRM'}
+                  </span>
+                )}
                 <span className="rounded-full border px-2 py-1">{user.role}</span>
               </div>
             </div>

@@ -20,6 +20,7 @@ import {
 import { useOrgSettings, useUpdateOrgSettings } from '@/lib/api/hooks/use-org-settings';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/utils/error-handler';
+import { Input } from '@/components/ui/input';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -317,6 +318,60 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               {local && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-lg border bg-white p-4 md:col-span-3">
+                    <div className="font-medium mb-2">White‑label (Branding)</div>
+                    <div className="text-sm text-gray-600 mb-4">
+                      Nombre, logo y favicon por organización.
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Nombre del CRM</label>
+                        <Input
+                          value={local.crm.branding?.name || ''}
+                          onChange={(e) =>
+                            setLocal((prev: any) => ({
+                              ...prev,
+                              crm: { ...prev.crm, branding: { ...(prev.crm.branding || {}), name: e.target.value } },
+                            }))
+                          }
+                          placeholder={`${user.organizationName} CRM`}
+                          disabled={!canEdit}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Logo URL (opcional)</label>
+                        <Input
+                          value={local.crm.branding?.logoUrl || ''}
+                          onChange={(e) =>
+                            setLocal((prev: any) => ({
+                              ...prev,
+                              crm: { ...prev.crm, branding: { ...(prev.crm.branding || {}), logoUrl: e.target.value || null } },
+                            }))
+                          }
+                          placeholder="https://..."
+                          disabled={!canEdit}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Favicon URL (opcional)</label>
+                        <Input
+                          value={local.crm.branding?.faviconUrl || ''}
+                          onChange={(e) =>
+                            setLocal((prev: any) => ({
+                              ...prev,
+                              crm: { ...prev.crm, branding: { ...(prev.crm.branding || {}), faviconUrl: e.target.value || null } },
+                            }))
+                          }
+                          placeholder="https://..."
+                          disabled={!canEdit}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-3">
+                      Tip: si cambiás el favicon, puede tardar en reflejarse por cache del navegador.
+                    </div>
+                  </div>
+
                   <div className="rounded-lg border bg-white p-4">
                     <div className="font-medium mb-2">Density</div>
                     <Select
@@ -324,7 +379,11 @@ export default function SettingsPage() {
                       onValueChange={(v) =>
                         setLocal((prev: any) => ({
                           ...prev,
-                          crm: { ...prev.crm, ui: { ...prev.crm.ui, density: v } },
+                          crm: {
+                            ...prev.crm,
+                            ui: { ...prev.crm.ui, density: v },
+                            branding: { ...(prev.crm.branding || {}), density: v },
+                          },
                         }))
                       }
                       disabled={!canEdit}
@@ -346,7 +405,11 @@ export default function SettingsPage() {
                       onValueChange={(v) =>
                         setLocal((prev: any) => ({
                           ...prev,
-                          crm: { ...prev.crm, ui: { ...prev.crm.ui, accentColor: v } },
+                          crm: {
+                            ...prev.crm,
+                            ui: { ...prev.crm.ui, accentColor: v },
+                            branding: { ...(prev.crm.branding || {}), accentColor: v },
+                          },
                         }))
                       }
                       disabled={!canEdit}

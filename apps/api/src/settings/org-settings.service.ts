@@ -29,7 +29,7 @@ export class OrgSettingsService {
   async getSettings(organizationId: string): Promise<OrgSettings> {
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { settings: true },
+      select: { settings: true, name: true },
     });
     if (!org) throw new NotFoundException('Organization not found');
 
@@ -40,6 +40,17 @@ export class OrgSettingsService {
       rawCrm.inbox.sellerSeesOnlyAssigned = rawCrm.inbox.showOnlyAssignedToSeller;
     }
     const mergedCrm = deepMerge(ORG_SETTINGS_DEFAULTS.crm, rawCrm);
+
+    // Org-specific branding defaults (white-label)
+    if (!mergedCrm.branding.name || mergedCrm.branding.name === 'CRM') {
+      mergedCrm.branding.name = `${org.name} CRM`;
+    }
+    if (!mergedCrm.branding.accentColor) {
+      mergedCrm.branding.accentColor = mergedCrm.ui?.accentColor || 'blue';
+    }
+    if (!mergedCrm.branding.density) {
+      mergedCrm.branding.density = mergedCrm.ui?.density || 'comfortable';
+    }
     return { crm: mergedCrm };
   }
 
@@ -69,6 +80,12 @@ export class OrgSettingsService {
       deepMerge(ORG_SETTINGS_DEFAULTS.crm, currentCrm),
       patchCrm,
     );
+
+    // Keep ui.* aligned as fallback if branding provides these
+    if (nextCrm?.branding?.density) nextCrm.ui = { ...(nextCrm.ui || {}), density: nextCrm.branding.density };
+    if (nextCrm?.branding?.accentColor && ['blue', 'violet', 'green'].includes(nextCrm.branding.accentColor)) {
+      nextCrm.ui = { ...(nextCrm.ui || {}), accentColor: nextCrm.branding.accentColor as any };
+    }
 
     const nextSettings = {
       ...current,

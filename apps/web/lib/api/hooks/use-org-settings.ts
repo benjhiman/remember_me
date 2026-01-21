@@ -8,6 +8,13 @@ export type UiAccentColor = 'blue' | 'violet' | 'green';
 
 export interface OrgSettingsResponse {
   crm: {
+    branding?: {
+      name: string;
+      logoUrl: string | null;
+      faviconUrl: string | null;
+      accentColor: string;
+      density: UiDensity;
+    };
     permissions: {
       sellerCanChangeConversationStatus: boolean;
       sellerCanReassignConversation: boolean;
