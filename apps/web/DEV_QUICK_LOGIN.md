@@ -4,9 +4,17 @@ Sistema de login rápido para testing en producción (Vercel) sin pasar por `/lo
 
 ## URL
 
+**Recomendado:**
+```
+https://app.iphonealcosto.com/dev/login?k=YOUR_KEY&redirect=/inbox
+```
+
+**Legacy (redirige a `/dev/login`):**
 ```
 https://app.iphonealcosto.com/__dev/login?k=YOUR_KEY&redirect=/inbox
 ```
+
+> **Nota**: La ruta `/__dev/login` puede fallar en Vercel debido a restricciones de rutas con guiones bajos. Se recomienda usar `/dev/login` directamente.
 
 ## Parámetros
 
@@ -44,12 +52,14 @@ https://app.iphonealcosto.com/__dev/login?k=YOUR_KEY&redirect=/inbox
 ## Uso
 
 1. Configurar variables de entorno en Vercel y Railway
-2. Acceder a: `https://app.iphonealcosto.com/__dev/login?k=YOUR_KEY&redirect=/inbox`
+2. Acceder a: `https://app.iphonealcosto.com/dev/login?k=YOUR_KEY&redirect=/inbox`
 3. El sistema automáticamente:
    - Valida la key
    - Crea o loguea el usuario de prueba
    - Guarda tokens en el auth store
    - Redirige a la ruta especificada
+
+> **Nota**: Si usas `/__dev/login`, serás redirigido automáticamente a `/dev/login` preservando los query params.
 
 ## Notas
 

@@ -1,70 +1,35 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuthStore } from '@/lib/store/auth-store';
 
-function DevLoginContent() {
+function DevLoginRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setTokens } = useAuthStore();
-  const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
 
   useEffect(() => {
     const key = searchParams.get('k');
-    const redirect = searchParams.get('redirect') || '/leads';
+    const redirect = searchParams.get('redirect');
+    
+    // Build new URL preserving query params
+    const params = new URLSearchParams();
+    if (key) params.set('k', key);
+    if (redirect) params.set('redirect', redirect);
+    
+    const queryString = params.toString();
+    const newUrl = `/dev/login${queryString ? `?${queryString}` : ''}`;
+    
+    router.replace(newUrl);
+  }, [router, searchParams]);
 
-    if (!key) {
-      setStatus('error');
-      return;
-    }
-
-    // Call route handler
-    fetch(`/api/dev-login?k=${encodeURIComponent(key)}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          setStatus('error');
-          return;
-        }
-
-        const data = await res.json();
-
-        if (data.accessToken && data.refreshToken && data.user) {
-          setTokens(data.accessToken, data.refreshToken, data.user);
-          setStatus('success');
-          router.push(redirect);
-        } else {
-          setStatus('error');
-        }
-      })
-      .catch(() => {
-        setStatus('error');
-      });
-  }, [searchParams, setTokens, router]);
-
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-lg font-semibold mb-2">Logging in...</div>
-          <div className="text-sm text-gray-500">Please wait</div>
-        </div>
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="text-lg font-semibold mb-2">Redirecting...</div>
+        <div className="text-sm text-gray-500">Please wait</div>
       </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="text-lg font-semibold mb-2">Not found</div>
-          <div className="text-sm text-gray-500">The requested page could not be found.</div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }
 
 export default function DevLoginPage() {
@@ -76,7 +41,7 @@ export default function DevLoginPage() {
         </div>
       </div>
     }>
-      <DevLoginContent />
+      <DevLoginRedirect />
     </Suspense>
   );
 }
