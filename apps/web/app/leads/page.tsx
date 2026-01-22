@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useLeads } from '@/lib/api/hooks/use-leads';
@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { Users } from 'lucide-react';
 import type { LeadStatus } from '@/types/api';
 
 export default function LeadsPage() {
@@ -28,15 +29,8 @@ export default function LeadsPage() {
     enabled: !!user,
   });
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
-  }
+  // Auth is handled by RouteGuard in layout
+  // No need to check here to avoid double redirects
 
   return (
     <div>
@@ -123,21 +117,38 @@ export default function LeadsPage() {
 
             {error && (
               <div className="p-8 text-center">
-                <p className="text-red-500 mb-4">
-                  Error: {(error as Error).message || 'Error al cargar los leads'}
-                </p>
-                <Button onClick={() => refetch()} variant="outline">
-                  Reintentar
-                </Button>
+                <div className="max-w-md mx-auto">
+                  <p className="text-red-600 font-medium mb-2">
+                    Error al cargar los leads
+                  </p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {(error as Error).message || 'No se pudo conectar con el servidor'}
+                  </p>
+                  <Button onClick={() => refetch()} variant="outline">
+                    Reintentar
+                  </Button>
+                </div>
               </div>
             )}
 
             {data && (
               <>
                 {data.data.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-muted-foreground mb-4">No hay leads que coincidan con los filtros</p>
-                    <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
+                  <div className="p-12 text-center">
+                    <div className="max-w-sm mx-auto">
+                      <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                      <h3 className="text-sm font-semibold text-foreground mb-1">
+                        {search || status ? 'No hay leads con estos filtros' : 'No hay leads'}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {search || status
+                          ? 'Intentá ajustar los filtros para ver más resultados.'
+                          : 'Creá tu primer lead para empezar a gestionar oportunidades.'}
+                      </p>
+                      {userCan(user, Permission.EDIT_LEADS) && (
+                        <Button onClick={() => router.push('/leads/new')}>Crear Lead</Button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <>

@@ -113,11 +113,8 @@ function InboxWhatsAppInner() {
     containerRef.current.scrollTop = containerRef.current.scrollHeight;
   }, [messages.length, isAtBottom]);
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
+  // Auth is handled by RouteGuard in layout
+  // No need to check here to avoid double redirects
 
   const [draft, setDraft] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -197,10 +194,9 @@ function InboxWhatsAppInner() {
     conversation?.lead?.name || conversation?.phone || conversation?.handle || 'WhatsApp';
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)]">
+    <div className="flex flex-col h-full">
       <InboxHeader currentChannel="whatsapp" />
-      <div className="flex-1 rounded-xl border bg-background overflow-hidden">
-        <div className="flex h-full">
+      <div className="flex-1 flex overflow-hidden bg-[#F0F2F5]">
         {/* LEFT: chat list */}
         <div
           className="border-r bg-background flex flex-col"
@@ -240,9 +236,13 @@ function InboxWhatsAppInner() {
           </div>
           <div className="flex-1 overflow-y-auto">
             {listLoading ? (
-              <div className="p-4 text-sm text-muted-foreground">Cargando…</div>
-            ) : (
-              (convList?.data || []).map((c) => (
+              <div className="p-4 space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-16 bg-muted/30 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : convList?.data && convList.data.length > 0 ? (
+              convList.data.map((c) => (
                 <EnterpriseChatListItem
                   key={c.id}
                   conversation={c}
@@ -251,6 +251,18 @@ function InboxWhatsAppInner() {
                   onClick={() => onSelectConversation(c.id)}
                 />
               ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center">
+                <div className="mb-4">
+                  <MessageSquare className="h-12 w-12 text-muted-foreground/40 mx-auto" />
+                </div>
+                <h3 className="text-sm font-semibold text-foreground mb-1">No hay conversaciones</h3>
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  {q || status
+                    ? 'No se encontraron conversaciones con los filtros aplicados.'
+                    : 'Las conversaciones de WhatsApp aparecerán aquí cuando lleguen mensajes.'}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -265,8 +277,8 @@ function InboxWhatsAppInner() {
           }}
         />
 
-        {/* RIGHT: chat */}
-        <div className="flex flex-col h-full bg-[#ECE5DD]">
+        {/* CENTER: chat */}
+        <div className="flex-1 flex flex-col bg-[#ECE5DD] min-w-0">
           {/* Header */}
           <div className="bg-background border-b px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -337,8 +349,19 @@ function InboxWhatsAppInner() {
             )}
 
             {!conversationId ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                Seleccioná una conversación.
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-[#ECE5DD]">
+                <div className="mb-6">
+                  <div className="h-24 w-24 rounded-full bg-white/80 flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground/40" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">WhatsApp</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Seleccioná una conversación de la lista para empezar a chatear.
+                </p>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Usá los filtros arriba para buscar conversaciones específicas.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -399,7 +422,6 @@ function InboxWhatsAppInner() {
               </Button>
             </div>
           </div>
-        </div>
         </div>
       </div>
     </div>

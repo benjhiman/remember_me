@@ -24,15 +24,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { data: settings } = useOrgSettings(!!user);
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
-  }
+  // Auth is handled by RouteGuard in layout
+  // No need to check here to avoid double redirects
 
   const handleLogout = () => {
     clearAuth();
@@ -169,9 +162,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         )}
 
         {/* Main content */}
-        <main className="flex-1 min-h-screen">
+        <main className="flex-1 min-h-screen flex flex-col">
           {/* Desktop header */}
-          <div className="hidden lg:block border-b bg-background">
+          <div className="hidden lg:block border-b bg-background flex-shrink-0">
             <div className="px-6 py-4 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <Breadcrumb items={breadcrumbs} />
@@ -187,7 +180,12 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
 
-          <div className="px-6 py-6">
+          {/* Content area - pages can opt out of padding by using full height */}
+          <div className={cn(
+            'flex-1 overflow-auto',
+            // No padding for inbox pages (they use full viewport)
+            !pathname?.startsWith('/inbox') && 'px-6 py-6'
+          )}>
             {children}
           </div>
         </main>

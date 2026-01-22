@@ -16,6 +16,7 @@ import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
 import { Instagram } from 'lucide-react';
 import type { ConversationStatus, Message } from '@/types/api';
+import { InboxHeader } from '@/components/inbox/inbox-header';
 
 function InboxInstagramInner() {
   const router = useRouter();
@@ -111,11 +112,8 @@ function InboxInstagramInner() {
     containerRef.current.scrollTop = containerRef.current.scrollHeight;
   }, [messages.length, isAtBottom]);
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
+  // Auth is handled by RouteGuard in layout
+  // No need to check here to avoid double redirects
 
   const [draft, setDraft] = useState('');
   const canSend =
@@ -153,8 +151,9 @@ function InboxInstagramInner() {
   const headerName = conversation?.handle || conversation?.lead?.name || 'Instagram';
 
   return (
-    <div className="h-[calc(100vh-140px)] rounded-xl border bg-background overflow-hidden">
-      <div className="flex h-full">
+    <div className="flex flex-col h-full">
+      <InboxHeader currentChannel="instagram" />
+      <div className="flex-1 flex overflow-hidden bg-white">
         {/* LEFT */}
         <div className="border-r bg-background flex flex-col" style={{ width: leftWidth }}>
           <div className="p-3 border-b">
@@ -174,9 +173,13 @@ function InboxInstagramInner() {
           </div>
           <div className="flex-1 overflow-y-auto">
             {listLoading ? (
-              <div className="p-4 text-sm text-muted-foreground">Cargando…</div>
-            ) : (
-              (convList?.data || []).map((c) => (
+              <div className="p-4 space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-16 bg-muted/30 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : convList?.data && convList.data.length > 0 ? (
+              convList.data.map((c) => (
                 <EnterpriseChatListItem
                   key={c.id}
                   conversation={c}
@@ -185,6 +188,18 @@ function InboxInstagramInner() {
                   onClick={() => onSelectConversation(c.id)}
                 />
               ))
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center">
+                <div className="mb-4">
+                  <Instagram className="h-12 w-12 text-muted-foreground/40 mx-auto" />
+                </div>
+                <h3 className="text-sm font-semibold text-foreground mb-1">No hay conversaciones</h3>
+                <p className="text-xs text-muted-foreground max-w-xs">
+                  {q || status
+                    ? 'No se encontraron conversaciones con los filtros aplicados.'
+                    : 'Las conversaciones de Instagram aparecerán aquí cuando lleguen mensajes.'}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -199,8 +214,8 @@ function InboxInstagramInner() {
           }}
         />
 
-        {/* RIGHT */}
-        <div className="flex flex-col h-full bg-white">
+        {/* CENTER */}
+        <div className="flex-1 flex flex-col bg-white min-w-0">
           <div className="bg-background border-b px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div className="h-9 w-9 rounded-full bg-gradient-to-br from-fuchsia-500 to-amber-500 text-white flex items-center justify-center font-semibold">
@@ -267,8 +282,19 @@ function InboxInstagramInner() {
             )}
 
             {!conversationId ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                Seleccioná una conversación.
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white">
+                <div className="mb-6">
+                  <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+                    <Instagram className="h-12 w-12 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Instagram Direct</h3>
+                <p className="text-sm text-muted-foreground max-w-sm">
+                  Seleccioná una conversación de la lista para ver los mensajes.
+                </p>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Los mensajes directos de Instagram aparecerán aquí.
+                </p>
               </div>
             ) : (
               <div className="space-y-4">

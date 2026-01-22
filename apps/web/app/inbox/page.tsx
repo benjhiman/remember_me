@@ -4,22 +4,10 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Instagram, MessageCircle } from 'lucide-react';
-import { useAuthStore } from '@/lib/store/auth-store';
-import { useEffect } from 'react';
 
 export default function InboxPage() {
   const router = useRouter();
-  const { user } = useAuthStore();
-
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
-  }
+  // Auth is handled by RouteGuard in layout
 
   const channels = [
     {
