@@ -25,7 +25,7 @@ export function InboxHeader({ currentChannel }: { currentChannel?: string }) {
     const channel = channels.find((c) => c.value === value);
     if (channel) {
       // Preserve query params if any
-      const currentSearch = window.location.search;
+      const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
       router.push(`${channel.href}${currentSearch}`);
     }
   };

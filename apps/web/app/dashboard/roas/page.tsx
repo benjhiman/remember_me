@@ -32,6 +32,8 @@ function exportToCSV(data: any[], groupBy: AttributionGroupBy) {
     item.avgTicket.toFixed(2),
   ]);
 
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  
   const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);

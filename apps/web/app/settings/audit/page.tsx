@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useAuditLogs } from '@/lib/api/hooks/use-audit-logs';
@@ -25,8 +25,13 @@ export default function AuditLogPage() {
     action: actionFilter || undefined,
   });
 
+  useEffect(() => {
+    if (!user || !userCan(user, Permission.MANAGE_MEMBERS)) {
+      router.push('/forbidden');
+    }
+  }, [user, router]);
+
   if (!user || !userCan(user, Permission.MANAGE_MEMBERS)) {
-    router.push('/forbidden');
     return null;
   }
 

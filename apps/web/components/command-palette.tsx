@@ -28,6 +28,8 @@ export function CommandPalette() {
   const { user } = useAuthStore();
 
   React.useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
     const down = (e: KeyboardEvent) => {
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();

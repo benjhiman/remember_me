@@ -37,7 +37,7 @@ function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
 }
 
 function setFavicon(url: string | null | undefined) {
-  if (!url) return;
+  if (!url || typeof document === 'undefined') return;
   const head = document.head;
   const existing = head.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
   existing.forEach((l) => l.parentNode?.removeChild(l));
@@ -52,6 +52,8 @@ export function OrgThemeSync() {
   const { data } = useOrgSettings(!!user);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
     const html = document.documentElement;
     const body = document.body;
 

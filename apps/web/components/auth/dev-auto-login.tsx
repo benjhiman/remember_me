@@ -40,9 +40,11 @@ export function DevAutoLogin() {
       if (authData) {
         setTokens(authData.accessToken, authData.refreshToken, authData.user);
         // Redirect to /leads (or current path if already on a protected route)
-        const currentPath = window.location.pathname;
-        if (currentPath === '/login' || currentPath === '/') {
-          router.push('/leads');
+        if (typeof window !== 'undefined') {
+          const currentPath = window.location.pathname;
+          if (currentPath === '/login' || currentPath === '/') {
+            router.push('/leads');
+          }
         }
       }
     };

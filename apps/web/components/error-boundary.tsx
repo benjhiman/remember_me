@@ -83,7 +83,11 @@ function DefaultErrorFallback({ error }: { error: Error }) {
         )}
         <div className="flex gap-2 justify-center">
           <Button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            }}
             variant="default"
             className="gap-2"
           >
@@ -91,7 +95,11 @@ function DefaultErrorFallback({ error }: { error: Error }) {
             Reintentar
           </Button>
           <Button
-            onClick={() => (window.location.href = '/login')}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+              }
+            }}
             variant="outline"
           >
             Ir a Login
