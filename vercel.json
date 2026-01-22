@@ -1,13 +1,8 @@
 {
-  "buildCommand": "cd apps/web && pnpm build",
-  "devCommand": "cd apps/web && pnpm dev",
+  "buildCommand": "pnpm --filter @remember-me/web build",
+  "devCommand": "pnpm --filter @remember-me/web dev",
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "outputDirectory": "apps/web/.next",
-  "rootDirectory": "apps/web",
-  "git": {
-    "deploymentEnabled": {
-      "main": true
-    }
-  }
+  "rootDirectory": "apps/web"
 }
