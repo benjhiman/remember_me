@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,10 +19,13 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setTokens, setTempToken } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [branding, setBranding] = useState<{ name: string; logoUrl: string | null } | null>(null);
+  
+  const redirectTo = searchParams.get('redirectTo') || '/inbox';
 
   useEffect(() => {
     try {
@@ -59,7 +62,7 @@ export default function LoginPage() {
       } else if (response.accessToken && response.refreshToken && response.user) {
         // Direct login
         setTokens(response.accessToken, response.refreshToken, response.user);
-        router.push('/inbox');
+        router.push(redirectTo);
       } else {
         setError('Respuesta inesperada del servidor');
       }

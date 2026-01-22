@@ -11,6 +11,15 @@ function DevLoginContent() {
   const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading');
 
   useEffect(() => {
+    // Only allow in development or if explicitly enabled
+    const isDev = process.env.NODE_ENV === 'development';
+    const isEnabled = process.env.NEXT_PUBLIC_DEV_QUICK_LOGIN_ENABLED === 'true';
+    
+    if (!isDev && !isEnabled) {
+      setStatus('error');
+      return;
+    }
+
     const key = searchParams.get('k');
     const redirect = searchParams.get('redirect') || '/leads';
 

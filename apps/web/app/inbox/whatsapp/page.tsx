@@ -15,6 +15,7 @@ import { EnterpriseChatListItem } from '@/components/inbox/enterprise-chat-list-
 import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
 import type { ConversationStatus, Message } from '@/types/api';
+import { InboxHeader } from '@/components/inbox/inbox-header';
 
 function InboxWhatsAppInner() {
   const router = useRouter();
@@ -196,8 +197,10 @@ function InboxWhatsAppInner() {
     conversation?.lead?.name || conversation?.phone || conversation?.handle || 'WhatsApp';
 
   return (
-    <div className="h-[calc(100vh-140px)] rounded-xl border bg-background overflow-hidden">
-      <div className="flex h-full">
+    <div className="flex flex-col h-[calc(100vh-140px)]">
+      <InboxHeader currentChannel="whatsapp" />
+      <div className="flex-1 rounded-xl border bg-background overflow-hidden">
+        <div className="flex h-full">
         {/* LEFT: chat list */}
         <div
           className="border-r bg-background flex flex-col"
@@ -396,6 +399,7 @@ function InboxWhatsAppInner() {
               </Button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
