@@ -6,7 +6,12 @@ import { NextRequest, NextResponse } from 'next/server';
  * Returns 404 if disabled or key invalid (no hints)
  */
 export async function GET(request: NextRequest) {
-  // Check if dev login is enabled
+  // In production, always return 404 (dev login disabled)
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  // Check if dev login is enabled (optional, defaults to false)
   const enabled = process.env.DEV_QUICK_LOGIN_ENABLED === 'true';
   if (!enabled) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -17,7 +22,7 @@ export async function GET(request: NextRequest) {
   const providedKey = searchParams.get('k');
   const expectedKey = process.env.DEV_QUICK_LOGIN_KEY;
 
-  // Validate key
+  // Validate key (optional in build-time, required at runtime if enabled)
   if (!expectedKey || !providedKey || providedKey !== expectedKey) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
