@@ -21,6 +21,14 @@ export default function ConversationPage() {
   const router = useRouter();
   const params = useParams();
   const conversationId = params.conversationId as string;
+  
+  // Redirect static routes that were incorrectly matched
+  useEffect(() => {
+    const staticRoutes = ['whatsapp', 'instagram', 'unified'];
+    if (conversationId && staticRoutes.includes(conversationId.toLowerCase())) {
+      router.replace(`/inbox/${conversationId}`);
+    }
+  }, [conversationId, router]);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState('');
