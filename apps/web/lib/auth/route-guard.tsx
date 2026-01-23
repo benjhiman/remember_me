@@ -60,12 +60,13 @@ export function RouteGuard({ children, requireAuth = true }: RouteGuardProps) {
       return;
     }
 
-    // Check auth state after hydration
+    // Check auth state after hydration (get fresh state each time)
     const state = useAuthStore.getState();
     const hasAuth = !!(state.user && state.accessToken);
 
     if (!hasAuth) {
       // Only redirect if we're not already on login/select-org page
+      // Use replace to avoid adding to history (prevents loops)
       if (pathname && pathname !== '/login' && pathname !== '/select-org') {
         const currentPath = pathname;
         const redirectTo = `?redirectTo=${encodeURIComponent(currentPath)}`;
@@ -76,7 +77,7 @@ export function RouteGuard({ children, requireAuth = true }: RouteGuardProps) {
     } else {
       setIsChecking(false);
     }
-  }, [isHydrated, requireAuth, pathname, router, user, accessToken]);
+  }, [isHydrated, requireAuth, pathname, router]);
 
   // Show loading state while hydrating or checking
   if (!isHydrated || (isChecking && requireAuth)) {
