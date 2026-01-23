@@ -22,11 +22,15 @@ export class AppService {
 
     const uptime = Math.floor((Date.now() - this.startTime) / 1000); // seconds
 
+    // Get commit hash from env (set by CI/CD) or default
+    const commit = process.env.GIT_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || 'unknown';
+
     return {
       status: 'ok',
       db: dbStatus,
       uptime,
       version: process.env.npm_package_version || require('../../package.json').version || 'unknown',
+      commit: commit.substring(0, 7), // Short commit hash
       env: process.env.NODE_ENV || 'development',
     };
   }
