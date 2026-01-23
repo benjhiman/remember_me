@@ -211,7 +211,7 @@ export default function VendorsPage() {
                         disabled={page === 1}
                       >
                         Anterior
-                      </div>
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

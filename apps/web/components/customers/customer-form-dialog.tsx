@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+// import { Label } from '@/components/ui/label';
+// import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -93,7 +93,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre *</Label>
+              <label htmlFor="name" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Nombre *
+              </label>
               <Input
                 id="name"
                 value={formData.name}
@@ -103,7 +105,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Email
+              </label>
               <Input
                 id="email"
                 type="email"
@@ -113,7 +117,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Teléfono</Label>
+              <label htmlFor="phone" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Teléfono
+              </label>
               <Input
                 id="phone"
                 value={formData.phone}
@@ -122,7 +128,9 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Estado</Label>
+              <label htmlFor="status" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Estado
+              </label>
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
@@ -138,13 +146,16 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="notes">Notas</Label>
-              <Textarea
+              <label htmlFor="notes" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Notas
+              </label>
+              <textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 disabled={isLoading}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </div>
