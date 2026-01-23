@@ -1,6 +1,6 @@
 'use client';
 
-import { AppLayout } from '@/components/layout/app-layout';
+import { AppShellZoho } from '@/components/layout/app-shell-zoho';
 import { RouteGuard } from '@/lib/auth/route-guard';
 import { ErrorBoundary } from '@/components/error-boundary';
 
@@ -12,7 +12,7 @@ export default function DashboardLayout({
   return (
     <ErrorBoundary>
       <RouteGuard requireAuth={true}>
-        <AppLayout>{children}</AppLayout>
+        <AppShellZoho>{children}</AppShellZoho>
       </RouteGuard>
     </ErrorBoundary>
   );

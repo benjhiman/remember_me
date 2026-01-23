@@ -43,11 +43,8 @@ export default function SettingsPage() {
     return JSON.stringify(orgSettings) !== JSON.stringify(local);
   }, [orgSettings, local]);
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
+  // Auth is handled by RouteGuard in layout
+  // No need to check here to avoid double redirects
 
   if (!user) {
     return null;
