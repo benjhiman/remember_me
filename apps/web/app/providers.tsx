@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { DevAutoLogin } from '@/components/auth/dev-auto-login';
 import { Toaster } from '@/components/ui/toaster';
 import { OrgThemeSync } from '@/components/settings/org-theme-sync';
+import { AuthHydrationGate } from '@/components/auth/auth-hydration-gate';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -23,10 +24,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <DevAutoLogin />
-      <OrgThemeSync />
-      {children}
-      <Toaster />
+      <AuthHydrationGate>
+        <DevAutoLogin />
+        <OrgThemeSync />
+        {children}
+        <Toaster />
+      </AuthHydrationGate>
     </QueryClientProvider>
   );
 }

@@ -21,7 +21,17 @@ function getApiBaseUrl(): string {
   }
   
   // Use env var if available, otherwise fallback
-  return envUrl || 'http://localhost:4000/api';
+  const baseUrl = envUrl || 'http://localhost:4000/api';
+  
+  // Ensure no double slashes and proper trailing
+  return baseUrl.replace(/\/+$/, '');
+}
+
+// Build endpoint URL safely (avoid //api/api)
+function buildEndpointUrl(endpoint: string): string {
+  const baseUrl = getApiBaseUrl();
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${baseUrl}${cleanEndpoint}`;
 }
 
 const API_BASE_URL = getApiBaseUrl();
@@ -101,7 +111,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
 
   try {
     const response = await Promise.race([
-      fetch(`${API_BASE_URL}/auth/refresh`, {
+      fetch(buildEndpointUrl('/auth/refresh'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -175,7 +185,7 @@ export async function apiRequest<T>(
   let requestId: string | null = null;
 
   try {
-    const fetchPromise = fetch(`${API_BASE_URL}${endpoint}`, {
+    const fetchPromise = fetch(buildEndpointUrl(endpoint), {
       ...options,
       headers,
       credentials: 'include',
@@ -210,7 +220,7 @@ export async function apiRequest<T>(
             retryHeaders['X-Organization-Id'] = user.organizationId;
           }
 
-          const retryFetchPromise = fetch(`${API_BASE_URL}${endpoint}`, {
+          const retryFetchPromise = fetch(buildEndpointUrl(endpoint), {
             ...options,
             headers: retryHeaders,
             credentials: 'include',
