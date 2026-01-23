@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useSales } from '@/lib/api/hooks/use-sales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageShell } from '@/components/layout/page-shell';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ShoppingCart, Plus, Search } from 'lucide-react';
 import type { SaleStatus } from '@/types/sales';
 
 export default function SalesPage() {
@@ -28,186 +29,167 @@ export default function SalesPage() {
     enabled: !!user,
   });
 
-  // Auth is handled by RouteGuard in layout
+  const breadcrumbs = [
+    { label: 'Ventas', href: '/sales' },
+  ];
+
+  const actions = (
+    <>
+      {userCan(user, Permission.EDIT_SALES) && (
+        <Button size="sm" onClick={() => router.push('/sales/new')}>
+          <Plus className="h-4 w-4 mr-1.5" />
+          Nueva Venta
+        </Button>
+      )}
+    </>
+  );
+
+  const toolbar = (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 max-w-sm">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Buscar ventas..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="pl-9 h-9 text-sm"
+          />
+        </div>
+      </div>
+      <select
+        className="h-9 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        value={statusFilter || ''}
+        onChange={(e) => {
+          setStatusFilter(e.target.value as SaleStatus | undefined);
+          setPage(1);
+        }}
+      >
+        <option value="">Todos los estados</option>
+        <option value="DRAFT">Borrador</option>
+        <option value="PENDING">Pendiente</option>
+        <option value="PAID">Pagado</option>
+        <option value="DELIVERED">Entregado</option>
+        <option value="CANCELLED">Cancelado</option>
+      </select>
+      {(search || statusFilter) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setStatusFilter(undefined);
+            setSearch('');
+            setPage(1);
+          }}
+          className="h-9"
+        >
+          Limpiar
+        </Button>
+      )}
+    </div>
+  );
 
   return (
-    <div>
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Ventas</h1>
-            <p className="text-muted-foreground">Gestión de ventas</p>
+    <PageShell
+      title="Ventas"
+      description="Gestión de ventas"
+      breadcrumbs={breadcrumbs}
+      actions={actions}
+      toolbar={toolbar}
+    >
+      <div className="zoho-card">
+        {isLoading && (
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
           </div>
-          {userCan(user, Permission.EDIT_SALES) && (
-            <Button onClick={() => router.push('/sales/new')}>Nueva Venta</Button>
-          )}
-        </div>
+        )}
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Filtros</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Búsqueda</label>
-                <Input
-                  placeholder="Número, cliente, email, teléfono..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Estado</label>
-                <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={statusFilter || ''}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value as SaleStatus | undefined);
-                    setPage(1);
-                  }}
-                >
-                  <option value="">Todos</option>
-                  <option value="DRAFT">Borrador</option>
-                  <option value="RESERVED">Reservado</option>
-                  <option value="PAID">Pagado</option>
-                  <option value="SHIPPED">Enviado</option>
-                  <option value="DELIVERED">Entregado</option>
-                  <option value="CANCELLED">Cancelado</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearch('');
-                    setStatusFilter(undefined);
-                    setPage(1);
-                  }}
-                  className="w-full"
-                >
-                  Limpiar
-                </Button>
-              </div>
+        {error && (
+          <div className="p-8 text-center">
+            <div className="max-w-md mx-auto">
+              <p className="text-red-600 font-medium mb-2">Error al cargar las ventas</p>
+              <p className="text-sm text-gray-600 mb-4">{(error as Error).message || 'No se pudo conectar con el servidor'}</p>
+              <Button onClick={() => refetch()} variant="outline" size="sm">
+                Reintentar
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* Table */}
-        <Card>
-          <CardContent className="p-0">
-            {isLoading && (
-              <div className="p-4 space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
+        {data && (
+          <>
+            {data.data.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="max-w-sm mx-auto">
+                  <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                    {search || statusFilter ? 'No hay ventas con estos filtros' : 'No hay ventas'}
+                  </h3>
+                  <p className="text-xs text-gray-600 mb-4">
+                    {search || statusFilter
+                      ? 'Intentá ajustar los filtros para ver más resultados.'
+                      : 'Creá tu primera venta para empezar a gestionar transacciones.'}
+                  </p>
+                  {userCan(user, Permission.EDIT_SALES) && (
+                    <Button onClick={() => router.push('/sales/new')} size="sm">
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Nueva Venta
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
-
-            {error && (
-              <div className="p-8 text-center text-red-500">
-                <p>Error al cargar ventas: {(error as Error).message}</p>
-                <Button onClick={() => refetch()} className="mt-4">
-                  Reintentar
-                </Button>
-              </div>
-            )}
-
-            {data && data.data.length === 0 && !isLoading && !error && (
-              <div className="p-8 text-center text-gray-500">
-                <p>No hay ventas para mostrar.</p>
-                <Button onClick={() => router.push('/sales/new')} className="mt-4">
-                  Crear Primera Venta
-                </Button>
-              </div>
-            )}
-
-            {data && data.data.length > 0 && (
+            ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                  <table className="zoho-table">
+                    <thead>
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Número / ID
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Lead
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Cliente
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Estado
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Total
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Moneda
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Creada
-                        </th>
+                        <th>Número</th>
+                        <th>Cliente</th>
+                        <th>Total</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                        <th>Asignado</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody>
                       {data.data.map((sale) => (
                         <tr
                           key={sale.id}
+                          className="cursor-pointer"
                           onClick={() => router.push(`/sales/${sale.id}`)}
-                          className="hover:bg-gray-50 cursor-pointer"
                         >
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td>
                             <div className="text-sm font-medium text-gray-900">
-                              {sale.saleNumber || sale.id}
+                              {sale.saleNumber || sale.id.slice(0, 8)}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {sale.lead ? (
-                              <div
-                                className="text-sm text-blue-600 hover:underline cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/leads/${sale.leadId}`);
-                                }}
-                              >
-                                {sale.lead.name}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-gray-500">—</div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {sale.customerName}
-                            </div>
+                          <td>
+                            <div className="text-sm text-gray-900">{sale.customerName || '—'}</div>
                             {sale.customerEmail && (
-                              <div className="text-sm text-gray-500">{sale.customerEmail}</div>
+                              <div className="text-xs text-gray-500">{sale.customerEmail}</div>
                             )}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="text-sm font-medium text-gray-900">
+                            ${parseFloat(sale.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td>
                             <span
-                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                              className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(
                                 sale.status
                               )}`}
                             >
                               {getStatusLabel(sale.status)}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {sale.total}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {sale.currency}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDate(sale.createdAt)}
-                          </td>
+                          <td className="text-sm text-gray-600">{formatDate(sale.createdAt)}</td>
+                          <td className="text-sm text-gray-600">{sale.assignedTo?.name || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -216,7 +198,7 @@ export default function SalesPage() {
 
                 {/* Pagination */}
                 {data?.meta?.totalPages && data.meta.totalPages > 1 && (
-                  <div className="p-4 border-t flex items-center justify-between">
+                  <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
                     <div className="text-sm text-gray-600">
                       Mostrando {data?.data?.length ?? 0} de {data?.meta?.total ?? 0} ventas
                     </div>
@@ -242,8 +224,9 @@ export default function SalesPage() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
-    </div>
+          </>
+        )}
+      </div>
+    </PageShell>
   );
 }

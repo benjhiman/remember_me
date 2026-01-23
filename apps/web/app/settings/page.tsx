@@ -21,6 +21,7 @@ import { useOrgSettings, useUpdateOrgSettings } from '@/lib/api/hooks/use-org-se
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 import { Input } from '@/components/ui/input';
+import { PageShell } from '@/components/layout/page-shell';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -67,23 +68,33 @@ export default function SettingsPage() {
     }
   };
 
+  const breadcrumbs = [
+    { label: 'Settings', href: '/settings' },
+  ];
+
+  const actions = (
+    <Button onClick={onSave} disabled={!canEdit || !isDirty || update.isPending || !local} size="sm">
+      <Save className="h-4 w-4 mr-2" />
+      {update.isPending ? 'Guardando…' : 'Guardar'}
+    </Button>
+  );
+
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-gray-600">Configuración por organización (SaaS)</p>
+    <PageShell
+      title="Settings"
+      description={
+        <>
+          Configuración por organización (SaaS)
           {!canEdit && (
-            <p className="text-xs text-gray-500 mt-1">
+            <span className="block text-xs text-gray-500 mt-0.5">
               Solo <strong>OWNER</strong> / <strong>ADMIN</strong> pueden guardar cambios.
-            </p>
+            </span>
           )}
-        </div>
-        <Button onClick={onSave} disabled={!canEdit || !isDirty || update.isPending || !local}>
-          <Save className="h-4 w-4 mr-2" />
-          {update.isPending ? 'Guardando…' : 'Guardar'}
-        </Button>
-      </div>
+        </>
+      }
+      breadcrumbs={breadcrumbs}
+      actions={actions}
+    >
 
       <Tabs defaultValue="general">
         <TabsList>
@@ -477,6 +488,6 @@ export default function SettingsPage() {
           </TabsContent>
         )}
       </Tabs>
-    </div>
+    </PageShell>
   );
 }

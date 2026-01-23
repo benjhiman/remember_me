@@ -10,6 +10,7 @@ import { useStockReservations } from '@/lib/api/hooks/use-stock-reservations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageShell } from '@/components/layout/page-shell';
 import { getDateRange, formatCurrency, formatNumber } from '@/lib/utils/date-range';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
@@ -90,18 +91,23 @@ export default function DashboardPage() {
     ?.count || 0;
   const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
 
+  const breadcrumbs = [
+    { label: 'Dashboard', href: '/dashboard' },
+  ];
+
+  const actions = (
+    <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/roas')}>
+      Ver ROAS
+    </Button>
+  );
+
   return (
-    <div>
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Vista general del negocio</p>
-          </div>
-          <Button variant="outline" onClick={() => router.push('/dashboard/roas')}>
-            Ver ROAS
-          </Button>
-        </div>
+    <PageShell
+      title="Dashboard"
+      description="Vista general del negocio"
+      breadcrumbs={breadcrumbs}
+      actions={actions}
+    >
 
         {/* Date Range Filter */}
         <Card className="mb-6">
