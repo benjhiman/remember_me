@@ -16,6 +16,7 @@ import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
 import type { ConversationStatus, Message } from '@/types/api';
 import { InboxHeader } from '@/components/inbox/inbox-header';
+import { MessageSquare } from 'lucide-react';
 
 function InboxWhatsAppInner() {
   const router = useRouter();
@@ -124,6 +125,15 @@ function InboxWhatsAppInner() {
     conversation.canReply &&
     (user?.role !== 'SELLER' || conversation.assignedToId === user.id);
 
+  const onSend = useCallback(async () => {
+    if (!draft.trim() || !conversationId) return;
+    await api.post(`/inbox/conversations/${conversationId}/send-text`, { text: draft.trim() });
+    setDraft('');
+    setBeforeCursor(undefined);
+    setMessages([]);
+    setIsAtBottom(true);
+  }, [draft, conversationId]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -151,7 +161,7 @@ function InboxWhatsAppInner() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [conversationId, canSend, draft, searchParams, router]);
+  }, [conversationId, canSend, draft, searchParams, router, onSend]);
 
   const canChangeStatus =
     !!conversation &&
@@ -178,15 +188,6 @@ function InboxWhatsAppInner() {
     await api.patch(`/inbox/conversations/${conversationId}/status`, { status });
     refetchConversation();
   };
-
-  const onSend = useCallback(async () => {
-    if (!draft.trim() || !conversationId) return;
-    await api.post(`/inbox/conversations/${conversationId}/send-text`, { text: draft.trim() });
-    setDraft('');
-    setBeforeCursor(undefined);
-    setMessages([]);
-    setIsAtBottom(true);
-  }, [draft, conversationId]);
 
   const grouped = useMemo(() => groupByDay(messages), [messages]);
 

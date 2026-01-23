@@ -62,7 +62,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Mobile header */}
       <div className="lg:hidden bg-background border-b px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-semibold truncate">
-          {settings?.crm?.branding?.name || user.organizationName || 'CRM'}
+          {settings?.crm?.branding?.name || user?.organizationName || 'CRM'}
         </h1>
         <Button
           variant="ghost"
@@ -84,6 +84,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <div className="px-4 py-4 border-b flex items-center justify-between gap-2">
             <div className={cn('min-w-0 flex items-center gap-3', sidebarCollapsed && 'hidden')}>
               {settings?.crm?.branding?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={settings.crm.branding.logoUrl}
                   alt="Logo"
@@ -91,14 +92,14 @@ export function AppLayout({ children }: AppLayoutProps) {
                 />
               ) : (
                 <div className="h-9 w-9 rounded-md border bg-muted flex items-center justify-center text-xs font-semibold">
-                  {(settings?.crm?.branding?.name || user.organizationName || 'CRM').slice(0, 1).toUpperCase()}
+                  {(settings?.crm?.branding?.name || user?.organizationName || 'CRM').slice(0, 1).toUpperCase()}
                 </div>
               )}
               <div className="min-w-0">
                 <h2 className="text-base font-semibold truncate">
-                  {settings?.crm?.branding?.name || user.organizationName || 'CRM'}
+                  {settings?.crm?.branding?.name || user?.organizationName || 'CRM'}
                 </h2>
-                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email || ''}</p>
               </div>
             </div>
             <Button
@@ -137,15 +138,15 @@ export function AppLayout({ children }: AppLayoutProps) {
             >
               <div className="p-4 border-b">
                 <h2 className="text-lg font-bold text-gray-900">Remember Me</h2>
-                <p className="text-sm text-gray-600">{user.organizationName || 'CRM'}</p>
+                <p className="text-sm text-gray-600">{user?.organizationName || 'CRM'}</p>
               </div>
               <div className="p-4">
                 <AppNav />
               </div>
               <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-white">
                 <div className="mb-2 text-sm text-gray-600">
-                  <div className="font-medium">{user.name || user.email}</div>
-                  <div className="text-xs text-gray-500">{user.email}</div>
+                  <div className="font-medium">{user?.name || user?.email || ''}</div>
+                  <div className="text-xs text-gray-500">{user?.email || ''}</div>
                 </div>
                 <Button
                   variant="outline"
@@ -172,10 +173,10 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {sidebarCollapsed && (
                   <span className="hidden xl:inline-flex max-w-[360px] truncate">
-                    {settings?.crm?.branding?.name || user.organizationName || 'CRM'}
+                    {settings?.crm?.branding?.name || user?.organizationName || 'CRM'}
                   </span>
                 )}
-                <span className="rounded-full border px-2 py-1">{user.role}</span>
+                <span className="rounded-full border px-2 py-1">{user?.role || ''}</span>
               </div>
             </div>
           </div>

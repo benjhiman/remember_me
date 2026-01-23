@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { api } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,7 +67,7 @@ export function TemplatePicker({ provider, onSelect, disabled }: TemplatePickerP
   };
 
   // Get all required variable indices from template
-  const getRequiredVariables = (template: WhatsAppTemplate): number[] => {
+  const getRequiredVariables = useCallback((template: WhatsAppTemplate): number[] => {
     const indices: number[] = [];
     template.componentsJson?.forEach((comp) => {
       if ((comp.type === 'BODY' || comp.type === 'HEADER') && comp.text) {
@@ -80,7 +80,7 @@ export function TemplatePicker({ provider, onSelect, disabled }: TemplatePickerP
       }
     });
     return indices.sort((a, b) => a - b);
-  };
+  }, []);
 
   // Render preview with variables replaced
   const renderPreview = (template: WhatsAppTemplate, vars: Record<string, string>): string => {
@@ -138,7 +138,7 @@ export function TemplatePicker({ provider, onSelect, disabled }: TemplatePickerP
       const varKey = `var${idx}`;
       return variables[varKey] && variables[varKey].trim().length > 0;
     });
-  }, [selectedTemplate, variables]);
+  }, [selectedTemplate, variables, getRequiredVariables]);
 
   const handleSend = () => {
     if (selectedTemplate && canSend) {

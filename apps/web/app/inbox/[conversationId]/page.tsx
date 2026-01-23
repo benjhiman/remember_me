@@ -60,13 +60,13 @@ export default function ConversationPage() {
   const lastMessageId = useMemo(() => {
     const msgs = messages;
     return msgs.length ? msgs[msgs.length - 1]?.id : null;
-  }, [messagesData?.data]);
+  }, [messages]);
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
     if (!isAtBottom) return;
     messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-  }, [lastMessageId]);
+  }, [lastMessageId, isAtBottom]);
 
   useEffect(() => {
     if (!messagesData?.data) return;

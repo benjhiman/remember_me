@@ -101,7 +101,7 @@ function NavItemComponent({
             <ChevronRight className="h-4 w-4 flex-shrink-0" />
           )}
         </button>
-        {isOpen && (
+        {isOpen && item.children && (
           <div className="ml-8 mt-1 space-y-1">
             {item.children.map((child) => (
               <NavItemComponent
