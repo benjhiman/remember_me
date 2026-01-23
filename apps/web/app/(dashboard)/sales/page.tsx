@@ -137,7 +137,7 @@ export default function SalesPage() {
                       ? 'Intentá ajustar los filtros para ver más resultados.'
                       : 'Creá tu primera venta para empezar a gestionar transacciones.'}
                   </p>
-                  {userCan(user, Permission.EDIT_SALES) && (
+                  {can('sales.write') && (
                     <Button onClick={() => router.push('/sales/new')} size="sm">
                       <Plus className="h-4 w-4 mr-1.5" />
                       Nueva Venta
