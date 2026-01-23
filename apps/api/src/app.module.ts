@@ -121,6 +121,8 @@ const envFilePath = (() => {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,
     },
+    // PermissionsGuard is applied per-endpoint with @RequirePermissions
+    // Not global to maintain backward compatibility
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, Building2, Plug, User, LogOut, Save } from 'lucide-react';
 import Link from 'next/link';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { usePermissions } from '@/lib/auth/use-permissions';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -27,10 +28,11 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const { toast } = useToast();
+  const { can } = usePermissions();
 
   const { data: orgSettings, isLoading, error } = useOrgSettings(!!user);
   const update = useUpdateOrgSettings();
-  const canEdit = user?.role === 'OWNER' || user?.role === 'ADMIN';
+  const canEdit = can('settings.write');
 
   const [local, setLocal] = useState<any>(null);
 

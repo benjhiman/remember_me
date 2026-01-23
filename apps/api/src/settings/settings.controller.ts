@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { Permission } from '../auth/permissions';
 import { CurrentOrganization } from '../common/decorators/current-organization.decorator';
 import { Role } from '@remember-me/prisma';
 import { OrgSettingsService } from './org-settings.service';
@@ -127,13 +130,15 @@ export class SettingsController {
   constructor(private readonly orgSettings: OrgSettingsService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.OWNER)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission['settings.read'])
   async getSettings(@CurrentOrganization() organizationId: string) {
     return this.orgSettings.getSettings(organizationId);
   }
 
   @Put()
-  @Roles(Role.ADMIN, Role.OWNER)
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission['settings.write'])
   async updateSettings(
     @CurrentOrganization() organizationId: string,
     @Body() body: UpdateSettingsDto,

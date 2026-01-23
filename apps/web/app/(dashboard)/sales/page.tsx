@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { usePermissions } from '@/lib/auth/use-permissions';
 import { ShoppingCart, Plus, Search } from 'lucide-react';
 import type { SaleStatus } from '@/types/sales';
 
@@ -35,7 +36,7 @@ export default function SalesPage() {
 
   const actions = (
     <>
-      {userCan(user, Permission.EDIT_SALES) && (
+      {can('sales.write') && (
         <Button size="sm" onClick={() => router.push('/sales/new')}>
           <Plus className="h-4 w-4 mr-1.5" />
           Nueva Venta

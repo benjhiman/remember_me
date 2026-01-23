@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgStore } from '@/lib/store/org-store';
 import { useOrganizations } from '@/lib/api/hooks/use-organizations';
+import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * Organization Provider
@@ -15,6 +16,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
   const { currentOrganizationId, setMemberships } = useOrgStore();
   const { data: orgs, isLoading } = useOrganizations();
+  const queryClient = useQueryClient();
 
   // Sync orgs when loaded
   useEffect(() => {
@@ -32,6 +34,13 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user?.organizationId, currentOrganizationId, orgs]);
+
+  // Invalidate /me query when org changes to refresh permissions
+  useEffect(() => {
+    if (currentOrganizationId) {
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    }
+  }, [currentOrganizationId, queryClient]);
 
   // Don't render children until orgs are loaded (if user is authenticated)
   if (user && isLoading && !orgs) {

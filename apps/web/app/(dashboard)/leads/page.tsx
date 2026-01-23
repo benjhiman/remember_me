@@ -11,12 +11,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getStatusBadgeColor, getStatusLabel, formatDate } from '@/lib/utils/lead-utils';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { usePermissions } from '@/lib/auth/use-permissions';
 import { Users, Search, Filter, Plus } from 'lucide-react';
 import type { LeadStatus } from '@/types/api';
 
 export default function LeadsPage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const { can } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<LeadStatus | undefined>();
@@ -40,7 +42,7 @@ export default function LeadsPage() {
           Board
         </Button>
       )}
-      {userCan(user, Permission.EDIT_LEADS) && (
+      {can('leads.write') && (
         <Button size="sm" onClick={() => router.push('/leads/new')}>
           <Plus className="h-4 w-4 mr-1.5" />
           Nuevo Lead

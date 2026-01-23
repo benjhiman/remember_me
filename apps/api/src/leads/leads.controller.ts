@@ -15,7 +15,10 @@ import {
 import { LeadsService } from './leads.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { Permission } from '../auth/permissions';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrganization } from '../common/decorators/current-organization.decorator';
 import { CreatePipelineDto } from './dto/create-pipeline.dto';
@@ -82,6 +85,8 @@ export class LeadsController {
 
   // Leads
   @Get()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission['leads.read'])
   async listLeads(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
@@ -100,6 +105,8 @@ export class LeadsController {
   }
 
   @Post()
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission['leads.write'])
   async createLead(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
