@@ -63,17 +63,17 @@ const navItems: NavItem[] = [
       { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
     ],
   },
-    {
-      href: '/sales',
-      label: 'Sales',
-      icon: ShoppingCart,
-      permission: Permission.VIEW_SALES,
-      children: [
-        { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
-        { href: '/sales/customers', label: 'Clientes', icon: Users, permission: Permission['customers.read'] },
-        { href: '/sales/vendors', label: 'Proveedores', icon: Building2, permission: Permission['vendors.read'] },
-      ],
-    },
+  {
+    href: '/sales',
+    label: 'Sales',
+    icon: ShoppingCart,
+    permission: Permission.VIEW_SALES,
+    children: [
+      { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
+      { href: '/sales/customers', label: 'Clientes', icon: Users, permission: Permission.VIEW_CUSTOMERS },
+      { href: '/sales/vendors', label: 'Proveedores', icon: Building2, permission: Permission.VIEW_VENDORS },
+    ],
+  },
   { href: '/pricing', label: 'Pricing', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
   { href: '/ads', label: 'Meta Ads', icon: Megaphone, permission: Permission.VIEW_INTEGRATIONS },
   { href: '/settings', label: 'Settings', icon: Settings, permission: Permission.VIEW_DASHBOARD },
