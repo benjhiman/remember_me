@@ -83,14 +83,9 @@ export default function SettingsPage() {
     <PageShell
       title="Settings"
       description={
-        <>
-          Configuración por organización (SaaS)
-          {!canEdit && (
-            <span className="block text-xs text-gray-500 mt-0.5">
-              Solo <strong>OWNER</strong> / <strong>ADMIN</strong> pueden guardar cambios.
-            </span>
-          )}
-        </>
+        !canEdit
+          ? 'Configuración por organización (SaaS). Solo OWNER / ADMIN pueden guardar cambios.'
+          : 'Configuración por organización (SaaS)'
       }
       breadcrumbs={breadcrumbs}
       actions={actions}
