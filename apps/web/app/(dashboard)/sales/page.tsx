@@ -18,6 +18,7 @@ import type { SaleStatus } from '@/types/sales';
 export default function SalesPage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const { can } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<SaleStatus | undefined>(undefined);
