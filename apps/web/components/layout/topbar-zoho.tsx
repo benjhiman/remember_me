@@ -27,9 +27,21 @@ export function TopbarZoho() {
   };
 
   const orgName = user?.organizationName || 'Organization';
+  
+  // Get build version from env or git commit
+  const buildVersion = typeof window !== 'undefined' 
+    ? (process.env.NEXT_PUBLIC_BUILD_VERSION || '66ce982')
+    : '66ce982';
 
   return (
     <div className="h-14 bg-gradient-to-r from-blue-700 to-blue-800 border-b border-blue-900 flex items-center px-4 gap-4">
+      {/* Build Badge - Visible indicator that ZohoShell is mounted */}
+      <div className="flex items-center gap-2 px-2.5 py-1 bg-green-500/20 border border-green-400/30 rounded-md">
+        <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
+        <span className="text-xs font-medium text-white">ZohoShell ON</span>
+        <span className="text-xs text-green-200">({buildVersion.slice(0, 7)})</span>
+      </div>
+
       {/* Search */}
       <div className="flex-1 max-w-md">
         <div className="relative">
