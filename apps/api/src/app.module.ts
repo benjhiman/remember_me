@@ -19,6 +19,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
+import { OrganizationInterceptor } from './common/interceptors/organization.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggerService } from './common/logger/logger.service';
 import { AuditLogModule } from './common/audit/audit-log.module';
@@ -127,6 +128,10 @@ const envFilePath = (() => {
     {
       provide: APP_INTERCEPTOR,
       useClass: MetricsInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: OrganizationInterceptor,
     },
     {
       provide: APP_FILTER,

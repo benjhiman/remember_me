@@ -10,6 +10,7 @@
  */
 
 import { useAuthStore } from '../store/auth-store';
+import { useOrgStore } from '../store/org-store';
 
 // Get API base URL with proper fallback and validation
 function getApiBaseUrl(): string {
@@ -159,24 +160,27 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
 }
 
 export async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const { accessToken, refreshToken, user, clearAuth, updateAccessToken } =
-    useAuthStore.getState();
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    const { accessToken, refreshToken, user, clearAuth, updateAccessToken } =
+      useAuthStore.getState();
+    const { currentOrganizationId } = useOrgStore.getState();
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
-  };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
 
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
 
-  if (user?.organizationId) {
-    headers['X-Organization-Id'] = user.organizationId;
-  }
+    // Use org store first, fallback to user.organizationId for backward compatibility
+    const orgId = currentOrganizationId || user?.organizationId;
+    if (orgId) {
+      headers['X-Organization-Id'] = orgId;
+    }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
@@ -216,8 +220,10 @@ export async function apiRequest<T>(
             ...(options.headers as Record<string, string>),
             Authorization: `Bearer ${newAccessToken}`,
           };
-          if (user?.organizationId) {
-            retryHeaders['X-Organization-Id'] = user.organizationId;
+          // Use org store first, fallback to user.organizationId for backward compatibility
+          const orgId = useOrgStore.getState().currentOrganizationId || user?.organizationId;
+          if (orgId) {
+            retryHeaders['X-Organization-Id'] = orgId;
           }
 
           const retryFetchPromise = fetch(buildEndpointUrl(endpoint), {

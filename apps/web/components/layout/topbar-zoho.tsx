@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
 import { Permission, userCan } from '@/lib/auth/permissions';
+import { OrgSwitcher } from '@/components/organizations/org-switcher';
 
 export function TopbarZoho() {
   const router = useRouter();
@@ -25,8 +26,6 @@ export function TopbarZoho() {
     clearAuth();
     router.push('/login');
   };
-
-  const orgName = user?.organizationName || 'Organization';
   
   // Get build version from env or git commit
   const buildVersion = typeof window !== 'undefined' 
@@ -57,28 +56,8 @@ export function TopbarZoho() {
         </div>
       </div>
 
-      {/* Organization Selector */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 text-white text-sm font-medium hover:bg-white/10 rounded-md transition-colors">
-            <span>{orgName}</span>
-            <ChevronDown className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem disabled>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">{orgName}</span>
-              <span className="text-xs text-gray-500">Organization ID: {user?.organizationId?.slice(0, 8)}</span>
-            </div>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push('/settings')}>
-            <Settings className="h-4 w-4 mr-2" />
-            Manage Organization
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Organization Switcher */}
+      <OrgSwitcher />
 
       {/* Actions */}
       <div className="flex items-center gap-1">

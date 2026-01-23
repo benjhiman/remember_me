@@ -23,7 +23,7 @@ export class LoggingInterceptor implements NestInterceptor {
 
     // Extract user info if available
     const userId = (request as any).user?.userId || 'anonymous';
-    const organizationId = (request as any).organizationId || 'unknown';
+    const organizationId = (request as any).user?.organizationId || (request as any).organizationId || 'unknown';
 
     this.logger.log(`${method} ${url}`, 'HTTP Request', {
       requestId,
