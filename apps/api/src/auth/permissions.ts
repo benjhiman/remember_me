@@ -22,6 +22,14 @@ export enum Permission {
   // Sales
   'sales.read' = 'sales.read',
   'sales.write' = 'sales.write',
+  
+  // Customers
+  'customers.read' = 'customers.read',
+  'customers.write' = 'customers.write',
+  
+  // Vendors
+  'vendors.read' = 'vendors.read',
+  'vendors.write' = 'vendors.write',
 
   // Stock
   'stock.read' = 'stock.read',
@@ -57,6 +65,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['leads.write'],
     Permission['sales.read'],
     Permission['sales.write'],
+    Permission['customers.read'],
+    Permission['customers.write'],
+    Permission['vendors.read'],
+    Permission['vendors.write'],
     Permission['stock.read'],
     Permission['stock.write'],
     Permission['inbox.read'],
@@ -75,6 +87,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['leads.write'],
     Permission['sales.read'],
     Permission['sales.write'],
+    Permission['customers.read'],
+    Permission['customers.write'],
+    Permission['vendors.read'],
+    Permission['vendors.write'],
     Permission['stock.read'],
     Permission['stock.write'],
     Permission['inbox.read'],
@@ -92,6 +108,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['leads.write'],
     Permission['sales.read'],
     Permission['sales.write'],
+    Permission['customers.read'],
+    Permission['customers.write'],
+    Permission['vendors.read'],
+    Permission['vendors.write'],
     Permission['stock.read'],
     Permission['stock.write'],
     Permission['inbox.read'],
@@ -108,6 +128,10 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['leads.write'], // Can edit assigned leads
     Permission['sales.read'],
     Permission['sales.write'],
+    Permission['customers.read'],
+    Permission['customers.write'],
+    Permission['vendors.read'],
+    Permission['vendors.write'],
     Permission['stock.read'], // Read-only
     Permission['inbox.read'],
     Permission['inbox.write'], // Can respond to assigned conversations

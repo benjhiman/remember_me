@@ -27,6 +27,14 @@ export enum Permission {
   VIEW_SALES = 'VIEW_SALES',
   EDIT_SALES = 'EDIT_SALES',
   
+  // Customers (legacy mapping, use 'customers.read' from backend)
+  VIEW_CUSTOMERS = 'VIEW_CUSTOMERS',
+  EDIT_CUSTOMERS = 'EDIT_CUSTOMERS',
+  
+  // Vendors (legacy mapping, use 'vendors.read' from backend)
+  VIEW_VENDORS = 'VIEW_VENDORS',
+  EDIT_VENDORS = 'EDIT_VENDORS',
+  
   // Inbox
   VIEW_INBOX = 'VIEW_INBOX',
   

@@ -36,6 +36,8 @@ model User {
   StockReservation      StockReservation[]
   idempotencyKeys       IdempotencyKey[]
   assignedConversations Conversation[]
+  createdCustomers      Customer[]         @relation("CustomerCreator")
+  createdVendors        Vendor[]           @relation("VendorCreator")
 
   @@index([email])
 }
@@ -72,6 +74,8 @@ model Organization {
   conversationTags         ConversationTag[]
   metaAttributionSnapshots MetaAttributionSnapshot[]
   MetaSpendDaily           MetaSpendDaily[]
+  customers                Customer[]
+  vendors                  Vendor[]
 
   @@index([slug])
 }
@@ -458,6 +462,52 @@ model SaleItem {
   @@index([stockItemId])
 }
 
+// ===== CUSTOMERS & VENDORS =====
+
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String?
+  
+  name           String
+  email          String?
+  phone          String?
+  notes          String?
+  status         String   @default("ACTIVE") // ACTIVE, INACTIVE
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?        @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId, createdAt])
+  @@index([organizationId, name])
+  @@index([organizationId, status])
+}
+
+model Vendor {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String?
+  
+  name           String
+  email          String?
+  phone          String?
+  notes          String?
+  status         String   @default("ACTIVE") // ACTIVE, INACTIVE
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User?        @relation("VendorCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId, createdAt])
+  @@index([organizationId, name])
+  @@index([organizationId, status])
+}
+
 model StockMovement {
   id             String            @id @default(cuid())
   organizationId String
@@ -542,6 +592,8 @@ enum AuditEntityType {
   SaleItem
   Note
   Task
+  Customer
+  Vendor
 }
 
 model AuditLog {
