@@ -64,20 +64,19 @@ export default function DashboardPage() {
   const { data: recentLeads } = useLeads({ limit: 10, sort: 'createdAt', order: 'desc', enabled: !!user });
   const { data: activeReservations } = useStockReservations({ status: 'ACTIVE', limit: 10, enabled: !!user });
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    // Check permission
-    if (!userCan(user, Permission.VIEW_DASHBOARD)) {
-      router.push('/forbidden');
-      return;
-    }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
+  // Auth is handled by RouteGuard in layout
+  // Permission check
+  if (user && !userCan(user, Permission.VIEW_DASHBOARD)) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card>
+          <CardContent className="p-6 text-center">
+            <h2 className="text-lg font-semibold mb-2">Acceso denegado</h2>
+            <p className="text-sm text-muted-foreground">No tenés permisos para ver el dashboard.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const isLoading = overviewLoading || leadsLoading || salesLoading;

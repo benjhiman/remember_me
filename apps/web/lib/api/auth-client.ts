@@ -11,7 +11,20 @@
 
 import { useAuthStore } from '../store/auth-store';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+// Get API base URL with proper fallback and validation
+function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  
+  // In production, log warning if missing
+  if (typeof window !== 'undefined' && !envUrl) {
+    console.error('[AUTH_CLIENT] NEXT_PUBLIC_API_BASE_URL is not set. Using fallback.');
+  }
+  
+  // Use env var if available, otherwise fallback
+  return envUrl || 'http://localhost:4000/api';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT = 30000; // 30 seconds
 
 export enum ErrorType {

@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api } from '@/lib/api/client';
+import { api, ApiError, ErrorType } from '@/lib/api/client';
 import { useAuthStore } from '@/lib/store/auth-store';
 import type { LoginRequest, LoginResponse } from '@/types/api';
 
@@ -67,22 +67,56 @@ function LoginPageContent() {
         setError('Respuesta inesperada del servidor');
       }
     } catch (err: any) {
-      // Better error handling for production
+      // Better error handling for production with specific error detection
       let errorMessage = 'Error al iniciar sesión';
       
-      if (err instanceof Error) {
-        errorMessage = err.message;
+      // Check if it's an ApiError with type information
+      if (err?.type) {
+        switch (err.type) {
+          case 'CORS':
+            errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
+            break;
+          case 'DNS':
+            errorMessage = 'No se pudo resolver el dominio del servidor. Verificá la configuración de API URL.';
+            break;
+          case 'TIMEOUT':
+            errorMessage = 'El servidor no responde. Verificá que el API esté disponible.';
+            break;
+          case 'AUTH':
+            errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
+            break;
+          case 'NETWORK':
+            // Check if it's a base URL issue
+            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+            if (!apiUrl || apiUrl.includes('localhost')) {
+              errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL.';
+            } else {
+              errorMessage = `No se pudo conectar con el servidor (${apiUrl}). Verificá tu conexión y la configuración del API.`;
+            }
+            break;
+          default:
+            errorMessage = err.message || 'Error al iniciar sesión';
+        }
+      } else if (err instanceof Error) {
+        const msg = err.message.toLowerCase();
+        if (msg.includes('cors') || msg.includes('cross-origin')) {
+          errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
+        } else if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
+          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+          if (!apiUrl || apiUrl.includes('localhost')) {
+            errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL en Vercel.';
+          } else {
+            errorMessage = `No se pudo conectar con el servidor (${apiUrl}). Verificá la configuración del API.`;
+          }
+        } else if (msg.includes('401') || msg.includes('403')) {
+          errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
+        } else {
+          errorMessage = err.message;
+        }
       } else if (err?.message) {
         errorMessage = err.message;
       } else if (typeof err === 'string') {
         errorMessage = err;
-      }
-      
-      // Check for network/CORS errors
-      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-        errorMessage = 'No se pudo conectar con el servidor. Verificá tu conexión.';
-      } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
-        errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
       }
       
       setError(errorMessage);

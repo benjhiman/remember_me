@@ -28,15 +28,7 @@ export default function SalesPage() {
     enabled: !!user,
   });
 
-  useEffect(() => {
-    if (!user) {
-      router.push('/login');
-    }
-  }, [user, router]);
-
-  if (!user) {
-    return null;
-  }
+  // Auth is handled by RouteGuard in layout
 
   return (
     <div>
