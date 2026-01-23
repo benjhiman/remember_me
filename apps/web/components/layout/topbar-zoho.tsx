@@ -38,8 +38,7 @@ export function TopbarZoho() {
       {/* Build Badge - Visible indicator that ZohoShell is mounted */}
       <div className="flex items-center gap-2 px-2.5 py-1 bg-green-500/20 border border-green-400/30 rounded-md">
         <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-        <span className="text-xs font-medium text-white">ZohoShell ON</span>
-        <span className="text-xs text-green-200">({buildVersion.slice(0, 7)})</span>
+        <span className="text-xs font-medium text-white">BautiSeLaCome</span>
       </div>
 
       {/* Search */}
