@@ -3,5 +3,5 @@
   "buildCommand": "pnpm --filter @remember-me/web build",
   "devCommand": "pnpm --filter @remember-me/web dev",
   "framework": "nextjs",
-  "outputDirectory": "apps/web/.next"
+  "outputDirectory": ".next"
 }
