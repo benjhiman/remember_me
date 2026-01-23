@@ -216,13 +216,9 @@ export async function apiRequest<T>(
           throw retryError;
         }
       } catch (refreshError) {
-        // Refresh failed, clear auth and redirect to login
+        // Refresh failed, clear auth
         clearAuth();
-        if (typeof window !== 'undefined') {
-          const currentPath = window.location.pathname;
-          const redirectTo = currentPath !== '/login' ? `?redirectTo=${encodeURIComponent(currentPath)}` : '';
-          window.location.href = `/login${redirectTo}`;
-        }
+        // Don't redirect here - let RouteGuard handle it to avoid loops
         throw new ApiError(
           'Session expired. Please login again.',
           401,
@@ -244,14 +240,10 @@ export async function apiRequest<T>(
         requestId || undefined
       );
 
-      // Don't auto-redirect on 401 if we already tried refresh
-      if (response.status === 401) {
+      // Don't auto-redirect on 401 - let RouteGuard handle it to avoid loops
+      if (response.status === 401 || response.status === 403) {
         clearAuth();
-        if (typeof window !== 'undefined') {
-          const currentPath = window.location.pathname;
-          const redirectTo = currentPath !== '/login' ? `?redirectTo=${encodeURIComponent(currentPath)}` : '';
-          window.location.href = `/login${redirectTo}`;
-        }
+        // RouteGuard will detect the cleared auth and redirect appropriately
       }
 
       throw apiError;

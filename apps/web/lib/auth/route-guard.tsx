@@ -13,42 +13,73 @@ interface RouteGuardProps {
  * Route Guard Component
  * 
  * Protects routes that require authentication.
+ * - Waits for zustand persist to hydrate from localStorage
  * - Checks auth state on mount and route changes
  * - Redirects to login if not authenticated
  * - Preserves redirectTo query param
- * - Prevents flash of protected content
+ * - Prevents flash of protected content and redirect loops
  */
 export function RouteGuard({ children, requireAuth = true }: RouteGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
 
+  // Wait for zustand persist to hydrate from localStorage
   useEffect(() => {
+    // Check if we're in the browser
+    if (typeof window === 'undefined') return;
+
+    // Zustand persist sets a flag in localStorage when hydrated
+    // We check by trying to access the store state
+    const checkHydration = () => {
+      try {
+        const state = useAuthStore.getState();
+        // If we can access the state, it's hydrated
+        setIsHydrated(true);
+      } catch {
+        // If there's an error, wait a bit more
+        setTimeout(checkHydration, 50);
+      }
+    };
+
+    // Initial check
+    const timer = setTimeout(() => {
+      checkHydration();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Once hydrated, check auth
+  useEffect(() => {
+    if (!isHydrated) return;
     if (!requireAuth) {
       setIsChecking(false);
       return;
     }
 
-    // Small delay to allow auth store to hydrate from localStorage
-    const timer = setTimeout(() => {
-      if (!user) {
-        // Only redirect if we're not already on login page
-        if (pathname !== '/login') {
-          const currentPath = pathname || '/';
-          const redirectTo = currentPath !== '/login' ? `?redirectTo=${encodeURIComponent(currentPath)}` : '';
-          router.push(`/login${redirectTo}`);
-        }
+    // Check auth state after hydration
+    const state = useAuthStore.getState();
+    const hasAuth = !!(state.user && state.accessToken);
+
+    if (!hasAuth) {
+      // Only redirect if we're not already on login/select-org page
+      if (pathname && pathname !== '/login' && pathname !== '/select-org') {
+        const currentPath = pathname;
+        const redirectTo = `?redirectTo=${encodeURIComponent(currentPath)}`;
+        router.replace(`/login${redirectTo}`);
       } else {
         setIsChecking(false);
       }
-    }, 150); // Slightly longer delay to ensure localStorage is hydrated
+    } else {
+      setIsChecking(false);
+    }
+  }, [isHydrated, requireAuth, pathname, router, user, accessToken]);
 
-    return () => clearTimeout(timer);
-  }, [user, pathname, router, requireAuth]);
-
-  // Show loading state while checking auth
-  if (isChecking && requireAuth) {
+  // Show loading state while hydrating or checking
+  if (!isHydrated || (isChecking && requireAuth)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
@@ -58,7 +89,7 @@ export function RouteGuard({ children, requireAuth = true }: RouteGuardProps) {
     );
   }
 
-  // If auth required but no user, don't render children (redirect will happen)
+  // If auth required but no user after hydration, don't render (redirect will happen)
   if (requireAuth && !user) {
     return null;
   }

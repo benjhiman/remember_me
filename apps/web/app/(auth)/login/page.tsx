@@ -67,7 +67,25 @@ function LoginPageContent() {
         setError('Respuesta inesperada del servidor');
       }
     } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+      // Better error handling for production
+      let errorMessage = 'Error al iniciar sesión';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      // Check for network/CORS errors
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        errorMessage = 'No se pudo conectar con el servidor. Verificá tu conexión.';
+      } else if (errorMessage.includes('401') || errorMessage.includes('403')) {
+        errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
