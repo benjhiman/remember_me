@@ -26,7 +26,7 @@ interface VirtualizedStockTableProps {
   className?: string;
 }
 
-export function VirtualizedStockTable({
+function VirtualizedStockTableComponent({
   items,
   onItemClick,
   getStatusColor,
@@ -106,6 +106,6 @@ export function VirtualizedStockTable({
   );
 }
 
-VirtualizedStockTable.displayName = 'VirtualizedStockTable';
+VirtualizedStockTableComponent.displayName = 'VirtualizedStockTable';
 
-VirtualizedStockTable.displayName = 'VirtualizedStockTable';
+export const VirtualizedStockTable = VirtualizedStockTableComponent;
