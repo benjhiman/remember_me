@@ -83,7 +83,14 @@ function LoginPageContent() {
             errorMessage = 'El servidor no responde. Verificá que el API esté disponible.';
             break;
           case 'AUTH':
-            errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
+            // Use backend message if available, otherwise default message
+            if (err.status === 401) {
+              errorMessage = err.message || 'Credenciales incorrectas. Verificá tu email y contraseña.';
+            } else if (err.status === 403) {
+              errorMessage = err.message || 'No tenés permisos para realizar esta acción.';
+            } else {
+              errorMessage = err.message || 'Error de autenticación.';
+            }
             break;
           case 'NETWORK':
             // Check if it's a base URL issue
@@ -95,6 +102,7 @@ function LoginPageContent() {
             }
             break;
           default:
+            // Use error message from API if available
             errorMessage = err.message || 'Error al iniciar sesión';
         }
       } else if (err instanceof Error) {

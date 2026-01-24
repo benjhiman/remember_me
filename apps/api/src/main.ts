@@ -25,15 +25,25 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS configuration
+  // ⚠️ PROD SAFETY: Always include production domain in allowed origins
+  const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001'];
+  const prodOrigin = 'https://app.iphonealcosto.com';
+  
   const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-    : ['http://localhost:3000', 'http://localhost:3001'];
+    : defaultOrigins;
+  
+  // Ensure production origin is always included if not in env var
+  const isProduction = process.env.NODE_ENV === 'production';
+  const finalOrigins = isProduction && !corsOrigins.includes(prodOrigin)
+    ? [...corsOrigins, prodOrigin]
+    : corsOrigins;
 
   app.enableCors({
-    origin: corsOrigins,
+    origin: finalOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key', 'X-Organization-Id'],
     exposedHeaders: ['X-Request-Id'],
   });
 

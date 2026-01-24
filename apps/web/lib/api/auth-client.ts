@@ -286,9 +286,16 @@ export async function apiRequest<T>(
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      const errorType = getErrorType(null, response.status);
+      // Always classify 401/403 as AUTH error, not NETWORK
+      const errorType = response.status === 401 || response.status === 403 
+        ? ErrorType.AUTH 
+        : getErrorType(null, response.status);
+      
+      // Use backend message if available, otherwise use status text
+      const errorMessage = errorData.message || errorData.error || `Request failed: ${response.statusText}`;
+      
       const apiError = new ApiError(
-        errorData.message || `Request failed: ${response.statusText}`,
+        errorMessage,
         response.status,
         errorType,
         errorData,
