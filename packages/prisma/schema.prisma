@@ -78,6 +78,9 @@ model Organization {
   customers                Customer[]
   vendors                  Vendor[]
   purchases                Purchase[]
+  ledgerAccounts           LedgerAccount[]
+  ledgerCategories         LedgerCategory[]
+  customerBalanceSnapshots CustomerBalanceSnapshot[]
 
   @@index([slug])
 }
@@ -482,6 +485,7 @@ model Customer {
   
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy      User?        @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  balanceSnapshots CustomerBalanceSnapshot[]
   
   @@index([organizationId, createdAt])
   @@index([organizationId, name])
@@ -519,6 +523,8 @@ model Purchase {
   
   status         PurchaseStatus @default(DRAFT)
   notes          String?
+  currency       String         @default("USD")
+  referenceNumber String?       // Optional reference number
   
   subtotalCents  Int
   taxCents       Int            @default(0)
@@ -652,6 +658,8 @@ enum AuditEntityType {
   Customer
   Vendor
   Purchase
+  LedgerAccount
+  LedgerCategory
 }
 
 model AuditLog {
