@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useSales } from '@/lib/api/hooks/use-sales';
@@ -12,6 +12,7 @@ import { formatDate } from '@/lib/utils/lead-utils';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { usePermissions } from '@/lib/auth/use-permissions';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { ShoppingCart, Plus, Search } from 'lucide-react';
 import type { SaleStatus } from '@/types/sales';
 
@@ -30,6 +31,16 @@ export default function SalesPage() {
     status: statusFilter,
     enabled: !!user,
   });
+
+  useEffect(() => {
+    perfMark('sales-page-mount');
+  }, []);
+
+  useEffect(() => {
+    if (data && !isLoading) {
+      perfMeasureToNow('sales-page-data-loaded', 'sales-page-mount');
+    }
+  }, [data, isLoading]);
 
   const breadcrumbs = [
     { label: 'Ventas', href: '/sales' },

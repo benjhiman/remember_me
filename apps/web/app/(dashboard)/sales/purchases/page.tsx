@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { usePurchases, type PurchaseStatus } from '@/lib/api/hooks/use-purchases';
@@ -11,6 +11,7 @@ import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { formatCurrency, getPurchaseStatusLabel, getPurchaseStatusColor } from '@/lib/utils/purchase-utils';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { Plus, Search, Eye, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,6 +30,16 @@ export default function PurchasesPage() {
     status: statusFilter,
     enabled: !!user,
   });
+
+  useEffect(() => {
+    perfMark('purchases-page-mount');
+  }, []);
+
+  useEffect(() => {
+    if (data && !isLoading) {
+      perfMeasureToNow('purchases-page-data-loaded', 'purchases-page-mount');
+    }
+  }, [data, isLoading]);
 
   const breadcrumbs = [
     { label: 'Ventas', href: '/sales' },

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import type { StockStatus, ItemCondition } from '@/types/stock';
 
 export default function StockPage() {
@@ -28,6 +29,16 @@ export default function StockPage() {
     condition: conditionFilter,
     enabled: !!user,
   });
+
+  useEffect(() => {
+    perfMark('stock-page-mount');
+  }, []);
+
+  useEffect(() => {
+    if (data && !isLoading) {
+      perfMeasureToNow('stock-page-data-loaded', 'stock-page-mount');
+    }
+  }, [data, isLoading]);
 
   useEffect(() => {
     if (!user) {

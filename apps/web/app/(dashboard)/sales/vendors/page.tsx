@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useVendors } from '@/lib/api/hooks/use-vendors';
 import { usePermissions } from '@/lib/auth/use-permissions';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { Plus, Search, Edit, Building2 } from 'lucide-react';
 import { VendorFormDialog } from '@/components/vendors/vendor-form-dialog';
 import type { Vendor } from '@/lib/api/hooks/use-vendors';
@@ -29,6 +30,16 @@ export default function VendorsPage() {
     status: statusFilter,
     enabled: !!user,
   });
+
+  useEffect(() => {
+    perfMark('vendors-page-mount');
+  }, []);
+
+  useEffect(() => {
+    if (data && !isLoading) {
+      perfMeasureToNow('vendors-page-data-loaded', 'vendors-page-mount');
+    }
+  }, [data, isLoading]);
 
   const breadcrumbs = [
     { label: 'Ventas', href: '/sales' },

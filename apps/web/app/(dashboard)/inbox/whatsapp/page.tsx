@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { EnterpriseChatListItem } from '@/components/inbox/enterprise-chat-list-item';
 import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import type { ConversationStatus, Message } from '@/types/api';
 import { InboxHeader } from '@/components/inbox/inbox-header';
 import { MessageSquare } from 'lucide-react';
@@ -77,6 +78,16 @@ function InboxWhatsAppInner() {
     limit: 30,
     enabled: !!user,
   });
+
+  useEffect(() => {
+    perfMark('inbox-whatsapp-mount');
+  }, []);
+
+  useEffect(() => {
+    if (convList && !listLoading) {
+      perfMeasureToNow('inbox-whatsapp-data-loaded', 'inbox-whatsapp-mount');
+    }
+  }, [convList, listLoading]);
 
   const { data: conversation, refetch: refetchConversation } = useConversation(conversationId, !!user && !!conversationId);
   const { data: orgUsers = [] } = useOrgUsers(!!user);

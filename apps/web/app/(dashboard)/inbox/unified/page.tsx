@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MessageSquare, Instagram, MessageCircle, Search } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import type { ConversationStatus } from '@/types/api';
 import { Skeleton } from '@/components/ui/skeleton';
 

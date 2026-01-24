@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useCustomers } from '@/lib/api/hooks/use-customers';
 import { usePermissions } from '@/lib/auth/use-permissions';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
+import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { Plus, Search, Edit, Users } from 'lucide-react';
 import { CustomerFormDialog } from '@/components/customers/customer-form-dialog';
 import type { Customer } from '@/lib/api/hooks/use-customers';
@@ -29,6 +30,16 @@ export default function CustomersPage() {
     status: statusFilter,
     enabled: !!user,
   });
+
+  useEffect(() => {
+    perfMark('customers-page-mount');
+  }, []);
+
+  useEffect(() => {
+    if (data && !isLoading) {
+      perfMeasureToNow('customers-page-data-loaded', 'customers-page-mount');
+    }
+  }, [data, isLoading]);
 
   const breadcrumbs = [
     { label: 'Ventas', href: '/sales' },
