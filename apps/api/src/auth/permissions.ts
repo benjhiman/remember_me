@@ -35,6 +35,10 @@ export enum Permission {
   'purchases.read' = 'purchases.read',
   'purchases.write' = 'purchases.write',
 
+  // Ledger
+  'ledger.read' = 'ledger.read',
+  'ledger.write' = 'ledger.write',
+
   // Stock
   'stock.read' = 'stock.read',
   'stock.write' = 'stock.write',
@@ -75,6 +79,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['vendors.write'],
     Permission['purchases.read'],
     Permission['purchases.write'],
+    Permission['ledger.read'],
+    Permission['ledger.write'],
     Permission['stock.read'],
     Permission['stock.write'],
     Permission['inbox.read'],
@@ -99,6 +105,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['vendors.write'],
     Permission['purchases.read'],
     Permission['purchases.write'],
+    Permission['ledger.read'],
+    Permission['ledger.write'],
     Permission['stock.read'],
     Permission['stock.write'],
     Permission['inbox.read'],
@@ -122,6 +130,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['vendors.write'],
     Permission['purchases.read'],
     Permission['purchases.write'],
+    Permission['ledger.read'],
+    Permission['ledger.write'],
     Permission['stock.read'],
     Permission['stock.write'],
     Permission['inbox.read'],
@@ -144,6 +154,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission['vendors.write'],
     Permission['purchases.read'],
     Permission['purchases.write'],
+    Permission['ledger.read'],
+    Permission['ledger.write'],
     Permission['stock.read'], // Read-only
     Permission['inbox.read'],
     Permission['inbox.write'], // Can respond to assigned conversations

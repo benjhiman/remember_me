@@ -33,6 +33,7 @@ import { SettingsModule } from './settings/settings.module';
 import { CustomersModule } from './customers/customers.module';
 import { VendorsModule } from './vendors/vendors.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { LedgerModule } from './ledger/ledger.module';
 
 // Resolve .env path relative to apps/api directory
 // Works from any CWD: finds apps/api/.env whether running from root or apps/api
