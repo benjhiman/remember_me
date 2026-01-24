@@ -11,6 +11,7 @@ import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
+import { VirtualizedStockTable } from '@/components/stock/virtualized-stock-table';
 import type { StockStatus, ItemCondition } from '@/types/stock';
 
 export default function StockPage() {
