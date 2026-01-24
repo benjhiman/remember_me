@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { api } from '../client';
 import type { StockListResponse, StockStatus, ItemCondition } from '@/types/stock';
 
@@ -15,11 +15,11 @@ interface UseStockItemsInfiniteParams {
 export function useStockItemsInfinite(params: UseStockItemsInfiniteParams = {}) {
   const { limit = 50, enabled = true, ...filters } = params;
 
-  return useInfiniteQuery<StockListResponse, Error, StockListResponse, string[], number>({
-    queryKey: ['stock-items-infinite', params],
-    queryFn: ({ pageParam = 1 }: { pageParam: number }) => {
+  return useInfiniteQuery({
+    queryKey: ['stock-items-infinite', params] as const,
+    queryFn: ({ pageParam }: { pageParam: number }) => {
       const queryParams = new URLSearchParams({
-        page: pageParam.toString(),
+        page: (pageParam ?? 1).toString(),
         limit: limit.toString(),
       });
 
@@ -31,7 +31,8 @@ export function useStockItemsInfinite(params: UseStockItemsInfiniteParams = {}) 
 
       return api.get<StockListResponse>(`/stock?${queryParams.toString()}`);
     },
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage: StockListResponse): number | undefined => {
+      if (!lastPage.meta) return undefined;
       const { meta } = lastPage;
       if (meta.page < meta.totalPages) {
         return meta.page + 1;

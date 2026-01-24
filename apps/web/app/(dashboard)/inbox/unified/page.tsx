@@ -66,10 +66,10 @@ function InboxUnifiedInner() {
   });
 
   const whatsappList = whatsappData
-    ? { data: whatsappData.pages.flatMap((p: any) => p.data) }
+    ? { data: whatsappData.pages.flatMap((p) => p.data) }
     : undefined;
   const instagramList = instagramData
-    ? { data: instagramData.pages.flatMap((p: any) => p.data) }
+    ? { data: instagramData.pages.flatMap((p) => p.data) }
     : undefined;
 
   const allConversations = useMemo(() => {

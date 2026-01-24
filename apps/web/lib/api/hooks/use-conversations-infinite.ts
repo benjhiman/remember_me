@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 import { api } from '../client';
 import { env } from '@/lib/config/env';
 import type { ConversationListResponse, IntegrationProvider, ConversationStatus } from '@/types/api';
@@ -17,11 +17,12 @@ interface UseConversationsInfiniteParams {
 export function useConversationsInfinite(params: UseConversationsInfiniteParams = {}) {
   const { limit = 50, enabled = true, refetchInterval, ...filters } = params;
 
-  return useInfiniteQuery<ConversationListResponse, Error, ConversationListResponse, string[], number>({
-    queryKey: ['conversations-infinite', params],
-    queryFn: ({ pageParam = 1 }: { pageParam: number }) => {
+  return useInfiniteQuery({
+    queryKey: ['conversations-infinite', params] as const,
+    queryFn: ({ pageParam }: { pageParam: number }) => {
+      const page = pageParam ?? 1;
       const queryParams = new URLSearchParams({
-        page: pageParam.toString(),
+        page: page.toString(),
         limit: limit.toString(),
       });
 
@@ -33,7 +34,8 @@ export function useConversationsInfinite(params: UseConversationsInfiniteParams 
 
       return api.get<ConversationListResponse>(`/inbox/conversations?${queryParams}`);
     },
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage: ConversationListResponse): number | undefined => {
+      if (!lastPage.meta) return undefined;
       const { meta } = lastPage;
       if (meta.page < meta.totalPages) {
         return meta.page + 1;
