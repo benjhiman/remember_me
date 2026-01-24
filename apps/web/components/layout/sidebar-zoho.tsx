@@ -205,7 +205,13 @@ export function SidebarZoho() {
   const orgName = settings?.crm?.branding?.name || user?.organizationName || 'Remember Me';
 
   // Filter nav items based on permissions
-  const visibleItems = navItems.filter((item) => userCan(user, item.permission));
+  // Purchases is always visible (legacy gating removed temporarily)
+  const visibleItems = navItems.filter((item) => {
+    if (item.label === 'Purchases') {
+      return !!user; // Always visible if user is logged in
+    }
+    return userCan(user, item.permission);
+  });
   const visibleTools = toolsItems.filter((item) => userCan(user, item.permission));
 
   return (
