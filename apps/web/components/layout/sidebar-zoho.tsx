@@ -112,7 +112,8 @@ function NavItemComponent({
   const hasChildren = item.children && item.children.length > 0;
   const isActive = item.href && (pathname === item.href || pathname?.startsWith(item.href + '/'));
 
-  if (!userCan(user, item.permission)) {
+  // Purchases is always visible (legacy gating removed temporarily)
+  if (item.label !== 'Purchases' && !userCan(user, item.permission)) {
     return null;
   }
 
