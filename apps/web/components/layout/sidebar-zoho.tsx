@@ -134,13 +134,13 @@ function NavItemComponent({
       <div>
         <Link
           href={item.href}
-          className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-            isActive
-              ? 'bg-blue-600 text-white'
-              : 'text-gray-700 hover:bg-gray-100',
-            level > 0 && 'pl-9'
-          )}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+              isActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-muted',
+              level > 0 && 'pl-9'
+            )}
           onClick={() => {
             if (hasChildren) {
               setIsOpen(!isOpen);

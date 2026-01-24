@@ -69,7 +69,7 @@ export function TopbarZoho() {
           <DropdownMenuTrigger asChild>
             <Button
               size="sm"
-              className="h-9 w-9 p-0 bg-white/10 hover:bg-white/20 border-0 text-white"
+              className="h-9 w-9 p-0 bg-white/10 dark:bg-white/5 hover:bg-white/20 dark:hover:bg-white/10 border-0 text-white"
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -94,7 +94,7 @@ export function TopbarZoho() {
         </DropdownMenu>
 
         {/* Users */}
-        <button className="h-9 w-9 p-0 text-white hover:bg-white/10 rounded-md transition-colors flex items-center justify-center">
+        <button className="h-9 w-9 p-0 text-white hover:bg-white/10 dark:hover:bg-white/5 rounded-md transition-colors flex items-center justify-center">
           <Users className="h-5 w-5" />
         </button>
 
@@ -127,18 +127,17 @@ export function TopbarZoho() {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
-              {resolvedTheme === 'dark' ? (
-                <>
-                  <Sun className="h-4 w-4 mr-2" />
-                  Light Mode
-                </>
-              ) : (
-                <>
-                  <Moon className="h-4 w-4 mr-2" />
-                  Dark Mode
-                </>
-              )}
+            <DropdownMenuItem onClick={() => setTheme('light')}>
+              <Sun className="h-4 w-4 mr-2" />
+              Light
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme('dark')}>
+              <Moon className="h-4 w-4 mr-2" />
+              Dark
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setTheme('system')}>
+              <Settings className="h-4 w-4 mr-2" />
+              System
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/settings')}>
               <Settings className="h-4 w-4 mr-2" />
