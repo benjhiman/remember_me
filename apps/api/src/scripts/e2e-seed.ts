@@ -165,7 +165,7 @@ async function main() {
     console.log(`✅ Found existing pipeline: ${pipeline.id}`);
   }
 
-  let stage = await prisma.pipelineStage.findFirst({
+  let stage = await prisma.stage.findFirst({
     where: {
       pipelineId: pipeline.id,
       name: 'Nuevo',
@@ -173,7 +173,7 @@ async function main() {
   });
 
   if (!stage) {
-    stage = await prisma.pipelineStage.create({
+    stage = await prisma.stage.create({
       data: {
         pipelineId: pipeline.id,
         name: 'Nuevo',
@@ -204,6 +204,7 @@ async function main() {
         phone: '+1234567892',
         source: 'E2E',
         assignedToId: user.id,
+        createdById: user.id,
       },
     });
     console.log(`✅ Created lead: ${lead.id}`);
