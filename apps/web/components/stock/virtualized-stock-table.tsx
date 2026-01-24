@@ -49,6 +49,7 @@ function VirtualizedStockTableComponent({
   );
 
   const renderRow = useMemo(
+    // eslint-disable-next-line react/display-name
     () => (item: StockItem) => {
       const reserved = item.reservedQuantity || 0;
       const available = item.availableQuantity ?? (item.quantity - reserved);
