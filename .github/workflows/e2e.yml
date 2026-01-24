@@ -12,7 +12,8 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -28,26 +29,57 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: cd apps/web && pnpm exec playwright install --with-deps chromium
+      - name: Check E2E secrets
+        id: check-secrets
+        run: |
+          if [ -z "${{ secrets.E2E_EMAIL }}" ] || [ -z "${{ secrets.E2E_PASSWORD }}" ] || [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            echo "secrets_available=false" >> $GITHUB_OUTPUT
+            echo "⚠️  E2E secrets not configured. Skipping E2E tests."
+            echo "Required secrets: E2E_EMAIL, E2E_PASSWORD, DATABASE_URL"
+          else
+            echo "secrets_available=true" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build web
         run: pnpm --filter @remember-me/web build
-        env:
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.E2E_API_BASE_URL || 'https://api.iphonealcosto.com/api' }}
 
-      - name: Run E2E tests
-        run: cd apps/web && pnpm test:e2e
+      - name: Install Playwright
+        if: steps.check-secrets.outputs.secrets_available == 'true'
+        run: cd apps/web && pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E seed
+        if: steps.check-secrets.outputs.secrets_available == 'true'
         env:
-          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL || 'https://app.iphonealcosto.com' }}
           E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
           E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
-        continue-on-error: true # Don't fail the build if tests are flaky
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pnpm --filter @remember-me/api ops:e2e-seed
 
-      - name: Upload test results
-        if: always()
+      - name: Run E2E tests
+        if: steps.check-secrets.outputs.secrets_available == 'true'
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        run: |
+          cd apps/web
+          pnpm test:e2e
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        if: always() && steps.check-secrets.outputs.secrets_available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: apps/web/playwright-report/
-          retention-days: 7
+          retention-days: 30
+
+      - name: Skip message
+        if: steps.check-secrets.outputs.secrets_available == 'false'
+        run: |
+          echo "✅ E2E tests skipped (secrets not configured)"
+          echo "To enable E2E tests, configure the following secrets in GitHub:"
+          echo "  - E2E_EMAIL"
+          echo "  - E2E_PASSWORD"
+          echo "  - DATABASE_URL"
