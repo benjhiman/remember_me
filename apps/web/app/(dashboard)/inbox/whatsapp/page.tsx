@@ -193,11 +193,31 @@ function InboxWhatsAppInner() {
     !!conversation &&
     (canManage || (user?.role === 'SELLER' && canSellerReassign && conversation.assignedToId === user.id));
 
-  const onSelectConversation = (id: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('conversationId', id);
-    router.push(`/inbox/whatsapp?${params.toString()}`);
-  };
+  const onSelectConversation = useCallback(
+    (id: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('conversationId', id);
+      router.push(`/inbox/whatsapp?${params.toString()}`);
+    },
+    [searchParams, router],
+  );
+
+  const handleLoadMore = useCallback(() => {
+    fetchNextConversations();
+  }, [fetchNextConversations]);
+
+  const renderConversationItem = useCallback(
+    (conversation: any) => (
+      <EnterpriseChatListItem
+        key={conversation.id}
+        conversation={conversation}
+        provider="WHATSAPP"
+        selected={conversation.id === conversationId}
+        onClick={() => onSelectConversation(conversation.id)}
+      />
+    ),
+    [conversationId, onSelectConversation],
+  );
 
   const onAssign = async (assignedToId: string) => {
     await api.patch(`/inbox/conversations/${conversationId}/assign`, { assignedToId });

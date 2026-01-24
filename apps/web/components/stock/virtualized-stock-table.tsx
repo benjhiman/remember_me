@@ -37,6 +37,9 @@ function VirtualizedStockTableComponent({
   getConditionLabel,
   formatDate,
   className,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
 }: VirtualizedStockTableProps) {
   const columns = useMemo(
     () => [
