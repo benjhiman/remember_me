@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../auth-client';
 import { useToast } from '@/components/ui/use-toast';
@@ -59,22 +60,22 @@ export function useCreatePurchase() {
       if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
-          description: (
-            <div>
-              <p>No tenés permisos para crear compras</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, 'No tenés permisos para crear compras'),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: (
-            <div>
-              <p>{message}</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, message),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
@@ -105,33 +106,33 @@ export function useUpdatePurchase() {
       if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
-          description: (
-            <div>
-              <p>No tenés permisos para editar compras</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, 'No tenés permisos para editar compras'),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
       } else if (error?.response?.data?.code === 'INVALID_STATUS') {
         toast({
           title: 'No se puede editar',
-          description: (
-            <div>
-              <p>Solo las compras en borrador pueden editarse</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, 'Solo las compras en borrador pueden editarse'),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: (
-            <div>
-              <p>{message}</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, message),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
@@ -163,22 +164,22 @@ export function useTransitionPurchase() {
         const transitionMessage = error.response.data.message || 'No se puede cambiar a este estado';
         toast({
           title: 'Transición inválida',
-          description: (
-            <div>
-              <p>{transitionMessage}</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, transitionMessage),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: (
-            <div>
-              <p>{message}</p>
-              {requestId && <RequestIdChip requestId={requestId} />}
-            </div>
+          description: React.createElement(
+            'div',
+            null,
+            React.createElement('p', null, message),
+            requestId && React.createElement(RequestIdChip, { requestId })
           ),
           variant: 'destructive',
         });
