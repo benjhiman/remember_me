@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { MessageSquare, Instagram, MessageCircle, Search } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
+import { VirtualizedConversationList } from '@/components/inbox/virtualized-conversation-list';
 import type { ConversationStatus } from '@/types/api';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -73,6 +74,16 @@ function InboxUnifiedInner() {
   }, [whatsappList?.data, instagramList?.data]);
 
   const isLoading = whatsappLoading || instagramLoading;
+
+  useEffect(() => {
+    perfMark('inbox-list-mount');
+  }, []);
+
+  useEffect(() => {
+    if (allConversations.length > 0 && !isLoading) {
+      perfMeasureToNow('inbox-list-data-loaded', 'inbox-list-mount');
+    }
+  }, [allConversations.length, isLoading]);
 
   // Auth is handled by RouteGuard in layout
   // No need to check here to avoid double redirects
@@ -146,7 +157,7 @@ function InboxUnifiedInner() {
         </div>
 
         {/* Conversation List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-hidden">
           {isLoading ? (
             <div className="p-4 space-y-3">
               {[...Array(5)].map((_, i) => (
@@ -165,8 +176,75 @@ function InboxUnifiedInner() {
                   : 'Las conversaciones de todos los canales aparecerán aquí.'}
               </p>
             </div>
+          ) : allConversations.length > 50 ? (
+            <VirtualizedConversationList
+              items={allConversations}
+              renderItem={({ conversation, provider }, index) => (
+                <div
+                  key={`${provider}-${conversation.id}`}
+                  className="hover:bg-muted/50 transition-colors cursor-pointer border-b"
+                  onClick={() => handleSelectConversation(conversation.id, provider)}
+                >
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="flex-shrink-0">
+                      {provider === 'WHATSAPP' ? (
+                        <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
+                          <MessageSquare className="h-5 w-5 text-white" />
+                        </div>
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center">
+                          <Instagram className="h-5 w-5 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold truncate">
+                          {conversation.lead?.name || conversation.phone || conversation.handle || 'Sin nombre'}
+                        </span>
+                        <span
+                          className={cn(
+                            'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                            provider === 'WHATSAPP'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-purple-100 text-purple-800'
+                          )}
+                        >
+                          {provider === 'WHATSAPP' ? 'WA' : 'IG'}
+                        </span>
+                        <span
+                          className={cn(
+                            'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                            conversation.status === 'OPEN'
+                              ? 'bg-blue-100 text-blue-800'
+                              : conversation.status === 'PENDING'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
+                          )}
+                        >
+                          {conversation.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {conversation.lastMessage?.text || 'Sin mensajes'}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 text-xs text-muted-foreground">
+                      {conversation.lastMessageAt
+                        ? new Date(conversation.lastMessageAt).toLocaleTimeString('es-AR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : ''}
+                    </div>
+                  </div>
+                </div>
+              )}
+              estimateSize={() => 80}
+              overscan={10}
+            />
           ) : (
-            <div className="divide-y">
+            <div className="divide-y overflow-y-auto h-full">
               {allConversations.map(({ conversation, provider }) => (
                 <div
                   key={`${provider}-${conversation.id}`}

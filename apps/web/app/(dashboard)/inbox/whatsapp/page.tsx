@@ -15,6 +15,7 @@ import { EnterpriseChatListItem } from '@/components/inbox/enterprise-chat-list-
 import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
+import { VirtualizedConversationList } from '@/components/inbox/virtualized-conversation-list';
 import type { ConversationStatus, Message } from '@/types/api';
 import { InboxHeader } from '@/components/inbox/inbox-header';
 import { MessageSquare } from 'lucide-react';
@@ -246,7 +247,7 @@ function InboxWhatsAppInner() {
               ))}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-hidden">
             {listLoading ? (
               <div className="p-4 space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -254,15 +255,34 @@ function InboxWhatsAppInner() {
                 ))}
               </div>
             ) : convList?.data && convList.data.length > 0 ? (
-              convList.data.map((c) => (
-                <EnterpriseChatListItem
-                  key={c.id}
-                  conversation={c}
-                  provider="WHATSAPP"
-                  selected={c.id === conversationId}
-                  onClick={() => onSelectConversation(c.id)}
+              convList.data.length > 50 ? (
+                <VirtualizedConversationList
+                  items={convList.data}
+                  renderItem={(c, index) => (
+                    <EnterpriseChatListItem
+                      key={c.id}
+                      conversation={c}
+                      provider="WHATSAPP"
+                      selected={c.id === conversationId}
+                      onClick={() => onSelectConversation(c.id)}
+                    />
+                  )}
+                  estimateSize={() => 80}
+                  overscan={10}
                 />
-              ))
+              ) : (
+                <div className="overflow-y-auto h-full">
+                  {convList.data.map((c) => (
+                    <EnterpriseChatListItem
+                      key={c.id}
+                      conversation={c}
+                      provider="WHATSAPP"
+                      selected={c.id === conversationId}
+                      onClick={() => onSelectConversation(c.id)}
+                    />
+                  ))}
+                </div>
+              )
             ) : (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center">
                 <div className="mb-4">
