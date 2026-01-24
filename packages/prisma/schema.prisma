@@ -470,97 +470,97 @@ model SaleItem {
 // ===== CUSTOMERS & VENDORS =====
 
 model Customer {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   createdById    String?
-  
-  name           String
-  email          String?
-  phone          String?
-  notes          String?
-  status         String   @default("ACTIVE") // ACTIVE, INACTIVE
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy      User?        @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  name   String
+  email  String?
+  phone  String?
+  notes  String?
+  status String  @default("ACTIVE") // ACTIVE, INACTIVE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        User?                     @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
   balanceSnapshots CustomerBalanceSnapshot[]
-  
+
   @@index([organizationId, createdAt])
   @@index([organizationId, name])
   @@index([organizationId, status])
 }
 
 model Vendor {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   createdById    String?
-  
-  name           String
-  email          String?
-  phone          String?
-  notes          String?
-  status         String   @default("ACTIVE") // ACTIVE, INACTIVE
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy      User?        @relation("VendorCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  purchases      Purchase[]
-  
+
+  name   String
+  email  String?
+  phone  String?
+  notes  String?
+  status String  @default("ACTIVE") // ACTIVE, INACTIVE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("VendorCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  purchases    Purchase[]
+
   @@index([organizationId, createdAt])
   @@index([organizationId, name])
   @@index([organizationId, status])
 }
 
 model Purchase {
-  id             String        @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   vendorId       String
   createdById    String?
-  
-  status         PurchaseStatus @default(DRAFT)
-  notes          String?
-  currency       String         @default("USD")
-  referenceNumber String?       // Optional reference number
-  
-  subtotalCents  Int
-  taxCents       Int            @default(0)
-  totalCents     Int
-  
-  approvedAt     DateTime?
-  receivedAt     DateTime?
-  cancelledAt    DateTime?
-  
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  createdBy      User?          @relation("PurchaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  lines          PurchaseLine[]
-  
+
+  status          PurchaseStatus @default(DRAFT)
+  notes           String?
+  currency        String         @default("USD")
+  referenceNumber String? // Optional reference number
+
+  subtotalCents Int
+  taxCents      Int @default(0)
+  totalCents    Int
+
+  approvedAt  DateTime?
+  receivedAt  DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendor       Vendor         @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  createdBy    User?          @relation("PurchaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines        PurchaseLine[]
+
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
   @@index([organizationId, vendorId])
 }
 
 model PurchaseLine {
-  id              String   @id @default(cuid())
-  purchaseId      String
-  description     String
-  quantity        Int
-  unitPriceCents  Int
-  lineTotalCents  Int
-  sku             String?  // Para futuro mapeo a StockItem
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  
+  id             String  @id @default(cuid())
+  purchaseId     String
+  description    String
+  quantity       Int
+  unitPriceCents Int
+  lineTotalCents Int
+  sku            String? // Para futuro mapeo a StockItem
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
   @@index([purchaseId])
 }
 
@@ -569,6 +569,54 @@ enum PurchaseStatus {
   APPROVED
   RECEIVED
   CANCELLED
+}
+
+// ===== ACCOUNTING-LITE (Prep for Zoho Books) =====
+
+model LedgerAccount {
+  id             String   @id @default(cuid())
+  organizationId String
+  code           String // Account code (e.g., "1000", "2000")
+  name           String
+  type           String // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, code])
+  @@index([organizationId, type])
+  @@index([organizationId, isActive])
+}
+
+model LedgerCategory {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, name])
+}
+
+model CustomerBalanceSnapshot {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  balanceCents   Int // Balance in cents (can be negative for credit)
+  asOfDate       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, customerId, asOfDate])
+  @@index([organizationId, customerId])
+  @@index([organizationId, asOfDate])
 }
 
 model StockMovement {
@@ -990,24 +1038,24 @@ model IntegrationJob {
 // ===== JOB RUNNER LOCK & STATE =====
 
 model JobRunnerLock {
-  id            String   @id @default("singleton") // Singleton pattern
-  lockedBy      String   // Worker instance ID (hostname + pid)
-  lockedAt      DateTime @default(now())
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default("singleton") // Singleton pattern
+  lockedBy  String // Worker instance ID (hostname + pid)
+  lockedAt  DateTime @default(now())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("job_runner_lock")
 }
 
 model JobRunnerState {
-  id                String   @id @default("singleton") // Singleton pattern
+  id                String    @id @default("singleton") // Singleton pattern
   lastRunAt         DateTime?
   lastRunDurationMs Int?
   lastRunJobCount   Int?
   lastRunError      String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@map("job_runner_state")
 }
