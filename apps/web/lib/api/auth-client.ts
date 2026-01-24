@@ -11,6 +11,7 @@
 
 import { useAuthStore } from '../store/auth-store';
 import { useOrgStore } from '../store/org-store';
+import { getOrCreateRequestId } from '../observability/request-id';
 
 // Get API base URL with proper fallback and validation
 // ⚠️ PROD SAFETY: In production, always use safe fallback to prevent localhost usage
@@ -193,8 +194,20 @@ export async function apiRequest<T>(
       useAuthStore.getState();
     const { currentOrganizationId } = useOrgStore.getState();
 
+    // Get client version (commit hash or build id)
+    const clientVersion = 
+      process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+      process.env.NEXT_PUBLIC_GIT_COMMIT?.slice(0, 7) ||
+      undefined;
+
+    // Get or create request ID for this request
+    const requestId = getOrCreateRequestId();
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Request-Id': requestId,
+      'X-Client': 'web',
+      ...(clientVersion && { 'X-Client-Version': clientVersion }),
       ...(options.headers as Record<string, string>),
     };
 
@@ -212,7 +225,7 @@ export async function apiRequest<T>(
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   let response: Response;
-  let requestId: string | null = null;
+  let responseRequestId: string | null = null;
 
   try {
     const fetchPromise = fetch(buildEndpointUrl(endpoint), {
@@ -228,7 +241,7 @@ export async function apiRequest<T>(
     ]);
 
     clearTimeout(timeoutId);
-    requestId = response.headers.get('X-Request-Id');
+    responseRequestId = response.headers.get('X-Request-Id');
 
     // Handle 401 - try to refresh token (only once)
     if (response.status === 401 && refreshToken && accessToken) {
@@ -241,8 +254,18 @@ export async function apiRequest<T>(
         const retryTimeoutId = setTimeout(() => retryController.abort(), REQUEST_TIMEOUT);
 
         try {
+          // Reuse same request ID for retry
+          const retryRequestId = getOrCreateRequestId();
+          const retryClientVersion = 
+            process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+            process.env.NEXT_PUBLIC_GIT_COMMIT?.slice(0, 7) ||
+            undefined;
+
           const retryHeaders: Record<string, string> = {
             'Content-Type': 'application/json',
+            'X-Request-Id': retryRequestId,
+            'X-Client': 'web',
+            ...(retryClientVersion && { 'X-Client-Version': retryClientVersion }),
             ...(options.headers as Record<string, string>),
             Authorization: `Bearer ${newAccessToken}`,
           };
@@ -265,7 +288,7 @@ export async function apiRequest<T>(
           ]);
 
           clearTimeout(retryTimeoutId);
-          requestId = response.headers.get('X-Request-Id');
+          responseRequestId = response.headers.get('X-Request-Id');
         } catch (retryError) {
           clearTimeout(retryTimeoutId);
           throw retryError;
@@ -279,7 +302,7 @@ export async function apiRequest<T>(
           401,
           ErrorType.AUTH,
           undefined,
-          requestId || undefined
+          responseRequestId || undefined
         );
       }
     }
@@ -299,7 +322,7 @@ export async function apiRequest<T>(
         response.status,
         errorType,
         errorData,
-        requestId || undefined
+        responseRequestId || undefined
       );
 
       // Don't auto-redirect on 401 - let RouteGuard handle it to avoid loops

@@ -29,3 +29,36 @@ export function getErrorMessage(error: any): string {
 
   return 'Error desconocido';
 }
+
+/**
+ * Extract request ID from error object
+ * 
+ * Checks multiple possible locations:
+ * - error.requestId (ApiError)
+ * - error.response?.data?.requestId (API response)
+ * - error.response?.headers?.['x-request-id'] (response header)
+ */
+export function getRequestIdFromError(error: any): string | null {
+  if (!error) return null;
+
+  // ApiError has requestId property
+  if (error.requestId) {
+    return error.requestId;
+  }
+
+  // Check response data
+  if (error?.response?.data?.requestId) {
+    return error.response.data.requestId;
+  }
+
+  // Check response headers (if available)
+  if (error?.response?.headers) {
+    const headers = error.response.headers;
+    if (typeof headers.get === 'function') {
+      return headers.get('X-Request-Id') || headers.get('x-request-id') || null;
+    }
+    return headers['X-Request-Id'] || headers['x-request-id'] || null;
+  }
+
+  return null;
+}

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../auth-client';
 import { useToast } from '@/components/ui/use-toast';
-import { getErrorMessage } from '@/lib/utils/error-handler';
+import { getErrorMessage, getRequestIdFromError } from '@/lib/utils/error-handler';
 import type { PurchaseStatus } from './use-purchases';
 
 export interface CreatePurchaseLineDto {
@@ -52,16 +52,22 @@ export function useCreatePurchase() {
     },
     onError: (error: any) => {
       const message = getErrorMessage(error);
+      const requestId = getRequestIdFromError(error);
+      const descriptionWithId = requestId 
+        ? `${message}\n\nID de error: ${requestId}`
+        : message;
       if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
-          description: 'No tenés permisos para crear compras',
+          description: requestId 
+            ? `No tenés permisos para crear compras\n\nID de error: ${requestId}`
+            : 'No tenés permisos para crear compras',
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: message,
+          description: descriptionWithId,
           variant: 'destructive',
         });
       }
@@ -87,22 +93,30 @@ export function useUpdatePurchase() {
     },
     onError: (error: any) => {
       const message = getErrorMessage(error);
+      const requestId = getRequestIdFromError(error);
+      const descriptionWithId = requestId 
+        ? `${message}\n\nID de error: ${requestId}`
+        : message;
       if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
-          description: 'No tenés permisos para editar compras',
+          description: requestId 
+            ? `No tenés permisos para editar compras\n\nID de error: ${requestId}`
+            : 'No tenés permisos para editar compras',
           variant: 'destructive',
         });
       } else if (error?.response?.data?.code === 'INVALID_STATUS') {
         toast({
           title: 'No se puede editar',
-          description: 'Solo las compras en borrador pueden editarse',
+          description: requestId 
+            ? `Solo las compras en borrador pueden editarse\n\nID de error: ${requestId}`
+            : 'Solo las compras en borrador pueden editarse',
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: message,
+          description: descriptionWithId,
           variant: 'destructive',
         });
       }
@@ -128,16 +142,23 @@ export function useTransitionPurchase() {
     },
     onError: (error: any) => {
       const message = getErrorMessage(error);
+      const requestId = getRequestIdFromError(error);
+      const descriptionWithId = requestId 
+        ? `${message}\n\nID de error: ${requestId}`
+        : message;
       if (error?.response?.data?.code === 'INVALID_TRANSITION') {
+        const transitionMessage = error.response.data.message || 'No se puede cambiar a este estado';
         toast({
           title: 'Transición inválida',
-          description: error.response.data.message || 'No se puede cambiar a este estado',
+          description: requestId 
+            ? `${transitionMessage}\n\nID de error: ${requestId}`
+            : transitionMessage,
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: message,
+          description: descriptionWithId,
           variant: 'destructive',
         });
       }
