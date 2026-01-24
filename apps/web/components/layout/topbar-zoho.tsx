@@ -16,11 +16,14 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { OrgSwitcher } from '@/components/organizations/org-switcher';
+import { useTheme } from '@/components/providers/theme-provider';
+import { Moon, Sun } from 'lucide-react';
 
 export function TopbarZoho() {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const [searchFocused, setSearchFocused] = useState(false);
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   const handleLogout = () => {
     clearAuth();
@@ -124,6 +127,19 @@ export function TopbarZoho() {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
+              {resolvedTheme === 'dark' ? (
+                <>
+                  <Sun className="h-4 w-4 mr-2" />
+                  Light Mode
+                </>
+              ) : (
+                <>
+                  <Moon className="h-4 w-4 mr-2" />
+                  Dark Mode
+                </>
+              )}
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/settings')}>
               <Settings className="h-4 w-4 mr-2" />
               Settings
