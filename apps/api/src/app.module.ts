@@ -32,6 +32,7 @@ import { ExternalHttpClientModule } from './common/http/external-http-client.mod
 import { SettingsModule } from './settings/settings.module';
 import { CustomersModule } from './customers/customers.module';
 import { VendorsModule } from './vendors/vendors.module';
+import { PurchasesModule } from './purchases/purchases.module';
 
 // Resolve .env path relative to apps/api directory
 // Works from any CWD: finds apps/api/.env whether running from root or apps/api
@@ -109,6 +110,7 @@ const envFilePath = (() => {
     SettingsModule,
     CustomersModule,
     VendorsModule,
+    PurchasesModule,
     RateLimitModule,
     MetricsModule,
     ExternalHttpClientModule,

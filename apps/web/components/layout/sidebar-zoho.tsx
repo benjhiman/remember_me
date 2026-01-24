@@ -28,6 +28,7 @@ import {
   Building2,
   CreditCard,
   Wrench,
+  ShoppingBag,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -72,6 +73,7 @@ const navItems: NavItem[] = [
       { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
       { href: '/sales/customers', label: 'Clientes', icon: Users, permission: Permission.VIEW_CUSTOMERS },
       { href: '/sales/vendors', label: 'Proveedores', icon: Building2, permission: Permission.VIEW_VENDORS },
+      { href: '/sales/purchases', label: 'Compras', icon: ShoppingBag, permission: Permission.VIEW_PURCHASES },
     ],
   },
   { href: '/pricing', label: 'Pricing', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },

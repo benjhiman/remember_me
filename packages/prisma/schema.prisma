@@ -38,6 +38,7 @@ model User {
   assignedConversations Conversation[]
   createdCustomers      Customer[]         @relation("CustomerCreator")
   createdVendors        Vendor[]           @relation("VendorCreator")
+  createdPurchases      Purchase[]         @relation("PurchaseCreator")
 
   @@index([email])
 }
@@ -76,6 +77,7 @@ model Organization {
   MetaSpendDaily           MetaSpendDaily[]
   customers                Customer[]
   vendors                  Vendor[]
+  purchases                Purchase[]
 
   @@index([slug])
 }
@@ -502,10 +504,65 @@ model Vendor {
   
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy      User?        @relation("VendorCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  purchases      Purchase[]
   
   @@index([organizationId, createdAt])
   @@index([organizationId, name])
   @@index([organizationId, status])
+}
+
+model Purchase {
+  id             String        @id @default(cuid())
+  organizationId String
+  vendorId       String
+  createdById    String?
+  
+  status         PurchaseStatus @default(DRAFT)
+  notes          String?
+  
+  subtotalCents  Int
+  taxCents       Int            @default(0)
+  totalCents     Int
+  
+  approvedAt     DateTime?
+  receivedAt     DateTime?
+  cancelledAt    DateTime?
+  
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendor         Vendor         @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  createdBy      User?          @relation("PurchaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines          PurchaseLine[]
+  
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@index([organizationId, vendorId])
+}
+
+model PurchaseLine {
+  id              String   @id @default(cuid())
+  purchaseId      String
+  description     String
+  quantity        Int
+  unitPriceCents  Int
+  lineTotalCents  Int
+  sku             String?  // Para futuro mapeo a StockItem
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  
+  @@index([purchaseId])
+}
+
+enum PurchaseStatus {
+  DRAFT
+  APPROVED
+  RECEIVED
+  CANCELLED
 }
 
 model StockMovement {
@@ -594,6 +651,7 @@ enum AuditEntityType {
   Task
   Customer
   Vendor
+  Purchase
 }
 
 model AuditLog {
