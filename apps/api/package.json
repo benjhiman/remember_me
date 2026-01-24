@@ -30,7 +30,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "smoke:e2e": "jest --config ./test/jest-smoke-e2e.json",
     "type-check": "tsc --noEmit",
-    "seed:owner": "ts-node -r tsconfig-paths/register src/scripts/seed-owner.ts"
+    "seed:owner": "ts-node -r tsconfig-paths/register src/scripts/seed-owner.ts",
+    "ops:e2e-seed": "ts-node -r tsconfig-paths/register src/scripts/e2e-seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
