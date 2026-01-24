@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { Conversation } from '@/types/api';
 import { formatTimeHHMM } from '@/lib/utils/inbox-format';
@@ -11,7 +12,7 @@ function statusBadge(status: string, provider: 'WHATSAPP' | 'INSTAGRAM') {
   return cn(base, 'bg-muted text-muted-foreground border-border');
 }
 
-export function EnterpriseChatListItem({
+function EnterpriseChatListItemComponent({
   conversation,
   selected,
   provider,
@@ -76,4 +77,15 @@ export function EnterpriseChatListItem({
     </button>
   );
 }
+
+export const EnterpriseChatListItem = memo(EnterpriseChatListItemComponent, (prev, next) => {
+  return (
+    prev.conversation.id === next.conversation.id &&
+    prev.selected === next.selected &&
+    prev.provider === next.provider &&
+    prev.conversation.lastMessageAt === next.conversation.lastMessageAt &&
+    prev.conversation.status === next.conversation.status &&
+    prev.conversation.unreadCount === next.conversation.unreadCount
+  );
+});
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useStockItemsInfinite } from '@/lib/api/hooks/use-stock-items-infinite';
@@ -37,8 +37,71 @@ export default function StockPage() {
     enabled: !!user,
   });
 
-  // Flatten pages into single array
-  const allItems = data?.pages.flatMap((page) => page.data) || [];
+  // Flatten pages into single array (memoized to avoid recalculation)
+  const allItems = useMemo(() => data?.pages.flatMap((page) => page.data) || [], [data?.pages]);
+
+  // Stable callbacks (must be before any early returns)
+  const getStatusColor = useCallback((status: StockStatus) => {
+    switch (status) {
+      case 'AVAILABLE':
+        return 'bg-green-100 text-green-800';
+      case 'RESERVED':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'SOLD':
+        return 'bg-blue-100 text-blue-800';
+      case 'DAMAGED':
+        return 'bg-red-100 text-red-800';
+      case 'RETURNED':
+        return 'bg-purple-100 text-purple-800';
+      case 'CANCELLED':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  }, []);
+
+  const getStatusLabel = useCallback((status: StockStatus) => {
+    switch (status) {
+      case 'AVAILABLE':
+        return 'Disponible';
+      case 'RESERVED':
+        return 'Reservado';
+      case 'SOLD':
+        return 'Vendido';
+      case 'DAMAGED':
+        return 'Dañado';
+      case 'RETURNED':
+        return 'Devuelto';
+      case 'CANCELLED':
+        return 'Cancelado';
+      default:
+        return status;
+    }
+  }, []);
+
+  const getConditionLabel = useCallback((condition: ItemCondition) => {
+    switch (condition) {
+      case 'NEW':
+        return 'Nuevo';
+      case 'USED':
+        return 'Usado';
+      case 'REFURBISHED':
+        return 'Reacondicionado';
+      default:
+        return condition;
+    }
+  }, []);
+
+  const handleItemClick = useCallback(
+    (item: any) => {
+      router.push(`/stock/${item.id}`);
+    },
+    [router],
+  );
+
+  const handleLoadMore = useCallback(() => {
+    fetchNextPage();
+  }, [fetchNextPage]);
 
   useEffect(() => {
     perfMark('stock-page-mount');
@@ -65,57 +128,6 @@ export default function StockPage() {
   if (!user) {
     return null;
   }
-
-  const getStatusColor = (status: StockStatus) => {
-    switch (status) {
-      case 'AVAILABLE':
-        return 'bg-green-100 text-green-800';
-      case 'RESERVED':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'SOLD':
-        return 'bg-blue-100 text-blue-800';
-      case 'DAMAGED':
-        return 'bg-red-100 text-red-800';
-      case 'RETURNED':
-        return 'bg-purple-100 text-purple-800';
-      case 'CANCELLED':
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusLabel = (status: StockStatus) => {
-    switch (status) {
-      case 'AVAILABLE':
-        return 'Disponible';
-      case 'RESERVED':
-        return 'Reservado';
-      case 'SOLD':
-        return 'Vendido';
-      case 'DAMAGED':
-        return 'Dañado';
-      case 'RETURNED':
-        return 'Devuelto';
-      case 'CANCELLED':
-        return 'Cancelado';
-      default:
-        return status;
-    }
-  };
-
-  const getConditionLabel = (condition: ItemCondition) => {
-    switch (condition) {
-      case 'NEW':
-        return 'Nuevo';
-      case 'USED':
-        return 'Usado';
-      case 'REFURBISHED':
-        return 'Reacondicionado';
-      default:
-        return condition;
-    }
-  };
 
   return (
     <div>
@@ -229,12 +241,12 @@ export default function StockPage() {
                   // Use virtualized table for large lists
                   <VirtualizedStockTable
                     items={allItems}
-                    onItemClick={(item) => router.push(`/stock/${item.id}`)}
+                    onItemClick={handleItemClick}
                     getStatusColor={getStatusColor}
                     getStatusLabel={getStatusLabel}
                     getConditionLabel={getConditionLabel}
                     formatDate={formatDate}
-                    onLoadMore={() => fetchNextPage()}
+                    onLoadMore={handleLoadMore}
                     hasMore={hasNextPage}
                     isLoadingMore={isFetchingNextPage}
                   />

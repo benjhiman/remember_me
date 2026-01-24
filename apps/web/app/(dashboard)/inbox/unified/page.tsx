@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState, useMemo } from 'react';
+import { Suspense, useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
@@ -104,10 +104,87 @@ function InboxUnifiedInner() {
   // Auth is handled by RouteGuard in layout
   // No need to check here to avoid double redirects
 
-  const handleSelectConversation = (id: string, provider: 'WHATSAPP' | 'INSTAGRAM') => {
-    const href = provider === 'WHATSAPP' ? '/inbox/whatsapp' : '/inbox/instagram';
-    router.push(`${href}?conversationId=${id}`);
-  };
+  const handleSelectConversation = useCallback(
+    (id: string, provider: 'WHATSAPP' | 'INSTAGRAM') => {
+      const href = provider === 'WHATSAPP' ? '/inbox/whatsapp' : '/inbox/instagram';
+      router.push(`${href}?conversationId=${id}`);
+    },
+    [router],
+  );
+
+  const handleLoadMore = useCallback(() => {
+    if (providerFilter === 'ALL' || providerFilter === 'WHATSAPP') {
+      fetchNextWhatsApp();
+    }
+    if (providerFilter === 'ALL' || providerFilter === 'INSTAGRAM') {
+      fetchNextInstagram();
+    }
+  }, [providerFilter, fetchNextWhatsApp, fetchNextInstagram]);
+
+  const renderConversationItem = useCallback(
+    ({ conversation, provider }: { conversation: any; provider: 'WHATSAPP' | 'INSTAGRAM' }) => (
+      <div
+        key={`${provider}-${conversation.id}`}
+        className="hover:bg-muted/50 transition-colors cursor-pointer border-b"
+        onClick={() => handleSelectConversation(conversation.id, provider)}
+      >
+        <div className="p-4 flex items-center gap-3">
+          <div className="flex-shrink-0">
+            {provider === 'WHATSAPP' ? (
+              <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
+                <MessageSquare className="h-5 w-5 text-white" />
+              </div>
+            ) : (
+              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center">
+                <Instagram className="h-5 w-5 text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-semibold truncate">
+                {conversation.lead?.name || conversation.phone || conversation.handle || 'Sin nombre'}
+              </span>
+              <span
+                className={cn(
+                  'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                  provider === 'WHATSAPP'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-purple-100 text-purple-800'
+                )}
+              >
+                {provider === 'WHATSAPP' ? 'WA' : 'IG'}
+              </span>
+              <span
+                className={cn(
+                  'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                  conversation.status === 'OPEN'
+                    ? 'bg-blue-100 text-blue-800'
+                    : conversation.status === 'PENDING'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-gray-100 text-gray-800'
+                )}
+              >
+                {conversation.status}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground truncate">
+              {conversation.lastMessage?.text || 'Sin mensajes'}
+            </p>
+          </div>
+          <div className="flex-shrink-0 text-xs text-muted-foreground">
+            {conversation.lastMessageAt
+              ? new Date(conversation.lastMessageAt).toLocaleTimeString('es-AR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : ''}
+          </div>
+        </div>
+      </div>
+    ),
+    [handleSelectConversation],
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -193,69 +270,24 @@ function InboxUnifiedInner() {
           ) : allConversations.length > 50 ? (
             <VirtualizedConversationList
               items={allConversations}
-              renderItem={({ conversation, provider }, index) => (
-                <div
-                  key={`${provider}-${conversation.id}`}
-                  className="hover:bg-muted/50 transition-colors cursor-pointer border-b"
-                  onClick={() => handleSelectConversation(conversation.id, provider)}
-                >
-                  <div className="p-4 flex items-center gap-3">
-                    <div className="flex-shrink-0">
-                      {provider === 'WHATSAPP' ? (
-                        <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
-                          <MessageSquare className="h-5 w-5 text-white" />
-                        </div>
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center">
-                          <Instagram className="h-5 w-5 text-white" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold truncate">
-                          {conversation.lead?.name || conversation.phone || conversation.handle || 'Sin nombre'}
-                        </span>
-                        <span
-                          className={cn(
-                            'text-[10px] px-2 py-0.5 rounded-full font-medium',
-                            provider === 'WHATSAPP'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-purple-100 text-purple-800'
-                          )}
-                        >
-                          {provider === 'WHATSAPP' ? 'WA' : 'IG'}
-                        </span>
-                        <span
-                          className={cn(
-                            'text-[10px] px-2 py-0.5 rounded-full font-medium',
-                            conversation.status === 'OPEN'
-                              ? 'bg-blue-100 text-blue-800'
-                              : conversation.status === 'PENDING'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                          )}
-                        >
-                          {conversation.status}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {conversation.lastMessage?.text || 'Sin mensajes'}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0 text-xs text-muted-foreground">
-                      {conversation.lastMessageAt
-                        ? new Date(conversation.lastMessageAt).toLocaleTimeString('es-AR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : ''}
-                    </div>
-                  </div>
-                </div>
-              )}
+              renderItem={renderConversationItem}
               estimateSize={() => 80}
               overscan={10}
+              onLoadMore={handleLoadMore}
+              hasMore={
+                providerFilter === 'ALL'
+                  ? hasNextWhatsApp || hasNextInstagram
+                  : providerFilter === 'WHATSAPP'
+                    ? hasNextWhatsApp
+                    : hasNextInstagram
+              }
+              isLoadingMore={
+                providerFilter === 'ALL'
+                  ? isFetchingNextWhatsApp || isFetchingNextInstagram
+                  : providerFilter === 'WHATSAPP'
+                    ? isFetchingNextWhatsApp
+                    : isFetchingNextInstagram
+              }
             />
           ) : (
             <div className="divide-y overflow-y-auto h-full">

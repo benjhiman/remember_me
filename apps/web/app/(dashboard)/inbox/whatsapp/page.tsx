@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback, memo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
@@ -264,18 +264,10 @@ function InboxWhatsAppInner() {
               convList.data.length > 50 ? (
                 <VirtualizedConversationList
                   items={convList.data}
-                  renderItem={(c, index) => (
-                    <EnterpriseChatListItem
-                      key={c.id}
-                      conversation={c}
-                      provider="WHATSAPP"
-                      selected={c.id === conversationId}
-                      onClick={() => onSelectConversation(c.id)}
-                    />
-                  )}
+                  renderItem={renderConversationItem}
                   estimateSize={() => 80}
                   overscan={10}
-                  onLoadMore={() => fetchNextConversations()}
+                  onLoadMore={handleLoadMore}
                   hasMore={hasNextConversations}
                   isLoadingMore={isFetchingNextConversations}
                 />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { VirtualizedTable } from '@/components/data/virtualized-table';
 import type { StockStatus, ItemCondition } from '@/types/stock';
 
@@ -88,23 +88,38 @@ function VirtualizedStockTableComponent({
     [getStatusColor, getStatusLabel, getConditionLabel, formatDate],
   );
 
+  const handleRowClick = useCallback(
+    (item: StockItem) => {
+      onItemClick(item);
+    },
+    [onItemClick],
+  );
+
+  const stableRenderRow = useCallback(
+    (item: StockItem) => (
+      <tr
+        key={item.id}
+        onClick={() => handleRowClick(item)}
+        className="hover:bg-gray-50 cursor-pointer"
+      >
+        {renderRow(item)}
+      </tr>
+    ),
+    [handleRowClick, renderRow],
+  );
+
   return (
     <div className={className || 'bg-white rounded-lg border border-gray-200 overflow-hidden'}>
       <VirtualizedTable
         items={items}
         columns={columns}
-        renderRow={(item) => (
-          <tr
-            key={item.id}
-            onClick={() => onItemClick(item)}
-            className="hover:bg-gray-50 cursor-pointer"
-          >
-            {renderRow(item)}
-          </tr>
-        )}
+        renderRow={stableRenderRow}
         estimateSize={() => 60}
         className="h-[600px]"
         tableClassName="min-w-full divide-y divide-gray-200"
+        onLoadMore={onLoadMore}
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
       />
     </div>
   );
