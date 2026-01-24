@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
-import { useConversations } from '@/lib/api/hooks/use-conversations';
+import { useConversationsInfinite } from '@/lib/api/hooks/use-conversations-infinite';
 import { EnterpriseChatListItem } from '@/components/inbox/enterprise-chat-list-item';
 import { InboxHeader } from '@/components/inbox/inbox-header';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,6 @@ function InboxUnifiedInner() {
   const [debouncedQ, setDebouncedQ] = useState('');
   const [status, setStatus] = useState<ConversationStatus | undefined>(undefined);
   const [providerFilter, setProviderFilter] = useState<'ALL' | 'WHATSAPP' | 'INSTAGRAM'>('ALL');
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
@@ -36,25 +35,42 @@ function InboxUnifiedInner() {
   const assignedToId =
     user?.role === 'SELLER' && settings?.crm.inbox.sellerSeesOnlyAssigned ? user.id : undefined;
 
-  const { data: whatsappList, isLoading: whatsappLoading } = useConversations({
+  const {
+    data: whatsappData,
+    isLoading: whatsappLoading,
+    fetchNextPage: fetchNextWhatsApp,
+    hasNextPage: hasNextWhatsApp,
+    isFetchingNextPage: isFetchingNextWhatsApp,
+  } = useConversationsInfinite({
     provider: 'WHATSAPP',
     q: debouncedQ || undefined,
     status,
     assignedToId,
-    page,
-    limit: 30,
+    limit: 50,
     enabled: !!user && (providerFilter === 'ALL' || providerFilter === 'WHATSAPP'),
   });
 
-  const { data: instagramList, isLoading: instagramLoading } = useConversations({
+  const {
+    data: instagramData,
+    isLoading: instagramLoading,
+    fetchNextPage: fetchNextInstagram,
+    hasNextPage: hasNextInstagram,
+    isFetchingNextPage: isFetchingNextInstagram,
+  } = useConversationsInfinite({
     provider: 'INSTAGRAM',
     q: debouncedQ || undefined,
     status,
     assignedToId,
-    page,
-    limit: 30,
+    limit: 50,
     enabled: !!user && (providerFilter === 'ALL' || providerFilter === 'INSTAGRAM'),
   });
+
+  const whatsappList = whatsappData
+    ? { data: whatsappData.pages.flatMap((p: any) => p.data) }
+    : undefined;
+  const instagramList = instagramData
+    ? { data: instagramData.pages.flatMap((p: any) => p.data) }
+    : undefined;
 
   const allConversations = useMemo(() => {
     const all: Array<{ conversation: any; provider: 'WHATSAPP' | 'INSTAGRAM' }> = [];
@@ -106,7 +122,6 @@ function InboxUnifiedInner() {
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
-                setPage(1);
               }}
               className="flex-1"
             />
@@ -146,7 +161,6 @@ function InboxUnifiedInner() {
                 size="sm"
                 onClick={() => {
                   setStatus(status === s ? undefined : s);
-                  setPage(1);
                 }}
                 className="h-8 text-xs capitalize"
               >

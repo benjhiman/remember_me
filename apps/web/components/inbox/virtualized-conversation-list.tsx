@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '@/lib/utils/cn';
 
@@ -10,6 +10,9 @@ interface VirtualizedConversationListProps<T> {
   estimateSize?: (index: number) => number;
   className?: string;
   overscan?: number;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 /**
@@ -23,6 +26,9 @@ export function VirtualizedConversationList<T>({
   estimateSize = () => 80,
   className,
   overscan = 8,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
 }: VirtualizedConversationListProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -34,6 +40,17 @@ export function VirtualizedConversationList<T>({
   });
 
   const virtualItems = virtualizer.getVirtualItems();
+
+  // Load more when scrolling near the end
+  useEffect(() => {
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (lastItem && hasMore && !isLoadingMore && onLoadMore) {
+      const threshold = items.length - 10; // Load more when 10 items from end
+      if (lastItem.index >= threshold) {
+        onLoadMore();
+      }
+    }
+  }, [virtualItems, hasMore, isLoadingMore, onLoadMore, items.length]);
 
   return (
     <div ref={parentRef} className={cn('h-full overflow-auto', className)}>

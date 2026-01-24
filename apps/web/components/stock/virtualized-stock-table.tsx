@@ -24,6 +24,9 @@ interface VirtualizedStockTableProps {
   getConditionLabel: (condition: ItemCondition) => string;
   formatDate: (date: string) => string;
   className?: string;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 function VirtualizedStockTableComponent({

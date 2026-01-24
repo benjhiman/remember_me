@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '@/lib/utils/cn';
 
@@ -15,6 +15,9 @@ interface VirtualizedTableProps<T> {
   estimateSize?: (index: number) => number;
   className?: string;
   tableClassName?: string;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 /**
@@ -30,6 +33,9 @@ export function VirtualizedTable<T>({
   estimateSize = () => 60,
   className,
   tableClassName,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
 }: VirtualizedTableProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +47,17 @@ export function VirtualizedTable<T>({
   });
 
   const virtualItems = virtualizer.getVirtualItems();
+
+  // Load more when scrolling near the end
+  useEffect(() => {
+    const lastItem = virtualItems[virtualItems.length - 1];
+    if (lastItem && hasMore && !isLoadingMore && onLoadMore) {
+      const threshold = items.length - 10; // Load more when 10 items from end
+      if (lastItem.index >= threshold) {
+        onLoadMore();
+      }
+    }
+  }, [virtualItems, hasMore, isLoadingMore, onLoadMore, items.length]);
 
   return (
     <div ref={parentRef} className={cn('overflow-auto', className)} style={{ height: '600px' }}>

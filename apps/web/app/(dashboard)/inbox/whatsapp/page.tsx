@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'rea
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
-import { useConversations } from '@/lib/api/hooks/use-conversations';
+import { useConversationsInfinite } from '@/lib/api/hooks/use-conversations-infinite';
 import { useConversation } from '@/lib/api/hooks/use-conversation';
 import { useMessages } from '@/lib/api/hooks/use-messages';
 import { useOrgUsers } from '@/lib/api/hooks/use-org-users';
@@ -35,7 +35,6 @@ function InboxWhatsAppInner() {
   const [q, setQ] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [status, setStatus] = useState<ConversationStatus | undefined>(undefined);
-  const [page, setPage] = useState(1);
   const [leftWidth, setLeftWidth] = useState<number>(380);
   const resizingRef = useRef(false);
 
@@ -70,15 +69,24 @@ function InboxWhatsAppInner() {
   const assignedToId =
     user?.role === 'SELLER' && settings?.crm.inbox.sellerSeesOnlyAssigned ? user.id : undefined;
 
-  const { data: convList, isLoading: listLoading } = useConversations({
+  const {
+    data: convListData,
+    isLoading: listLoading,
+    fetchNextPage: fetchNextConversations,
+    hasNextPage: hasNextConversations,
+    isFetchingNextPage: isFetchingNextConversations,
+  } = useConversationsInfinite({
     provider: 'WHATSAPP',
     q: debouncedQ || undefined,
     status,
     assignedToId,
-    page,
-    limit: 30,
+    limit: 50,
     enabled: !!user,
   });
+
+  const convList = convListData
+    ? { data: convListData.pages.flatMap((p) => p.data) }
+    : undefined;
 
   useEffect(() => {
     perfMark('inbox-whatsapp-mount');
@@ -224,7 +232,6 @@ function InboxWhatsAppInner() {
                 value={q}
                 onChange={(e) => {
                   setQ(e.target.value);
-                  setPage(1);
                 }}
               />
             </div>
@@ -239,7 +246,6 @@ function InboxWhatsAppInner() {
                   )}
                   onClick={() => {
                     setStatus(status === s ? undefined : (s as any));
-                    setPage(1);
                   }}
                 >
                   {s}
@@ -269,6 +275,9 @@ function InboxWhatsAppInner() {
                   )}
                   estimateSize={() => 80}
                   overscan={10}
+                  onLoadMore={() => fetchNextConversations()}
+                  hasMore={hasNextConversations}
+                  isLoadingMore={isFetchingNextConversations}
                 />
               ) : (
                 <div className="overflow-y-auto h-full">

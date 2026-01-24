@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { useStockItems } from '@/lib/api/hooks/use-stock-items';
+import { useStockItemsInfinite } from '@/lib/api/hooks/use-stock-items-infinite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,19 +17,28 @@ import type { StockStatus, ItemCondition } from '@/types/stock';
 export default function StockPage() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StockStatus | undefined>(undefined);
   const [conditionFilter, setConditionFilter] = useState<ItemCondition | undefined>(undefined);
 
-  const { data, isLoading, error, refetch } = useStockItems({
-    page,
-    limit: 20,
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useStockItemsInfinite({
     search: search || undefined,
     status: statusFilter,
     condition: conditionFilter,
+    limit: 50,
     enabled: !!user,
   });
+
+  // Flatten pages into single array
+  const allItems = data?.pages.flatMap((page) => page.data) || [];
 
   useEffect(() => {
     perfMark('stock-page-mount');
@@ -134,7 +143,6 @@ export default function StockPage() {
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
-                    setPage(1);
                   }}
                 />
               </div>
@@ -145,7 +153,6 @@ export default function StockPage() {
                   value={statusFilter || ''}
                   onChange={(e) => {
                     setStatusFilter(e.target.value as StockStatus | undefined);
-                    setPage(1);
                   }}
                 >
                   <option value="">Todos</option>
@@ -164,7 +171,6 @@ export default function StockPage() {
                   value={conditionFilter || ''}
                   onChange={(e) => {
                     setConditionFilter(e.target.value as ItemCondition | undefined);
-                    setPage(1);
                   }}
                 >
                   <option value="">Todas</option>
@@ -180,7 +186,6 @@ export default function StockPage() {
                     setSearch('');
                     setStatusFilter(undefined);
                     setConditionFilter(undefined);
-                    setPage(1);
                   }}
                   className="w-full"
                 >
@@ -212,16 +217,30 @@ export default function StockPage() {
               </div>
             )}
 
-            {data && data.data.length === 0 && !isLoading && !error && (
+            {allItems.length === 0 && !isLoading && !error && (
               <div className="p-8 text-center text-gray-500">
                 <p>No hay items en stock.</p>
               </div>
             )}
 
-            {data && data.data.length > 0 && (
+            {allItems.length > 0 && (
               <>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                {allItems.length > 50 ? (
+                  // Use virtualized table for large lists
+                  <VirtualizedStockTable
+                    items={allItems}
+                    onItemClick={(item) => router.push(`/stock/${item.id}`)}
+                    getStatusColor={getStatusColor}
+                    getStatusLabel={getStatusLabel}
+                    getConditionLabel={getConditionLabel}
+                    formatDate={formatDate}
+                    onLoadMore={() => fetchNextPage()}
+                    hasMore={hasNextPage}
+                    isLoadingMore={isFetchingNextPage}
+                  />
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -248,7 +267,7 @@ export default function StockPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {data.data.map((item) => {
+                      {allItems.map((item) => {
                         const reserved = item.reservedQuantity || 0;
                         const available = item.availableQuantity ?? (item.quantity - reserved);
                         return (
@@ -295,31 +314,24 @@ export default function StockPage() {
                     </tbody>
                   </table>
                 </div>
+                )}
 
-                {/* Pagination */}
-                {data?.meta?.totalPages && data.meta.totalPages > 1 && (
-                  <div className="p-4 border-t flex items-center justify-between">
-                    <div className="text-sm text-gray-600">
-                      Mostrando {data?.data?.length ?? 0} de {data?.meta?.total ?? 0} items
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                      >
-                        Anterior
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPage((p) => Math.min(data.meta.totalPages, p + 1))}
-                        disabled={page === data.meta.totalPages}
-                      >
-                        Siguiente
-                      </Button>
-                    </div>
+                {/* Infinite loading indicator */}
+                {hasNextPage && (
+                  <div className="p-4 border-t flex items-center justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? 'Cargando...' : 'Cargar más'}
+                    </Button>
+                  </div>
+                )}
+                {!hasNextPage && allItems.length > 0 && (
+                  <div className="p-4 border-t text-center text-sm text-gray-600">
+                    Mostrando {allItems.length} items
                   </div>
                 )}
               </>
