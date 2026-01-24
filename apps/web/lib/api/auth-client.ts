@@ -13,30 +13,41 @@ import { useAuthStore } from '../store/auth-store';
 import { useOrgStore } from '../store/org-store';
 
 // Get API base URL with proper fallback and validation
+// ⚠️ PROD SAFETY: In production, always use safe fallback to prevent localhost usage
 function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   
-  // Validate in production (log error but don't throw to avoid breaking app)
-  if (typeof window !== 'undefined') {
-    const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+  // Detect production environment
+  const isProduction =
+    typeof window !== 'undefined'
+      ? window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')
+      : process.env.NODE_ENV === 'production';
+  
+  // Production: Use safe fallback if env var is missing or invalid
+  if (isProduction) {
+    // Check if env var is missing, empty, localhost, or HTTP (not HTTPS)
+    const isInvalid =
+      !envUrl ||
+      envUrl.trim() === '' ||
+      envUrl.includes('localhost') ||
+      envUrl.includes('127.0.0.1') ||
+      envUrl.startsWith('http://');
     
-    if (isProduction) {
+    if (isInvalid) {
       if (!envUrl) {
-        console.error('[AUTH_CLIENT] CRITICAL: NEXT_PUBLIC_API_BASE_URL is not set in production. Requests will fail.');
-        // Store error in sessionStorage to show in UI
-        try {
-          sessionStorage.setItem('rm.apiConfigError', 'NEXT_PUBLIC_API_BASE_URL not configured');
-        } catch {}
-      } else if (envUrl.includes('localhost') || envUrl.startsWith('http://')) {
-        console.error(`[AUTH_CLIENT] CRITICAL: NEXT_PUBLIC_API_BASE_URL is set to localhost/HTTP in production: ${envUrl}`);
-        try {
-          sessionStorage.setItem('rm.apiConfigError', `Invalid API URL: ${envUrl}`);
-        } catch {}
+        console.error('[AUTH_CLIENT] ⚠️ NEXT_PUBLIC_API_BASE_URL not set in production. Using safe fallback.');
+      } else {
+        console.error(`[AUTH_CLIENT] ⚠️ NEXT_PUBLIC_API_BASE_URL is invalid in production: ${envUrl}. Using safe fallback.`);
       }
+      // Safe production fallback - hardcoded to prevent localhost usage
+      return 'https://api.iphonealcosto.com/api';
     }
+    
+    // Env var is valid, use it
+    return envUrl.replace(/\/+$/, '');
   }
   
-  // Use env var if available, otherwise fallback (only for dev)
+  // Development: Allow localhost fallback
   const baseUrl = envUrl || 'http://localhost:4000/api';
   
   // Ensure no double slashes and proper trailing
