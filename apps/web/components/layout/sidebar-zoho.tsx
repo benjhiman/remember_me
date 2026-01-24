@@ -73,6 +73,16 @@ const navItems: NavItem[] = [
       { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
       { href: '/sales/customers', label: 'Clientes', icon: Users, permission: Permission.VIEW_CUSTOMERS },
       { href: '/sales/vendors', label: 'Proveedores', icon: Building2, permission: Permission.VIEW_VENDORS },
+      { href: '/sales/sellers', label: 'Vendedores', icon: Users, permission: Permission.VIEW_SALES }, // Owner-only (checked in page)
+    ],
+  },
+  {
+    href: '/sales/purchases',
+    label: 'Purchases',
+    icon: ShoppingBag,
+    permission: Permission.VIEW_PURCHASES,
+    children: [
+      { href: '/sales/vendors', label: 'Proveedores', icon: Building2, permission: Permission.VIEW_VENDORS },
       { href: '/sales/purchases', label: 'Compras', icon: ShoppingBag, permission: Permission.VIEW_PURCHASES },
     ],
   },

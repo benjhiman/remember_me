@@ -122,26 +122,31 @@ export default function PurchasesPage() {
 
       {data && (
         <>
-          {data.items.length === 0 ? (
-            <div className="p-12 text-center">
-              <div className="max-w-sm mx-auto">
-                <ShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">
-                  {search || statusFilter ? 'No hay compras con estos filtros' : 'No hay compras'}
-                </h3>
-                <p className="text-xs text-gray-600 mb-4">
-                  {search || statusFilter
-                    ? 'Intentá ajustar los filtros para ver más resultados.'
-                    : 'Creá tu primera compra para empezar a gestionar órdenes de compra.'}
-                </p>
-                {can('purchases.write') && (
-                  <Button onClick={() => router.push('/sales/purchases/new')} size="sm">
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Nueva Compra
-                  </Button>
-                )}
-              </div>
-            </div>
+              {data.items.length === 0 ? (
+                <div className="p-12 text-center">
+                  <div className="max-w-sm mx-auto">
+                    <ShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                      {search || statusFilter ? 'No hay compras con estos filtros' : 'Every purchase starts with a vendor'}
+                    </h3>
+                    <p className="text-xs text-gray-600 mb-4">
+                      {search || statusFilter
+                        ? 'Intentá ajustar los filtros para ver más resultados.'
+                        : 'Crea tu primera orden de compra para empezar a gestionar tus compras y proveedores.'}
+                    </p>
+                    <div className="flex items-center justify-center gap-2">
+                      {can('purchases.write') && (
+                        <Button onClick={() => router.push('/sales/purchases/new')} size="sm">
+                          <Plus className="h-4 w-4 mr-1.5" />
+                          Crear nueva compra
+                        </Button>
+                      )}
+                      <Button variant="outline" size="sm" disabled>
+                        Importar archivo
+                      </Button>
+                    </div>
+                  </div>
+                </div>
           ) : (
             <>
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
