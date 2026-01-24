@@ -16,12 +16,27 @@ import { useOrgStore } from '../store/org-store';
 function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   
-  // In production, log warning if missing
-  if (typeof window !== 'undefined' && !envUrl) {
-    console.error('[AUTH_CLIENT] NEXT_PUBLIC_API_BASE_URL is not set. Using fallback.');
+  // Validate in production (log error but don't throw to avoid breaking app)
+  if (typeof window !== 'undefined') {
+    const isProduction = window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+    
+    if (isProduction) {
+      if (!envUrl) {
+        console.error('[AUTH_CLIENT] CRITICAL: NEXT_PUBLIC_API_BASE_URL is not set in production. Requests will fail.');
+        // Store error in sessionStorage to show in UI
+        try {
+          sessionStorage.setItem('rm.apiConfigError', 'NEXT_PUBLIC_API_BASE_URL not configured');
+        } catch {}
+      } else if (envUrl.includes('localhost') || envUrl.startsWith('http://')) {
+        console.error(`[AUTH_CLIENT] CRITICAL: NEXT_PUBLIC_API_BASE_URL is set to localhost/HTTP in production: ${envUrl}`);
+        try {
+          sessionStorage.setItem('rm.apiConfigError', `Invalid API URL: ${envUrl}`);
+        } catch {}
+      }
+    }
   }
   
-  // Use env var if available, otherwise fallback
+  // Use env var if available, otherwise fallback (only for dev)
   const baseUrl = envUrl || 'http://localhost:4000/api';
   
   // Ensure no double slashes and proper trailing
