@@ -460,3 +460,53 @@ pnpm --filter @remember-me/api test purchases
 - **Frontend List Page**: `apps/web/app/(dashboard)/sales/purchases/page.tsx`
 - **Frontend Detail Page**: `apps/web/app/(dashboard)/sales/purchases/[id]/page.tsx`
 - **Prisma Schema**: `packages/prisma/schema.prisma` (models `Purchase`, `PurchaseLine`, enum `PurchaseStatus`)
+
+---
+
+## Manual Smoke Checklist (2 minutes)
+
+**Objetivo**: Validar que Purchases v0 funciona end-to-end sin herramientas especiales.
+
+### Checklist
+
+- [ ] **Abrir `/sales/purchases`**
+  - Verificar que la página carga sin errores
+  - Verificar que se muestra la tabla (vacía o con datos)
+  - Verificar que el botón "Nueva Compra" es visible (si tienes `purchases.write`)
+
+- [ ] **Crear purchase DRAFT con vendor + 1 línea**
+  - Click en "Nueva Compra"
+  - Seleccionar un vendor existente
+  - Agregar al menos 1 línea (descripción, cantidad, precio unitario)
+  - Verificar que los totales se calculan automáticamente
+  - Guardar
+  - Verificar que aparece en el listado con estado "Borrador"
+
+- [ ] **Aprobar**
+  - Abrir el detalle de la compra creada
+  - Click en "Aprobar"
+  - Verificar que el estado cambia a "Aprobada"
+  - Verificar que `approvedAt` aparece en el historial
+
+- [ ] **Marcar recibida**
+  - Con la compra en estado APPROVED, click en "Marcar Recibida"
+  - Verificar que el estado cambia a "Recibida"
+  - Verificar que `receivedAt` aparece en el historial
+
+- [ ] **Confirmar que no se puede cancelar recibida**
+  - Con la compra en estado RECEIVED, verificar que el botón "Cancelar" NO aparece
+  - Si intentas transicionar manualmente (API), debe devolver 400 con `code: "INVALID_TRANSITION"`
+
+- [ ] **Org switch verifica aislamiento**
+  - Crear una compra en Org A
+  - Cambiar a Org B usando el org switcher
+  - Verificar que la compra de Org A NO es visible en Org B
+  - Volver a Org A y verificar que la compra es visible
+
+- [ ] **Role sin purchases.write no ve CTA**
+  - Iniciar sesión con un usuario que tenga `purchases.read` pero NO `purchases.write` (ej: VIEWER)
+  - Verificar que el botón "Nueva Compra" NO aparece en `/sales/purchases`
+  - Verificar que los botones de transición NO aparecen en el detalle
+  - Si intentas crear vía API, debe devolver 403 Forbidden
+
+**Tiempo estimado**: 2 minutos si todo funciona correctamente.
