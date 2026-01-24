@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../auth-client';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage, getRequestIdFromError } from '@/lib/utils/error-handler';
+import { RequestIdChip } from '@/components/observability/request-id-chip';
 import type { PurchaseStatus } from './use-purchases';
 
 export interface CreatePurchaseLineDto {
@@ -53,21 +54,26 @@ export function useCreatePurchase() {
     onError: (error: any) => {
       const message = getErrorMessage(error);
       const requestId = getRequestIdFromError(error);
-      const descriptionWithId = requestId 
-        ? `${message}\n\nID de error: ${requestId}`
-        : message;
       if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
-          description: requestId 
-            ? `No tenés permisos para crear compras\n\nID de error: ${requestId}`
-            : 'No tenés permisos para crear compras',
+          description: (
+            <div>
+              <p>No tenés permisos para crear compras</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: descriptionWithId,
+          description: (
+            <div>
+              <p>{message}</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       }
@@ -94,29 +100,37 @@ export function useUpdatePurchase() {
     onError: (error: any) => {
       const message = getErrorMessage(error);
       const requestId = getRequestIdFromError(error);
-      const descriptionWithId = requestId 
-        ? `${message}\n\nID de error: ${requestId}`
-        : message;
       if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
-          description: requestId 
-            ? `No tenés permisos para editar compras\n\nID de error: ${requestId}`
-            : 'No tenés permisos para editar compras',
+          description: (
+            <div>
+              <p>No tenés permisos para editar compras</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       } else if (error?.response?.data?.code === 'INVALID_STATUS') {
         toast({
           title: 'No se puede editar',
-          description: requestId 
-            ? `Solo las compras en borrador pueden editarse\n\nID de error: ${requestId}`
-            : 'Solo las compras en borrador pueden editarse',
+          description: (
+            <div>
+              <p>Solo las compras en borrador pueden editarse</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: descriptionWithId,
+          description: (
+            <div>
+              <p>{message}</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       }
@@ -143,22 +157,27 @@ export function useTransitionPurchase() {
     onError: (error: any) => {
       const message = getErrorMessage(error);
       const requestId = getRequestIdFromError(error);
-      const descriptionWithId = requestId 
-        ? `${message}\n\nID de error: ${requestId}`
-        : message;
       if (error?.response?.data?.code === 'INVALID_TRANSITION') {
         const transitionMessage = error.response.data.message || 'No se puede cambiar a este estado';
         toast({
           title: 'Transición inválida',
-          description: requestId 
-            ? `${transitionMessage}\n\nID de error: ${requestId}`
-            : transitionMessage,
+          description: (
+            <div>
+              <p>{transitionMessage}</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Error',
-          description: descriptionWithId,
+          description: (
+            <div>
+              <p>{message}</p>
+              {requestId && <RequestIdChip requestId={requestId} />}
+            </div>
+          ),
           variant: 'destructive',
         });
       }
