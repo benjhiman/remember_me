@@ -605,14 +605,14 @@ export class PurchasesService {
       },
       include: {
         stockApplication: true,
-      },
+      } as any,
     });
 
     if (!purchase) {
       throw new NotFoundException('Purchase not found');
     }
 
-    const isApplied = !!purchase.stockApplication;
+    const isApplied = !!(purchase as any).stockApplication;
 
     // Get movements for this purchase
     const movements = await this.prisma.stockMovement.findMany({
@@ -629,8 +629,8 @@ export class PurchasesService {
 
     return {
       isApplied,
-      appliedAt: purchase.stockApplication?.appliedAt || null,
-      appliedBy: purchase.stockApplication?.appliedByUserId || null,
+      appliedAt: (purchase as any).stockApplication?.appliedAt || null,
+      appliedBy: (purchase as any).stockApplication?.appliedByUserId || null,
       movements: movements.map((m) => ({
         id: m.id,
         stockItemId: m.stockItemId,
