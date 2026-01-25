@@ -605,24 +605,6 @@ export class PurchasesService {
       },
       include: {
         stockApplication: true,
-        lines: {
-          include: {
-            stockItem: {
-              include: {
-                movements: {
-                  where: {
-                    metadata: {
-                      path: ['purchaseId'],
-                      equals: purchaseId,
-                    },
-                  },
-                  orderBy: { createdAt: 'desc' },
-                  take: 10,
-                },
-              },
-            },
-          },
-        },
       },
     });
 
@@ -631,9 +613,19 @@ export class PurchasesService {
     }
 
     const isApplied = !!purchase.stockApplication;
-    const movements = purchase.lines.flatMap((line) =>
-      line.stockItem?.movements || [],
-    );
+
+    // Get movements for this purchase
+    const movements = await this.prisma.stockMovement.findMany({
+      where: {
+        organizationId,
+        metadata: {
+          path: ['purchaseId'],
+          equals: purchaseId,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
 
     return {
       isApplied,
