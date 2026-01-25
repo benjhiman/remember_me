@@ -9,6 +9,15 @@
 const API_BASE_URL = process.env.API_BASE_URL || 'https://api.iphonealcosto.com/api';
 const TEST_ORIGIN = 'https://app.iphonealcosto.com';
 
+// Helper to extract headers as lowercase object
+function extractHeaders(response: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  response.headers.forEach((value, key) => {
+    headers[key.toLowerCase()] = value;
+  });
+  return headers;
+}
+
 interface VerificationResult {
   step: string;
   success: boolean;
@@ -18,6 +27,73 @@ interface VerificationResult {
 }
 
 const results: VerificationResult[] = [];
+
+async function verifyHealthEndpoint(): Promise<VerificationResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: 'GET',
+      headers: {
+        'Origin': TEST_ORIGIN,
+      },
+    });
+
+    const headers = extractHeaders(response);
+    const status = response.status;
+    const allowOrigin = headers['access-control-allow-origin'];
+    const allowCredentials = headers['access-control-allow-credentials'];
+
+    // Validate health response
+    const isValidStatus = status === 200;
+    const isValidOrigin = allowOrigin === TEST_ORIGIN;
+    const isValidCredentials = allowCredentials === 'true';
+
+    if (!isValidStatus) {
+      return {
+        step: 'GET /health',
+        success: false,
+        status,
+        headers,
+        error: `Expected status 200, got ${status}`,
+      };
+    }
+
+    if (!isValidOrigin) {
+      return {
+        step: 'GET /health',
+        success: false,
+        status,
+        headers,
+        error: `Expected access-control-allow-origin: ${TEST_ORIGIN}, got: ${allowOrigin || 'missing'}`,
+      };
+    }
+
+    if (!isValidCredentials) {
+      return {
+        step: 'GET /health',
+        success: false,
+        status,
+        headers,
+        error: `Expected access-control-allow-credentials: true, got: ${allowCredentials || 'missing'}`,
+      };
+    }
+
+    return {
+      step: 'GET /health',
+      success: true,
+      status,
+      headers: {
+        'access-control-allow-origin': allowOrigin,
+        'access-control-allow-credentials': allowCredentials,
+      },
+    };
+  } catch (error: any) {
+    return {
+      step: 'GET /health',
+      success: false,
+      error: error.message || 'Unknown error',
+    };
+  }
+}
 
 async function verifyPreflight(): Promise<VerificationResult> {
   try {
@@ -30,10 +106,7 @@ async function verifyPreflight(): Promise<VerificationResult> {
       },
     });
 
-    const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headers[key.toLowerCase()] = value;
-    });
+    const headers = extractHeaders(response);
 
     const status = response.status;
     const allowOrigin = headers['access-control-allow-origin'];
@@ -124,10 +197,7 @@ async function verifyPostRequest(): Promise<VerificationResult> {
       }),
     });
 
-    const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headers[key.toLowerCase()] = value;
-    });
+    const headers = extractHeaders(response);
 
     const status = response.status;
     const allowOrigin = headers['access-control-allow-origin'];
@@ -192,8 +262,30 @@ async function main() {
   console.log(`API Base URL: ${API_BASE_URL}`);
   console.log(`Test Origin: ${TEST_ORIGIN}\n`);
 
-  // Step 1: Verify preflight
-  console.log('1. Verifying preflight (OPTIONS)...');
+  // Step 1: Verify health endpoint
+  console.log('1. Verifying health endpoint (GET /health)...');
+  const healthResult = await verifyHealthEndpoint();
+  results.push(healthResult);
+  
+  if (healthResult.success) {
+    console.log(`   ✅ ${healthResult.step} - Status: ${healthResult.status}`);
+    console.log(`      - access-control-allow-origin: ${healthResult.headers?.['access-control-allow-origin']}`);
+    console.log(`      - access-control-allow-credentials: ${healthResult.headers?.['access-control-allow-credentials']}`);
+  } else {
+    console.error(`   ❌ ${healthResult.step}`);
+    console.error(`      Error: ${healthResult.error}`);
+    if (healthResult.status) {
+      console.error(`      Status: ${healthResult.status}`);
+    }
+    if (healthResult.headers) {
+      console.error(`      Headers:`, JSON.stringify(healthResult.headers, null, 2));
+    }
+  }
+
+  console.log('');
+
+  // Step 2: Verify preflight
+  console.log('2. Verifying preflight (OPTIONS)...');
   const preflightResult = await verifyPreflight();
   results.push(preflightResult);
   
@@ -202,18 +294,22 @@ async function main() {
     console.log(`      - access-control-allow-origin: ${preflightResult.headers?.['access-control-allow-origin']}`);
     console.log(`      - access-control-allow-credentials: ${preflightResult.headers?.['access-control-allow-credentials']}`);
     console.log(`      - access-control-allow-headers: ${preflightResult.headers?.['access-control-allow-headers']}`);
+    console.log(`      - access-control-allow-methods: ${preflightResult.headers?.['access-control-allow-methods']}`);
   } else {
     console.error(`   ❌ ${preflightResult.step}`);
     console.error(`      Error: ${preflightResult.error}`);
     if (preflightResult.status) {
       console.error(`      Status: ${preflightResult.status}`);
     }
+    if (preflightResult.headers) {
+      console.error(`      Headers:`, JSON.stringify(preflightResult.headers, null, 2));
+    }
   }
 
   console.log('');
 
-  // Step 2: Verify POST request
-  console.log('2. Verifying POST request...');
+  // Step 3: Verify POST request
+  console.log('3. Verifying POST request...');
   const postResult = await verifyPostRequest();
   results.push(postResult);
 
@@ -227,6 +323,9 @@ async function main() {
     if (postResult.status) {
       console.error(`      Status: ${postResult.status}`);
     }
+    if (postResult.headers) {
+      console.error(`      Headers:`, JSON.stringify(postResult.headers, null, 2));
+    }
   }
 
   // Summary
@@ -236,15 +335,19 @@ async function main() {
 
   if (allPassed) {
     console.log('✅ CORS VERIFY PASSED');
-    console.log('   → Preflight responds correctly');
+    console.log('   → Health endpoint includes CORS headers');
+    console.log('   → Preflight responds correctly (204)');
     console.log('   → POST request includes CORS headers');
-    console.log('   → Production origin is allowed');
+    console.log('   → Production origin (https://app.iphonealcosto.com) is allowed');
     process.exit(0);
   } else {
     console.error('❌ CORS VERIFY FAILED');
     results.forEach((r) => {
       if (!r.success) {
         console.error(`   - ${r.step}: ${r.error}`);
+        if (r.headers) {
+          console.error(`     Relevant headers:`, JSON.stringify(r.headers, null, 2));
+        }
       }
     });
     process.exit(1);

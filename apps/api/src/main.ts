@@ -98,7 +98,10 @@ async function bootstrap() {
 
     // F) Origin not allowed
     const error = new Error(`CORS_NOT_ALLOWED:${normalizedOrigin}`);
-    console.warn(`[CORS] Blocked origin: ${normalizedOrigin}`);
+    // Log blocked origin only in production for debugging
+    if (isProduction) {
+      console.warn(`[CORS] ❌ Blocked origin: ${normalizedOrigin}`);
+    }
     callback(error, false);
   };
 
@@ -108,14 +111,25 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key', 'X-Organization-Id'],
     exposedHeaders: ['X-Request-Id'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   // Log CORS configuration on startup
   if (isProduction) {
-    console.log('[CORS] Production mode - Allowed origins:', Array.from(allowlist).join(', '));
+    console.log('[CORS] ✅ Production mode - Allowed origins:', Array.from(allowlist).join(', '));
+    console.log('[CORS] ✅ Example allowed origin: https://app.iphonealcosto.com');
   } else {
     console.log('[CORS] Development mode - Allowed origins:', Array.from(allowlist).join(', '));
   }
+
+  // Belt & suspenders: Ensure OPTIONS requests return 204 before routes
+  app.use((req: any, res: any, next: any) => {
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
 
   // Global validation pipe (strict)
   app.useGlobalPipes(
