@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as url from 'url';
 
 const TARGET_MIGRATION = '20250124120000_add_accounting_lite_models';
+const PURCHASE_STOCK_MIGRATION = '20250124130000_add_purchase_stock_application';
 
 interface MigrationRecord {
   migration_name: string;
@@ -125,8 +126,9 @@ function verifyFingerprintConsistency(dbUrl: string, step: string): void {
   }
 }
 
-async function getMigrationRecord(prisma: PrismaClient): Promise<MigrationRecord | null> {
+async function getMigrationRecord(prisma: PrismaClient, migrationName?: string): Promise<MigrationRecord | null> {
   try {
+    const target = migrationName || TARGET_MIGRATION;
     const result = await prisma.$queryRaw<Array<MigrationRecord>>`
       SELECT 
         migration_name, 
@@ -136,7 +138,7 @@ async function getMigrationRecord(prisma: PrismaClient): Promise<MigrationRecord
         applied_steps_count, 
         logs
       FROM "_prisma_migrations"
-      WHERE migration_name = ${TARGET_MIGRATION}
+      WHERE migration_name = ${target}
       ORDER BY started_at DESC
       LIMIT 1
     `;
@@ -148,6 +150,30 @@ async function getMigrationRecord(prisma: PrismaClient): Promise<MigrationRecord
     return result[0];
   } catch (error) {
     console.error('❌ Error querying _prisma_migrations:', error);
+    throw error;
+  }
+}
+
+async function getAllFailedMigrations(prisma: PrismaClient): Promise<MigrationRecord[]> {
+  try {
+    const result = await prisma.$queryRaw<Array<MigrationRecord>>`
+      SELECT 
+        migration_name, 
+        started_at, 
+        finished_at, 
+        rolled_back_at, 
+        applied_steps_count, 
+        logs
+      FROM "_prisma_migrations"
+      WHERE finished_at IS NULL
+        AND rolled_back_at IS NULL
+        AND started_at IS NOT NULL
+      ORDER BY started_at DESC
+    `;
+
+    return result;
+  } catch (error) {
+    console.error('❌ Error querying failed migrations:', error);
     throw error;
   }
 }
@@ -377,16 +403,113 @@ async function forceRollbackViaSQL(prisma: PrismaClient, migrationName: string):
   }
 }
 
-async function verifyMigrationCleared(prisma: PrismaClient): Promise<boolean> {
-  const record = await getMigrationRecord(prisma);
+async function verifyMigrationCleared(prisma: PrismaClient, migrationName?: string): Promise<boolean> {
+  const record = await getMigrationRecord(prisma, migrationName);
   if (!record) {
     return true; // No record exists, that's fine
   }
   return !isFailed(record); // Not failed anymore
 }
 
-async function printMigrationStatus(prisma: PrismaClient): Promise<void> {
-  const record = await getMigrationRecord(prisma);
+interface PurchaseStockApplicationAudit {
+  hasPurchaseStockApplicationTable: boolean;
+  hasPurchaseLineStockItemIdColumn: boolean;
+  hasPurchaseLineStockItemIdIndex: boolean;
+  hasPurchaseStockApplicationIndexes: boolean;
+  hasPurchaseStockApplicationForeignKeys: boolean;
+  allChangesApplied: boolean;
+}
+
+async function auditPurchaseStockApplicationMigration(prisma: PrismaClient): Promise<PurchaseStockApplicationAudit> {
+  try {
+    // Check if PurchaseStockApplication table exists
+    const tableCheck = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT (to_regclass('public."PurchaseStockApplication"') IS NOT NULL) as exists
+    `;
+    const hasPurchaseStockApplicationTable = (tableCheck[0] as any).exists === true;
+
+    // Check if PurchaseLine.stockItemId column exists
+    const columnCheck = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+          AND table_name = 'PurchaseLine' 
+          AND column_name = 'stockItemId'
+      ) as exists
+    `;
+    const hasPurchaseLineStockItemIdColumn = (columnCheck[0] as any).exists === true;
+
+    // Check if PurchaseLine_stockItemId_idx index exists
+    const indexCheck = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+          AND indexname = 'PurchaseLine_stockItemId_idx'
+      ) as exists
+    `;
+    const hasPurchaseLineStockItemIdIndex = (indexCheck[0] as any).exists === true;
+
+    // Check if PurchaseStockApplication indexes exist
+    const psaIndexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
+      SELECT indexname 
+      FROM pg_indexes 
+      WHERE schemaname = 'public' 
+        AND tablename = 'PurchaseStockApplication'
+    `;
+    const indexNames = psaIndexes.map((i) => i.indexname);
+    const hasPurchaseStockApplicationIndexes = 
+      indexNames.includes('PurchaseStockApplication_purchaseId_key') &&
+      indexNames.some((n) => n.includes('organizationId_appliedAt')) &&
+      indexNames.some((n) => n.includes('purchaseId'));
+
+    // Check if foreign keys exist
+    const fkCheck = await prisma.$queryRaw<Array<{ constraint_name: string }>>`
+      SELECT constraint_name 
+      FROM information_schema.table_constraints 
+      WHERE table_schema = 'public' 
+        AND table_name = 'PurchaseStockApplication'
+        AND constraint_type = 'FOREIGN KEY'
+    `;
+    const fkNames = fkCheck.map((f) => f.constraint_name);
+    const hasPurchaseStockApplicationForeignKeys = 
+      fkNames.some((n) => n.includes('organizationId')) &&
+      fkNames.some((n) => n.includes('purchaseId')) &&
+      fkNames.some((n) => n.includes('appliedByUserId'));
+
+    // Check PurchaseLine foreign key
+    const purchaseLineFk = await prisma.$queryRaw<Array<{ constraint_name: string }>>`
+      SELECT constraint_name 
+      FROM information_schema.table_constraints 
+      WHERE table_schema = 'public' 
+        AND table_name = 'PurchaseLine'
+        AND constraint_name = 'PurchaseLine_stockItemId_fkey'
+    `;
+    const hasPurchaseLineFk = purchaseLineFk.length > 0;
+
+    const allChangesApplied = 
+      hasPurchaseStockApplicationTable &&
+      hasPurchaseLineStockItemIdColumn &&
+      hasPurchaseLineStockItemIdIndex &&
+      hasPurchaseStockApplicationIndexes &&
+      hasPurchaseStockApplicationForeignKeys &&
+      hasPurchaseLineFk;
+
+    return {
+      hasPurchaseStockApplicationTable,
+      hasPurchaseLineStockItemIdColumn,
+      hasPurchaseLineStockItemIdIndex,
+      hasPurchaseStockApplicationIndexes,
+      hasPurchaseStockApplicationForeignKeys,
+      allChangesApplied,
+    };
+  } catch (error) {
+    console.error('❌ Error auditing PurchaseStockApplication migration:', error);
+    throw error;
+  }
+}
+
+async function printMigrationStatus(prisma: PrismaClient, migrationName?: string): Promise<void> {
+  const record = await getMigrationRecord(prisma, migrationName);
   if (!record) {
     console.log('   → No migration record found');
     return;
@@ -400,7 +523,7 @@ async function printMigrationStatus(prisma: PrismaClient): Promise<void> {
   console.log(`      - applied_steps_count: ${record.applied_steps_count}`);
   console.log(`      - is_failed: ${isFailed(record)}`);
   if (record.logs) {
-    console.log(`      - logs (last 200 chars): ${record.logs.substring(Math.max(0, record.logs.length - 200))}`);
+    console.log(`      - logs (last 500 chars): ${record.logs.substring(Math.max(0, record.logs.length - 500))}`);
   }
 }
 
@@ -660,7 +783,7 @@ async function main() {
       }
 
       // Verify it's cleared
-      const cleared = await verifyMigrationCleared(prisma);
+      const cleared = await verifyMigrationCleared(prisma, TARGET_MIGRATION);
       if (!cleared) {
         console.error('❌ Migration still appears as failed after resolve --applied');
         await printMigrationStatus(prisma);
@@ -692,7 +815,7 @@ async function main() {
       }
 
       // Verify it's cleared
-      const cleared = await verifyMigrationCleared(prisma);
+      const cleared = await verifyMigrationCleared(prisma, TARGET_MIGRATION);
       if (!cleared) {
         console.error('❌ Migration still appears as failed after rollback attempt');
         await printMigrationStatus(prisma);
