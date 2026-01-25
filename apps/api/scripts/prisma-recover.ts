@@ -581,12 +581,9 @@ async function main() {
       }
       
       console.log('✅ Purchase table validated with SQL\n');
+      console.log('✅ DB PUSH completed - ready for migrate deploy\n');
       
-      // PASO 4: MIGRATE DEPLOY (UNA SOLA VEZ, SIN LOOP)
-      const deploySuccess = await runMigrateDeploy(rescueMode);
-      if (!deploySuccess && !rescueMode) {
-        process.exit(1);
-      }
+      // Exit successfully - migrate deploy will run separately
       process.exit(0);
     }
 
@@ -599,12 +596,8 @@ async function main() {
 
     if (!migrationRecord) {
       console.log('✅ No failed migration record found');
-      console.log('   → Proceeding with normal migrate deploy...\n');
+      console.log('   → Database ready for migrate deploy\n');
       await prisma.$disconnect();
-      const deploySuccess = await runMigrateDeploy(rescueMode);
-      if (!deploySuccess && !rescueMode) {
-        process.exit(1);
-      }
       process.exit(0);
     }
 
@@ -625,10 +618,7 @@ async function main() {
         console.log('⚠️  Migration exists but is not in failed state (skipping recovery)');
       }
       await prisma.$disconnect();
-      const deploySuccess = await runMigrateDeploy(rescueMode);
-      if (!deploySuccess && !rescueMode) {
-        process.exit(1);
-      }
+      console.log('   → Database ready for migrate deploy\n');
       process.exit(0);
     }
 
@@ -682,10 +672,7 @@ async function main() {
       await printMigrationStatus(prisma);
       
       await prisma.$disconnect();
-      const deploySuccess = await runMigrateDeploy(rescueMode);
-      if (!deploySuccess && !rescueMode) {
-        process.exit(1);
-      }
+      console.log('   → Database ready for migrate deploy\n');
       process.exit(0);
     } else {
       // A3: Partial or nothing applied, cleanup and rollback
@@ -717,10 +704,7 @@ async function main() {
       await printMigrationStatus(prisma);
       
       await prisma.$disconnect();
-      const deploySuccess = await runMigrateDeploy(rescueMode);
-      if (!deploySuccess && !rescueMode) {
-        process.exit(1);
-      }
+      console.log('   → Database ready for migrate deploy\n');
       process.exit(0);
     }
   } catch (error) {
