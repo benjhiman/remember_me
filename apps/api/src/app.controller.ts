@@ -1,6 +1,6 @@
 import { Public } from './common/decorators/public.decorator';
-import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
-import { Request } from 'express';
+import { Controller, Get, Post, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CurrentOrganization } from './common/decorators/current-organization.decorator';
@@ -86,8 +86,9 @@ export class AppController {
     
     // Read actual response headers set by CORS middleware
     // Note: getHeader returns string | string[] | number | undefined
+    // Use type assertion since Express Response has getHeader but TypeScript types may not reflect it
     const getHeaderString = (name: string): string | null => {
-      const value = res.getHeader(name);
+      const value = (res as any).getHeader(name);
       if (value === undefined) return null;
       if (Array.isArray(value)) return value[0] || null;
       return String(value);
