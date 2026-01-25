@@ -19,8 +19,23 @@ export function useOrganizations() {
     queryFn: async () => {
       setLoading(true);
       setError(null);
+      
+      // Production logging
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+        console.log('[USE_ORGANIZATIONS] Starting organizations fetch...');
+      }
+      
+      const startTime = Date.now();
+      
       try {
         const data = await api.get<OrganizationResponse[]>('/organizations');
+        
+        // Production logging
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+          const duration = Date.now() - startTime;
+          console.log(`[USE_ORGANIZATIONS] ✅ Organizations loaded in ${duration}ms:`, data.length);
+        }
+        
         // Transform to match Organization interface
         const memberships = data.map((org: any) => ({
           id: org.id,
@@ -31,7 +46,15 @@ export function useOrganizations() {
         setMemberships(memberships);
         return memberships;
       } catch (error: any) {
-        setError(error.message || 'Failed to load organizations');
+        const duration = Date.now() - startTime;
+        const errorMessage = error.message || 'Failed to load organizations';
+        
+        // Production logging
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+          console.error(`[USE_ORGANIZATIONS] ❌ Failed after ${duration}ms:`, errorMessage);
+        }
+        
+        setError(errorMessage);
         throw error;
       } finally {
         setLoading(false);
@@ -39,6 +62,16 @@ export function useOrganizations() {
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    // Add retry configuration to prevent infinite retries
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403 (auth errors)
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      // Retry up to 1 time for network errors
+      return failureCount < 1;
+    },
+    retryDelay: 1000, // 1 second between retries
   });
 }
 
