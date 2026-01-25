@@ -33,6 +33,14 @@ interface DatabaseState {
   hasLedgerCategoryEnum: boolean;
 }
 
+interface DatabaseAudit {
+  isDatabaseEmpty: boolean;
+  hasOrganizationTable: boolean;
+  organizationCount: number | null;
+  coreTablesMissing: string[];
+  hasPurchaseTable: boolean;
+}
+
 function redactDatabaseUrl(dbUrl: string): string {
   try {
     const parsed = url.parse(dbUrl);
@@ -264,7 +272,27 @@ async function printMigrationStatus(prisma: PrismaClient): Promise<void> {
   }
 }
 
-async function runMigrateDeploy(): Promise<void> {
+async function runDbPush(): Promise<void> {
+  console.log('🔨 Running prisma db push --accept-data-loss...');
+  try {
+    const monorepoRoot = getMonorepoRoot();
+    
+    execSync(
+      `pnpm --filter @remember-me/prisma exec prisma db push --accept-data-loss`,
+      { 
+        stdio: 'inherit', 
+        cwd: monorepoRoot,
+        env: { ...process.env }
+      }
+    );
+    console.log('✅ prisma db push completed successfully');
+  } catch (error) {
+    console.error('❌ prisma db push failed:', error);
+    throw error;
+  }
+}
+
+async function runMigrateDeploy(rescueMode: boolean = false): Promise<boolean> {
   console.log('🚀 Running prisma migrate deploy...');
   try {
     const monorepoRoot = getMonorepoRoot();
@@ -278,9 +306,25 @@ async function runMigrateDeploy(): Promise<void> {
       }
     );
     console.log('✅ prisma migrate deploy completed successfully');
+    return true;
   } catch (error) {
     console.error('❌ prisma migrate deploy failed:', error);
+    if (rescueMode) {
+      console.log('⚠️  RESCUE MODE: Continuing despite migration failure');
+      return false;
+    }
     throw error;
+  }
+}
+
+async function validatePurchaseTable(prisma: PrismaClient): Promise<boolean> {
+  try {
+    const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT (to_regclass('public."Purchase"') IS NOT NULL) as exists
+    `;
+    return (result[0] as any).exists === true;
+  } catch {
+    return false;
   }
 }
 
@@ -301,8 +345,51 @@ async function main() {
   console.log(`   - Hostname: ${hostname}\n`);
 
   const prisma = new PrismaClient();
+  const rescueMode = process.env.PRISMA_MIGRATE_MODE === 'rescue';
 
   try {
+    // FASE 2: Detectar DB vacía PRIMERO
+    console.log('📊 Auditing database state...');
+    const dbAudit = await auditDatabase(prisma);
+    
+    console.log('\n📋 Database Audit Results:');
+    console.log(`   - isDatabaseEmpty: ${dbAudit.isDatabaseEmpty}`);
+    console.log(`   - hasOrganizationTable: ${dbAudit.hasOrganizationTable}`);
+    console.log(`   - organizationCount: ${dbAudit.organizationCount}`);
+    console.log(`   - hasPurchaseTable: ${dbAudit.hasPurchaseTable}`);
+    console.log(`   - coreTablesMissing: ${dbAudit.coreTablesMissing.join(', ') || 'none'}`);
+
+    // CASO A: DB VACÍA
+    if (dbAudit.isDatabaseEmpty) {
+      console.log('\n⚠️  EMPTY DATABASE DETECTED — SAFE REBUILD MODE');
+      console.log('   → Executing db push --accept-data-loss to rebuild schema...\n');
+      
+      await prisma.$disconnect();
+      await runDbPush();
+      
+      // Validate Purchase table exists
+      const prisma2 = new PrismaClient();
+      const purchaseExists = await validatePurchaseTable(prisma2);
+      await prisma2.$disconnect();
+      
+      if (!purchaseExists) {
+        console.error('❌ Purchase table still missing after db push');
+        process.exit(1);
+      }
+      
+      console.log('✅ Purchase table validated');
+      console.log('   → Proceeding with migrate deploy...\n');
+      
+      const deploySuccess = await runMigrateDeploy(rescueMode);
+      if (!deploySuccess && !rescueMode) {
+        process.exit(1);
+      }
+      process.exit(0);
+    }
+
+    // CASO B: DB NO VACÍA - Continuar con recovery normal
+    console.log('\n✅ Database has data - using normal migration flow\n');
+
     // PASO 2: Query directo a _prisma_migrations
     console.log(`📋 Checking migration status for: ${TARGET_MIGRATION}`);
     const migrationRecord = await getMigrationRecord(prisma);
@@ -311,7 +398,10 @@ async function main() {
       console.log('✅ No failed migration record found');
       console.log('   → Proceeding with normal migrate deploy...\n');
       await prisma.$disconnect();
-      await runMigrateDeploy();
+      const deploySuccess = await runMigrateDeploy(rescueMode);
+      if (!deploySuccess && !rescueMode) {
+        process.exit(1);
+      }
       process.exit(0);
     }
 
@@ -332,7 +422,10 @@ async function main() {
         console.log('⚠️  Migration exists but is not in failed state (skipping recovery)');
       }
       await prisma.$disconnect();
-      await runMigrateDeploy();
+      const deploySuccess = await runMigrateDeploy(rescueMode);
+      if (!deploySuccess && !rescueMode) {
+        process.exit(1);
+      }
       process.exit(0);
     }
 
@@ -386,7 +479,10 @@ async function main() {
       await printMigrationStatus(prisma);
       
       await prisma.$disconnect();
-      await runMigrateDeploy();
+      const deploySuccess = await runMigrateDeploy(rescueMode);
+      if (!deploySuccess && !rescueMode) {
+        process.exit(1);
+      }
       process.exit(0);
     } else {
       // A3: Partial or nothing applied, cleanup and rollback
@@ -418,13 +514,23 @@ async function main() {
       await printMigrationStatus(prisma);
       
       await prisma.$disconnect();
-      await runMigrateDeploy();
+      const deploySuccess = await runMigrateDeploy(rescueMode);
+      if (!deploySuccess && !rescueMode) {
+        process.exit(1);
+      }
       process.exit(0);
     }
   } catch (error) {
     console.error('\n❌ Recovery failed:', error);
     console.log('\n📋 Final migration status:');
     await printMigrationStatus(prisma).catch(() => {});
+    
+    if (rescueMode) {
+      console.log('\n⚠️  RESCUE MODE: Exiting with code 0 to allow API to start');
+      await prisma.$disconnect();
+      process.exit(0);
+    }
+    
     await prisma.$disconnect();
     process.exit(1);
   }
