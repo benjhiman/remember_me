@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { usePurchase } from '@/lib/api/hooks/use-purchase';
 import { useTransitionPurchase } from '@/lib/api/hooks/use-purchase-mutations';
+import { usePurchaseStockImpact } from '@/lib/api/hooks/use-purchase-stock-impact';
 import { usePermissions } from '@/lib/auth/use-permissions';
 import { Button } from '@/components/ui/button';
 import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { formatCurrency, getPurchaseStatusLabel, getPurchaseStatusColor } from '@/lib/utils/purchase-utils';
-import { ArrowLeft, CheckCircle, XCircle, Package } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, Package, Warehouse, ExternalLink } from 'lucide-react';
 import type { PurchaseStatus } from '@/lib/api/hooks/use-purchases';
 
 export default function PurchaseDetailPage({ params }: { params: { id: string } }) {
@@ -19,6 +20,9 @@ export default function PurchaseDetailPage({ params }: { params: { id: string } 
   const { can } = usePermissions();
   const { data: purchase, isLoading, error } = usePurchase(params.id, !!user);
   const transitionPurchase = useTransitionPurchase();
+  const { data: stockImpact, isLoading: stockImpactLoading } = usePurchaseStockImpact(
+    purchase?.id || null,
+  );
 
   const handleTransition = async (newStatus: PurchaseStatus) => {
     if (!purchase) return;
@@ -27,6 +31,10 @@ export default function PurchaseDetailPage({ params }: { params: { id: string } 
         id: purchase.id,
         dto: { status: newStatus },
       });
+      // If transitioning to RECEIVED, show toast about stock update
+      if (newStatus === 'RECEIVED') {
+        // Toast will be shown by mutation hook
+      }
     } catch (error) {
       // Error handled by mutation
     }
@@ -243,6 +251,64 @@ export default function PurchaseDetailPage({ params }: { params: { id: string } 
             </div>
           </div>
         </div>
+
+        {/* Stock Impact Panel */}
+        {purchase.status === 'RECEIVED' && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Warehouse className="h-5 w-5 text-gray-600" />
+                <h3 className="text-sm font-semibold text-gray-900">Impacto en Stock</h3>
+              </div>
+              {stockImpact?.isApplied && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Aplicado
+                </span>
+              )}
+              {!stockImpact?.isApplied && !stockImpactLoading && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  No aplicado
+                </span>
+              )}
+            </div>
+
+            {stockImpactLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+            ) : stockImpact?.isApplied ? (
+              <div className="space-y-3">
+                <div className="text-sm text-gray-600">
+                  <p>
+                    <span className="font-medium">Aplicado el:</span>{' '}
+                    {stockImpact.appliedAt ? formatDate(stockImpact.appliedAt) : 'N/A'}
+                  </p>
+                  {stockImpact.totalMovements > 0 && (
+                    <p className="mt-1">
+                      <span className="font-medium">Movimientos creados:</span> {stockImpact.totalMovements}
+                    </p>
+                  )}
+                </div>
+                {stockImpact.totalMovements > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push('/stock')}
+                    className="mt-2"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                    Ver movimientos de stock
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600">
+                <p>Esta compra aún no ha impactado el stock.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </PageShell>
   );
