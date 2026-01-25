@@ -357,10 +357,19 @@ export async function apiRequest<T>(
       );
     }
 
+    // Check if it's a CORS error (fetch fails before response)
+    const errorMessage = error instanceof Error ? error.message : 'Network error';
+    const isCorsError = errorMessage.toLowerCase().includes('cors') || 
+                       errorMessage.toLowerCase().includes('cross-origin') ||
+                       (error instanceof TypeError && errorMessage.includes('fetch'));
+
+    // If it's a CORS-like error, classify as CORS, not generic NETWORK
+    const finalErrorType = isCorsError ? ErrorType.CORS : errorType;
+
     throw new ApiError(
-      error instanceof Error ? error.message : 'Network error',
+      errorMessage,
       0,
-      errorType,
+      finalErrorType,
       undefined,
       requestId || undefined,
       error as Error

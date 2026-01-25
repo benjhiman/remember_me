@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api, ApiError, ErrorType } from '@/lib/api/client';
+import { api, ApiError, ErrorType } from '@/lib/api/auth-client';
 import { useAuthStore } from '@/lib/store/auth-store';
 import type { LoginRequest, LoginResponse } from '@/types/api';
 
@@ -69,52 +69,80 @@ function LoginPageContent() {
     } catch (err: any) {
       // Better error handling for production with specific error detection
       let errorMessage = 'Error al iniciar sesión';
+      let diagnosticInfo: string | null = null;
+      
+      // Get effective API base URL for diagnostics
+      const apiBaseUrl = typeof window !== 'undefined' 
+        ? (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api')
+        : (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api');
       
       // Check if it's an ApiError with type information
-      if (err?.type) {
-        switch (err.type) {
-          case 'CORS':
+      if (err instanceof ApiError || err?.type) {
+        const errorType = err.type || (err instanceof ApiError ? err.type : null);
+        const status = err.status;
+        
+        switch (errorType) {
+          case ErrorType.CORS:
             errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
+            if (process.env.NODE_ENV === 'production') {
+              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: CORS`;
+            }
             break;
-          case 'DNS':
+          case ErrorType.DNS:
             errorMessage = 'No se pudo resolver el dominio del servidor. Verificá la configuración de API URL.';
+            if (process.env.NODE_ENV === 'production') {
+              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: DNS`;
+            }
             break;
-          case 'TIMEOUT':
+          case ErrorType.TIMEOUT:
             errorMessage = 'El servidor no responde. Verificá que el API esté disponible.';
+            if (process.env.NODE_ENV === 'production') {
+              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: TIMEOUT`;
+            }
             break;
-          case 'AUTH':
+          case ErrorType.AUTH:
             // Use backend message if available, otherwise default message
-            if (err.status === 401) {
+            if (status === 401) {
               errorMessage = err.message || 'Credenciales incorrectas. Verificá tu email y contraseña.';
-            } else if (err.status === 403) {
+            } else if (status === 403) {
               errorMessage = err.message || 'No tenés permisos para realizar esta acción.';
             } else {
               errorMessage = err.message || 'Error de autenticación.';
             }
             break;
-          case 'NETWORK':
-            // Check if it's a base URL issue
-            const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
-            if (!apiUrl || apiUrl.includes('localhost')) {
+          case ErrorType.NETWORK:
+            // Only show "No se pudo conectar" for real network errors (not AUTH)
+            if (!apiBaseUrl || apiBaseUrl.includes('localhost')) {
               errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL.';
             } else {
-              errorMessage = `No se pudo conectar con el servidor (${apiUrl}). Verificá tu conexión y la configuración del API.`;
+              errorMessage = `No se pudo conectar con el servidor (${apiBaseUrl}). Verificá tu conexión y la configuración del API.`;
+            }
+            if (process.env.NODE_ENV === 'production') {
+              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: NETWORK | Status: ${status || 'N/A'}`;
             }
             break;
           default:
             // Use error message from API if available
             errorMessage = err.message || 'Error al iniciar sesión';
+            if (process.env.NODE_ENV === 'production') {
+              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: ${errorType || 'UNKNOWN'} | Status: ${status || 'N/A'}`;
+            }
         }
       } else if (err instanceof Error) {
         const msg = err.message.toLowerCase();
         if (msg.includes('cors') || msg.includes('cross-origin')) {
           errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
+          if (process.env.NODE_ENV === 'production') {
+            diagnosticInfo = `API: ${apiBaseUrl} | Tipo: CORS (detectado por mensaje)`;
+          }
         } else if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
-          const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
-          if (!apiUrl || apiUrl.includes('localhost')) {
+          if (!apiBaseUrl || apiBaseUrl.includes('localhost')) {
             errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL en Vercel.';
           } else {
-            errorMessage = `No se pudo conectar con el servidor (${apiUrl}). Verificá la configuración del API.`;
+            errorMessage = `No se pudo conectar con el servidor (${apiBaseUrl}). Verificá la configuración del API.`;
+          }
+          if (process.env.NODE_ENV === 'production') {
+            diagnosticInfo = `API: ${apiBaseUrl} | Tipo: NETWORK (Failed to fetch)`;
           }
         } else if (msg.includes('401') || msg.includes('403')) {
           errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
@@ -128,6 +156,11 @@ function LoginPageContent() {
       }
       
       setError(errorMessage);
+      
+      // Show diagnostic info in production (only if there's an error)
+      if (diagnosticInfo && process.env.NODE_ENV === 'production') {
+        console.error('[LOGIN_ERROR]', diagnosticInfo);
+      }
     } finally {
       setLoading(false);
     }
@@ -187,7 +220,20 @@ function LoginPageContent() {
               )}
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <div>
+                <p className="text-sm text-red-500">{error}</p>
+                {process.env.NODE_ENV === 'production' && typeof window !== 'undefined' && (
+                  <details className="mt-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer hover:text-foreground">Diagnóstico</summary>
+                    <div className="mt-1 p-2 bg-muted rounded text-xs font-mono">
+                      <div>API Base: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api'}</div>
+                      <div>Origin: {window.location.origin}</div>
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
