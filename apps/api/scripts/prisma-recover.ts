@@ -10,15 +10,17 @@
 import { PrismaClient } from '@prisma/client';
 import { execSync } from 'child_process';
 import * as path from 'path';
+import * as url from 'url';
 
 const TARGET_MIGRATION = '20250124120000_add_accounting_lite_models';
 
-interface MigrationStatus {
-  exists: boolean;
-  failed: boolean;
-  applied: boolean;
-  rolledBack: boolean;
-  logs?: string | null;
+interface MigrationRecord {
+  migration_name: string;
+  started_at: Date | null;
+  finished_at: Date | null;
+  rolled_back_at: Date | null;
+  applied_steps_count: number;
+  logs: string | null;
 }
 
 interface DatabaseState {
@@ -31,18 +33,48 @@ interface DatabaseState {
   hasLedgerCategoryEnum: boolean;
 }
 
-async function checkMigrationStatus(prisma: PrismaClient): Promise<MigrationStatus | null> {
+function redactDatabaseUrl(dbUrl: string): string {
   try {
-    const result = await prisma.$queryRaw<Array<{
-      migration_name: string;
-      started_at: Date | null;
-      finished_at: Date | null;
-      applied_steps_count: number;
-      logs: string | null;
-    }>>`
-      SELECT migration_name, started_at, finished_at, applied_steps_count, logs
+    const parsed = url.parse(dbUrl);
+    if (parsed.auth) {
+      const [user, ...passParts] = parsed.auth.split(':');
+      const password = passParts.join(':');
+      parsed.auth = `${user}:${password ? '***' : ''}`;
+    }
+    return url.format(parsed);
+  } catch {
+    // If parsing fails, just redact after @
+    const atIndex = dbUrl.indexOf('@');
+    if (atIndex > 0) {
+      const beforeAt = dbUrl.substring(0, dbUrl.indexOf(':', dbUrl.indexOf('://') + 3) + 1);
+      return `${beforeAt}***@${dbUrl.substring(atIndex + 1)}`;
+    }
+    return '***';
+  }
+}
+
+function getDatabaseHostname(dbUrl: string): string {
+  try {
+    const parsed = url.parse(dbUrl);
+    return parsed.hostname || 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
+async function getMigrationRecord(prisma: PrismaClient): Promise<MigrationRecord | null> {
+  try {
+    const result = await prisma.$queryRaw<Array<MigrationRecord>>`
+      SELECT 
+        migration_name, 
+        started_at, 
+        finished_at, 
+        rolled_back_at, 
+        applied_steps_count, 
+        logs
       FROM "_prisma_migrations"
       WHERE migration_name = ${TARGET_MIGRATION}
+      ORDER BY started_at DESC
       LIMIT 1
     `;
 
@@ -50,45 +82,33 @@ async function checkMigrationStatus(prisma: PrismaClient): Promise<MigrationStat
       return null;
     }
 
-    const migration = result[0];
-    const failed = migration.finished_at === null && migration.applied_steps_count > 0;
-    const applied = migration.finished_at !== null && migration.applied_steps_count > 0;
-    const rolledBack = migration.finished_at === null && migration.applied_steps_count === 0;
-
-    return {
-      exists: true,
-      failed,
-      applied,
-      rolledBack,
-      logs: migration.logs,
-    };
+    return result[0];
   } catch (error) {
-    console.error('❌ Error checking migration status:', error);
+    console.error('❌ Error querying _prisma_migrations:', error);
     throw error;
   }
 }
 
+function isFailed(record: MigrationRecord): boolean {
+  return (
+    record.finished_at === null &&
+    record.rolled_back_at === null &&
+    record.started_at !== null
+  );
+}
+
 async function checkDatabaseState(prisma: PrismaClient): Promise<DatabaseState> {
   try {
-    // Check tables
+    // Check tables using to_regclass (PostgreSQL native)
     const [ledgerAccount, ledgerCategory, customerBalance] = await Promise.all([
       prisma.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_schema = 'public' AND table_name = 'LedgerAccount'
-        ) as exists
+        SELECT (to_regclass('public."LedgerAccount"') IS NOT NULL) as exists
       `,
       prisma.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_schema = 'public' AND table_name = 'LedgerCategory'
-        ) as exists
+        SELECT (to_regclass('public."LedgerCategory"') IS NOT NULL) as exists
       `,
       prisma.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables 
-          WHERE table_schema = 'public' AND table_name = 'CustomerBalanceSnapshot'
-        ) as exists
+        SELECT (to_regclass('public."CustomerBalanceSnapshot"') IS NOT NULL) as exists
       `,
     ]);
 
@@ -140,11 +160,12 @@ async function checkDatabaseState(prisma: PrismaClient): Promise<DatabaseState> 
   }
 }
 
-async function cleanupPartialMigration(prisma: PrismaClient, state: DatabaseState): Promise<void> {
-  console.log('🧹 Cleaning up partial migration...');
+async function cleanupPartialTables(prisma: PrismaClient, state: DatabaseState): Promise<void> {
+  console.log('🧹 Cleaning up partial tables (if needed)...');
 
   try {
-    // Drop tables if they exist (idempotent, safe if empty)
+    // Only drop tables if they exist and might cause issues
+    // We keep columns in Purchase as they're safe
     if (state.hasCustomerBalanceSnapshot) {
       console.log('   → Dropping CustomerBalanceSnapshot table...');
       await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "CustomerBalanceSnapshot" CASCADE;');
@@ -160,11 +181,6 @@ async function cleanupPartialMigration(prisma: PrismaClient, state: DatabaseStat
       await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "LedgerAccount" CASCADE;');
     }
 
-    // Remove enum values if they exist (PostgreSQL doesn't support direct removal, but we can ignore)
-    // Note: We'll let the migration re-add them if needed
-
-    // Keep currency and referenceNumber columns (they're safe to keep)
-
     console.log('✅ Cleanup completed');
   } catch (error) {
     console.error('❌ Error during cleanup:', error);
@@ -172,14 +188,17 @@ async function cleanupPartialMigration(prisma: PrismaClient, state: DatabaseStat
   }
 }
 
-function resolveMigration(action: 'rolled-back' | 'applied', migrationName: string): void {
-  console.log(`📝 Resolving migration as ${action}...`);
+function getMonorepoRoot(): string {
+  const currentDir = process.cwd();
+  return currentDir.includes('apps/api') 
+    ? path.resolve(currentDir, '../..')
+    : currentDir;
+}
+
+async function resolveMigrationViaPrisma(action: 'rolled-back' | 'applied', migrationName: string): Promise<boolean> {
+  console.log(`📝 Attempting to resolve migration as ${action} via Prisma CLI...`);
   try {
-    // Run from monorepo root
-    const currentDir = process.cwd();
-    const monorepoRoot = currentDir.includes('apps/api') 
-      ? path.resolve(currentDir, '../..')
-      : currentDir;
+    const monorepoRoot = getMonorepoRoot();
     
     execSync(
       `pnpm --filter @remember-me/prisma exec prisma migrate resolve --${action} ${migrationName}`,
@@ -189,9 +208,78 @@ function resolveMigration(action: 'rolled-back' | 'applied', migrationName: stri
         env: { ...process.env }
       }
     );
-    console.log(`✅ Migration resolved as ${action}`);
+    console.log(`✅ Migration resolved as ${action} via Prisma CLI`);
+    return true;
   } catch (error) {
-    console.error(`❌ Failed to resolve migration as ${action}:`, error);
+    console.error(`⚠️  Failed to resolve migration via Prisma CLI:`, error);
+    return false;
+  }
+}
+
+async function forceRollbackViaSQL(prisma: PrismaClient, migrationName: string): Promise<void> {
+  console.log('🔧 Forcing rollback via direct SQL UPDATE...');
+  try {
+    await prisma.$executeRawUnsafe(`
+      UPDATE "_prisma_migrations"
+      SET 
+        rolled_back_at = NOW(),
+        finished_at = NOW(),
+        logs = COALESCE(logs, '') || E'\\n[auto-recover] forced rolled_back_at/finished_at at ' || NOW()::text
+      WHERE migration_name = $1
+        AND finished_at IS NULL
+        AND rolled_back_at IS NULL
+    `, migrationName);
+    
+    console.log('✅ Forced rollback via SQL completed');
+  } catch (error) {
+    console.error('❌ Failed to force rollback via SQL:', error);
+    throw error;
+  }
+}
+
+async function verifyMigrationCleared(prisma: PrismaClient): Promise<boolean> {
+  const record = await getMigrationRecord(prisma);
+  if (!record) {
+    return true; // No record exists, that's fine
+  }
+  return !isFailed(record); // Not failed anymore
+}
+
+async function printMigrationStatus(prisma: PrismaClient): Promise<void> {
+  const record = await getMigrationRecord(prisma);
+  if (!record) {
+    console.log('   → No migration record found');
+    return;
+  }
+  
+  console.log('   → Migration record:');
+  console.log(`      - migration_name: ${record.migration_name}`);
+  console.log(`      - started_at: ${record.started_at || 'NULL'}`);
+  console.log(`      - finished_at: ${record.finished_at || 'NULL'}`);
+  console.log(`      - rolled_back_at: ${record.rolled_back_at || 'NULL'}`);
+  console.log(`      - applied_steps_count: ${record.applied_steps_count}`);
+  console.log(`      - is_failed: ${isFailed(record)}`);
+  if (record.logs) {
+    console.log(`      - logs (last 200 chars): ${record.logs.substring(Math.max(0, record.logs.length - 200))}`);
+  }
+}
+
+async function runMigrateDeploy(): Promise<void> {
+  console.log('🚀 Running prisma migrate deploy...');
+  try {
+    const monorepoRoot = getMonorepoRoot();
+    
+    execSync(
+      `pnpm --filter @remember-me/prisma db:migrate:deploy`,
+      { 
+        stdio: 'inherit', 
+        cwd: monorepoRoot,
+        env: { ...process.env }
+      }
+    );
+    console.log('✅ prisma migrate deploy completed successfully');
+  } catch (error) {
+    console.error('❌ prisma migrate deploy failed:', error);
     throw error;
   }
 }
@@ -205,43 +293,55 @@ async function main() {
     process.exit(1);
   }
 
+  // PASO 1: Log DATABASE_URL (redactado) y hostname
+  const redactedUrl = redactDatabaseUrl(process.env.DATABASE_URL);
+  const hostname = getDatabaseHostname(process.env.DATABASE_URL);
+  console.log(`📡 Database connection:`);
+  console.log(`   - DATABASE_URL: ${redactedUrl}`);
+  console.log(`   - Hostname: ${hostname}\n`);
+
   const prisma = new PrismaClient();
 
   try {
-    // Step 1: Check migration status
+    // PASO 2: Query directo a _prisma_migrations
     console.log(`📋 Checking migration status for: ${TARGET_MIGRATION}`);
-    const migrationStatus = await checkMigrationStatus(prisma);
+    const migrationRecord = await getMigrationRecord(prisma);
 
-    if (!migrationStatus || !migrationStatus.exists) {
-      console.log('✅ Migration not found in _prisma_migrations (not failed, nothing to recover)');
+    if (!migrationRecord) {
+      console.log('✅ No failed migration record found');
+      console.log('   → Proceeding with normal migrate deploy...\n');
       await prisma.$disconnect();
+      await runMigrateDeploy();
       process.exit(0);
     }
 
-    if (migrationStatus.applied) {
-      console.log('✅ Migration is already applied (nothing to recover)');
+    console.log('   → Migration record found:');
+    console.log(`      - started_at: ${migrationRecord.started_at || 'NULL'}`);
+    console.log(`      - finished_at: ${migrationRecord.finished_at || 'NULL'}`);
+    console.log(`      - rolled_back_at: ${migrationRecord.rolled_back_at || 'NULL'}`);
+    console.log(`      - applied_steps_count: ${migrationRecord.applied_steps_count}`);
+    
+    const isFailedState = isFailed(migrationRecord);
+    
+    if (!isFailedState) {
+      if (migrationRecord.finished_at) {
+        console.log('✅ Migration is already applied (nothing to recover)');
+      } else if (migrationRecord.rolled_back_at) {
+        console.log('✅ Migration is already rolled back (nothing to recover)');
+      } else {
+        console.log('⚠️  Migration exists but is not in failed state (skipping recovery)');
+      }
       await prisma.$disconnect();
-      process.exit(0);
-    }
-
-    if (migrationStatus.rolledBack) {
-      console.log('✅ Migration is already rolled back (nothing to recover)');
-      await prisma.$disconnect();
-      process.exit(0);
-    }
-
-    if (!migrationStatus.failed) {
-      console.log('⚠️  Migration exists but is not in failed state (skipping recovery)');
-      await prisma.$disconnect();
+      await runMigrateDeploy();
       process.exit(0);
     }
 
     console.log('⚠️  Migration is in FAILED state');
-    if (migrationStatus.logs) {
-      console.log(`   Logs: ${migrationStatus.logs.substring(0, 200)}...`);
+    if (migrationRecord.logs) {
+      console.log(`   → Logs: ${migrationRecord.logs.substring(0, 300)}...`);
     }
 
-    // Step 2: Check database state
+    // PASO 3: Check database state
     console.log('\n📊 Checking database state...');
     const dbState = await checkDatabaseState(prisma);
     console.log('   Database state:');
@@ -253,34 +353,78 @@ async function main() {
     console.log(`   - AuditEntityType.LedgerAccount enum: ${dbState.hasLedgerAccountEnum ? '✅ exists' : '❌ missing'}`);
     console.log(`   - AuditEntityType.LedgerCategory enum: ${dbState.hasLedgerCategoryEnum ? '✅ exists' : '❌ missing'}`);
 
-    // Step 3: Determine recovery strategy
-    const hasAnyTables = dbState.hasLedgerAccount || dbState.hasLedgerCategory || dbState.hasCustomerBalanceSnapshot;
-    const hasAnyColumns = dbState.hasCurrencyColumn || dbState.hasReferenceNumberColumn;
-    const hasAnyEnums = dbState.hasLedgerAccountEnum || dbState.hasLedgerCategoryEnum;
-    const hasEverything = hasAnyTables && hasAnyColumns && hasAnyEnums;
+    // Determine if everything is applied
+    const hasAllTables = dbState.hasLedgerAccount && dbState.hasLedgerCategory && dbState.hasCustomerBalanceSnapshot;
+    const hasAllColumns = dbState.hasCurrencyColumn && dbState.hasReferenceNumberColumn;
+    const hasAllEnums = dbState.hasLedgerAccountEnum && dbState.hasLedgerCategoryEnum;
+    const hasEverything = hasAllTables && hasAllColumns && hasAllEnums;
 
     console.log('\n🎯 Recovery strategy:');
 
-    if (!hasAnyTables && !hasAnyColumns && !hasAnyEnums) {
-      // Nothing was applied, just mark as rolled-back
-      console.log('   → Nothing was applied, marking as rolled-back');
-      resolveMigration('rolled-back', TARGET_MIGRATION);
-    } else if (hasEverything) {
-      // Everything exists, mark as applied
-      console.log('   → Everything exists, marking as applied');
-      resolveMigration('applied', TARGET_MIGRATION);
-    } else {
-      // Partial application, cleanup and mark as rolled-back
-      console.log('   → Partial application detected, cleaning up...');
-      await cleanupPartialMigration(prisma, dbState);
-      resolveMigration('rolled-back', TARGET_MIGRATION);
-    }
+    if (hasEverything) {
+      // A2: Everything exists, mark as applied
+      console.log('   → Everything is applied, marking as applied...');
+      const resolved = await resolveMigrationViaPrisma('applied', TARGET_MIGRATION);
+      
+      if (!resolved) {
+        console.error('❌ Failed to resolve as applied, cannot proceed');
+        await printMigrationStatus(prisma);
+        await prisma.$disconnect();
+        process.exit(1);
+      }
 
-    console.log('\n✅ Recovery completed successfully');
-    await prisma.$disconnect();
-    process.exit(0);
+      // Verify it's cleared
+      const cleared = await verifyMigrationCleared(prisma);
+      if (!cleared) {
+        console.error('❌ Migration still appears as failed after resolve --applied');
+        await printMigrationStatus(prisma);
+        await prisma.$disconnect();
+        process.exit(1);
+      }
+
+      console.log('✅ Recovered FAILED migration record (marked as applied)');
+      await printMigrationStatus(prisma);
+      
+      await prisma.$disconnect();
+      await runMigrateDeploy();
+      process.exit(0);
+    } else {
+      // A3: Partial or nothing applied, cleanup and rollback
+      console.log('   → Partial or no application detected, cleaning up and rolling back...');
+      
+      // Cleanup partial tables if needed
+      if (dbState.hasLedgerAccount || dbState.hasLedgerCategory || dbState.hasCustomerBalanceSnapshot) {
+        await cleanupPartialTables(prisma, dbState);
+      }
+
+      // Try Prisma CLI first
+      const resolved = await resolveMigrationViaPrisma('rolled-back', TARGET_MIGRATION);
+      
+      if (!resolved) {
+        console.log('   → Prisma CLI resolve failed, trying direct SQL...');
+        await forceRollbackViaSQL(prisma, TARGET_MIGRATION);
+      }
+
+      // Verify it's cleared
+      const cleared = await verifyMigrationCleared(prisma);
+      if (!cleared) {
+        console.error('❌ Migration still appears as failed after rollback attempt');
+        await printMigrationStatus(prisma);
+        await prisma.$disconnect();
+        process.exit(1);
+      }
+
+      console.log('✅ Recovered FAILED migration record (marked as rolled-back)');
+      await printMigrationStatus(prisma);
+      
+      await prisma.$disconnect();
+      await runMigrateDeploy();
+      process.exit(0);
+    }
   } catch (error) {
     console.error('\n❌ Recovery failed:', error);
+    console.log('\n📋 Final migration status:');
+    await printMigrationStatus(prisma).catch(() => {});
     await prisma.$disconnect();
     process.exit(1);
   }
