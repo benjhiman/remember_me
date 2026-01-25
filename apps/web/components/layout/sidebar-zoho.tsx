@@ -29,6 +29,7 @@ import {
   CreditCard,
   Wrench,
   ShoppingBag,
+  BookOpen,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -87,7 +88,15 @@ const navItems: NavItem[] = [
   },
   { href: '/pricing', label: 'Pricing', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
   { href: '/ads', label: 'Meta Ads', icon: Megaphone, permission: Permission.VIEW_INTEGRATIONS },
-  { href: '/settings', label: 'Settings', icon: Settings, permission: Permission.VIEW_DASHBOARD },
+  {
+    href: '/settings',
+    label: 'Settings',
+    icon: Settings,
+    permission: Permission.VIEW_DASHBOARD,
+    children: [
+      { href: '/settings/accounting/accounts', label: 'Accounts', icon: BookOpen, permission: Permission.VIEW_DASHBOARD },
+    ],
+  },
 ];
 
 const toolsItems: NavItem[] = [];
