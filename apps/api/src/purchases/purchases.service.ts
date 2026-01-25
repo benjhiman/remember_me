@@ -502,11 +502,11 @@ export class PurchasesService {
         // Find or create stock item
         let stockItem = null;
 
-        if (line.stockItemId) {
+        if ((line as any).stockItemId) {
           // Use existing stock item
           stockItem = await tx.stockItem.findFirst({
             where: {
-              id: line.stockItemId,
+              id: (line as any).stockItemId,
               organizationId,
             },
           });
@@ -534,14 +534,13 @@ export class PurchasesService {
               basePrice: line.unitPriceCents / 100,
               status: 'AVAILABLE',
               condition: 'NEW',
-              createdById: userId,
             },
           });
 
           // Update PurchaseLine with stockItemId
           await tx.purchaseLine.update({
             where: { id: line.id },
-            data: { stockItemId: stockItem.id },
+            data: { stockItemId: stockItem.id } as any,
           });
         }
 
