@@ -6,7 +6,8 @@
  * Usage: ts-node scripts/prod-verify.ts
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api';
+// Use hardcoded production URL (same as runtime-config.ts)
+const API_BASE_URL = 'https://api.iphonealcosto.com/api';
 
 interface VerificationResult {
   step: string;

@@ -104,19 +104,70 @@ export function assertRuntimeConfig(): void {
 
 /**
  * Gets API base URL with validation
+ * @deprecated Use getApiBaseUrl() instead
  */
 export function getValidatedApiBaseUrl(): string {
-  const config = validateRuntimeConfig();
-  if (!config.isValid) {
-    // In production, use safe fallback
-    if (typeof window !== 'undefined') {
-      const isProduction =
-        window.location.hostname !== 'localhost' &&
-        !window.location.hostname.includes('127.0.0.1');
-      if (isProduction) {
-        return 'https://api.iphonealcosto.com/api';
+  return getApiBaseUrl();
+}
+
+/**
+ * Single source of truth for API base URL
+ * 
+ * Rules:
+ * - In production: ALWAYS return "https://api.iphonealcosto.com/api" (hardcoded)
+ *   (even if env var exists and is wrong, log warning and use hardcoded)
+ * - In preview/dev: use env var if exists, else fallback to localhost
+ * 
+ * This ensures all API calls use the exact same base URL.
+ */
+export function getApiBaseUrl(): string {
+  // Check if we're in browser
+  if (typeof window === 'undefined') {
+    // SSR: Use env var or hardcoded prod
+    const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (isProduction) {
+      // Production SSR: always use hardcoded
+      if (envUrl && envUrl !== 'https://api.iphonealcosto.com/api') {
+        console.warn(`[API_BASE] ⚠️ NEXT_PUBLIC_API_BASE_URL in SSR differs from hardcoded: ${envUrl}. Using hardcoded.`);
       }
+      return 'https://api.iphonealcosto.com/api';
     }
+    
+    // Dev SSR: use env or localhost
+    return envUrl || 'http://localhost:4000/api';
   }
-  return config.apiBaseUrl;
+
+  // Client-side
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  
+  // Detect production environment
+  const isProduction =
+    window.location.hostname !== 'localhost' &&
+    !window.location.hostname.includes('127.0.0.1') &&
+    !window.location.hostname.includes('192.168.') &&
+    !window.location.hostname.includes('10.0.') &&
+    !window.location.hostname.includes('.local');
+
+  if (isProduction) {
+    // Production: ALWAYS use hardcoded, ignore env var if different
+    const hardcodedUrl = 'https://api.iphonealcosto.com/api';
+    
+    if (envUrl && envUrl !== hardcodedUrl) {
+      console.warn(`[API_BASE] ⚠️ NEXT_PUBLIC_API_BASE_URL differs from hardcoded: ${envUrl}. Using hardcoded: ${hardcodedUrl}`);
+    }
+    
+    // Log once in production
+    if (!(window as any).__API_BASE_LOGGED) {
+      console.log(`[API_BASE] using ${hardcodedUrl}`);
+      (window as any).__API_BASE_LOGGED = true;
+    }
+    
+    return hardcodedUrl;
+  }
+
+  // Development/preview: use env var if exists, else localhost
+  const devUrl = envUrl || 'http://localhost:4000/api';
+  return devUrl.replace(/\/+$/, '');
 }

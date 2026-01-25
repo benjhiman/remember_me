@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { api, ApiError, ErrorType } from '@/lib/api/auth-client';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 import type { LoginRequest, LoginResponse } from '@/types/api';
 
 const loginSchema = z.object({
@@ -24,6 +25,10 @@ function LoginPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [branding, setBranding] = useState<{ name: string; logoUrl: string | null } | null>(null);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<Record<string, string> | null>(null);
+  
+  // Get API base URL (single source of truth)
+  const apiBaseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : 'https://api.iphonealcosto.com/api';
   
   const redirectTo = searchParams.get('redirectTo') || '/inbox';
 
@@ -69,71 +74,121 @@ function LoginPageContent() {
     } catch (err: any) {
       // Better error handling for production with specific error detection
       let errorMessage = 'Error al iniciar sesión';
-      let diagnosticInfo: string | null = null;
+      let diagnosticInfo: Record<string, string> | null = null;
       
-      // Get effective API base URL for diagnostics
-      const apiBaseUrl = typeof window !== 'undefined' 
-        ? (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api')
-        : (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api');
+      // Build diagnostic info (always in production, only on error)
+      if (process.env.NODE_ENV === 'production' && typeof window !== 'undefined') {
+        const diag: Record<string, string> = {
+          apiBase: apiBaseUrl,
+          origin: window.location.origin,
+        };
+        
+        // Add request ID if available
+        if (err?.requestId) {
+          diag.requestId = err.requestId;
+        }
+        
+        // Add redirect location if available
+        if (err?.data?.redirectLocation) {
+          diag.redirectLocation = err.data.redirectLocation;
+        }
+        
+        // Add response type if available
+        if (err?.data?.diagnostics?.responseType) {
+          diag.responseType = err.data.diagnostics.responseType;
+        }
+        
+        // Add final URL if available (from redirect)
+        if (err?.data?.diagnostics?.finalUrl) {
+          diag.finalUrl = err.data.diagnostics.finalUrl;
+        }
+        
+        diagnosticInfo = diag;
+        setDiagnosticInfo(diag);
+      }
       
       // Check if it's an ApiError with type information
       if (err instanceof ApiError || err?.type) {
         const errorType = err.type || (err instanceof ApiError ? err.type : null);
         const status = err.status;
         
-        switch (errorType) {
-          case ErrorType.CORS:
-            errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
-            if (process.env.NODE_ENV === 'production') {
-              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: CORS`;
-            }
-            break;
-          case ErrorType.DNS:
-            errorMessage = 'No se pudo resolver el dominio del servidor. Verificá la configuración de API URL.';
-            if (process.env.NODE_ENV === 'production') {
-              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: DNS`;
-            }
-            break;
-          case ErrorType.TIMEOUT:
-            errorMessage = 'El servidor no responde. Verificá que el API esté disponible.';
-            if (process.env.NODE_ENV === 'production') {
-              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: TIMEOUT`;
-            }
-            break;
-          case ErrorType.AUTH:
-            // Use backend message if available, otherwise default message
-            if (status === 401) {
-              errorMessage = err.message || 'Credenciales incorrectas. Verificá tu email y contraseña.';
-            } else if (status === 403) {
-              errorMessage = err.message || 'No tenés permisos para realizar esta acción.';
-            } else {
-              errorMessage = err.message || 'Error de autenticación.';
-            }
-            break;
-          case ErrorType.NETWORK:
-            // Only show "No se pudo conectar" for real network errors (not AUTH)
-            if (!apiBaseUrl || apiBaseUrl.includes('localhost')) {
-              errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL.';
-            } else {
-              errorMessage = `No se pudo conectar con el servidor (${apiBaseUrl}). Verificá tu conexión y la configuración del API.`;
-            }
-            if (process.env.NODE_ENV === 'production') {
-              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: NETWORK | Status: ${status || 'N/A'}`;
-            }
-            break;
-          default:
-            // Use error message from API if available
-            errorMessage = err.message || 'Error al iniciar sesión';
-            if (process.env.NODE_ENV === 'production') {
-              diagnosticInfo = `API: ${apiBaseUrl} | Tipo: ${errorType || 'UNKNOWN'} | Status: ${status || 'N/A'}`;
-            }
+        // Check for REDIRECT_DETECTED
+        if (err.message?.includes('REDIRECT_DETECTED')) {
+          errorMessage = `Redirect detectado en API. Revisar endpoint/baseURL.`;
+          if (diagnosticInfo && err.data?.redirectLocation) {
+            diagnosticInfo.location = err.data.redirectLocation;
+          }
+        } else {
+          switch (errorType) {
+            case ErrorType.CORS:
+              errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
+              if (diagnosticInfo) {
+                diagnosticInfo.errorType = 'CORS';
+              }
+              break;
+            case ErrorType.DNS:
+              errorMessage = 'No se pudo resolver el dominio del servidor. Verificá la configuración de API URL.';
+              if (diagnosticInfo) {
+                diagnosticInfo.errorType = 'DNS';
+              }
+              break;
+            case ErrorType.TIMEOUT:
+              errorMessage = 'El servidor no responde. Verificá que el API esté disponible.';
+              if (diagnosticInfo) {
+                diagnosticInfo.errorType = 'TIMEOUT';
+              }
+              break;
+            case ErrorType.AUTH:
+              // Use backend message if available, otherwise default message
+              if (status === 401) {
+                errorMessage = err.message || 'Credenciales incorrectas. Verificá tu email y contraseña.';
+              } else if (status === 403) {
+                errorMessage = err.message || 'No tenés permisos para realizar esta acción.';
+              } else {
+                errorMessage = err.message || 'Error de autenticación.';
+              }
+              if (diagnosticInfo) {
+                diagnosticInfo.errorType = 'AUTH';
+                diagnosticInfo.status = String(status || 'N/A');
+              }
+              break;
+            case ErrorType.NETWORK:
+              // Only show "No se pudo conectar" for real network errors (not AUTH)
+              if (!apiBaseUrl || apiBaseUrl.includes('localhost')) {
+                errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL.';
+              } else {
+                errorMessage = `No se pudo conectar con el servidor (${apiBaseUrl}). Verificá tu conexión y la configuración del API.`;
+              }
+              if (diagnosticInfo) {
+                diagnosticInfo.errorType = 'NETWORK';
+                diagnosticInfo.status = String(status || 'N/A');
+              }
+              break;
+            default:
+              // Use error message from API if available
+              errorMessage = err.message || 'Error al iniciar sesión';
+              if (diagnosticInfo) {
+                diagnosticInfo.errorType = errorType || 'UNKNOWN';
+                diagnosticInfo.status = String(status || 'N/A');
+              }
+          }
         }
       } else if (err instanceof Error) {
         const msg = err.message.toLowerCase();
-        if (msg.includes('cors') || msg.includes('cross-origin')) {
+        if (msg.includes('redirect_detected')) {
+          errorMessage = 'Redirect detectado en API. Revisar endpoint/baseURL.';
+          if (diagnosticInfo) {
+            diagnosticInfo.errorType = 'REDIRECT';
+          }
+        } else if (msg.includes('opaque_response')) {
+          errorMessage = 'Respuesta opaca detectada (posible problema de CORS/proxy).';
+          if (diagnosticInfo) {
+            diagnosticInfo.errorType = 'OPAQUE_RESPONSE';
+          }
+        } else if (msg.includes('cors') || msg.includes('cross-origin')) {
           errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
-          if (process.env.NODE_ENV === 'production') {
-            diagnosticInfo = `API: ${apiBaseUrl} | Tipo: CORS (detectado por mensaje)`;
+          if (diagnosticInfo) {
+            diagnosticInfo.errorType = 'CORS (detectado por mensaje)';
           }
         } else if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
           if (!apiBaseUrl || apiBaseUrl.includes('localhost')) {
@@ -141,8 +196,8 @@ function LoginPageContent() {
           } else {
             errorMessage = `No se pudo conectar con el servidor (${apiBaseUrl}). Verificá la configuración del API.`;
           }
-          if (process.env.NODE_ENV === 'production') {
-            diagnosticInfo = `API: ${apiBaseUrl} | Tipo: NETWORK (Failed to fetch)`;
+          if (diagnosticInfo) {
+            diagnosticInfo.errorType = 'NETWORK (Failed to fetch)';
           }
         } else if (msg.includes('401') || msg.includes('403')) {
           errorMessage = 'Credenciales incorrectas. Verificá tu email y contraseña.';
@@ -226,9 +281,14 @@ function LoginPageContent() {
                 {process.env.NODE_ENV === 'production' && typeof window !== 'undefined' && (
                   <details className="mt-2 text-xs text-muted-foreground">
                     <summary className="cursor-pointer hover:text-foreground">Diagnóstico</summary>
-                    <div className="mt-1 p-2 bg-muted rounded text-xs font-mono">
-                      <div>API Base: {process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.iphonealcosto.com/api'}</div>
+                    <div className="mt-1 p-2 bg-muted rounded text-xs font-mono space-y-1">
+                      <div>API Base: {apiBaseUrl}</div>
                       <div>Origin: {window.location.origin}</div>
+                      {diagnosticInfo && Object.entries(diagnosticInfo).map(([key, value]) => (
+                        <div key={key}>
+                          {key}: {value}
+                        </div>
+                      ))}
                     </div>
                   </details>
                 )}

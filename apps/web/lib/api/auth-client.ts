@@ -12,58 +12,22 @@
 import { useAuthStore } from '../store/auth-store';
 import { useOrgStore } from '../store/org-store';
 import { getOrCreateRequestId } from '../observability/request-id';
-
-// Get API base URL with proper fallback and validation
-// ⚠️ PROD SAFETY: In production, always use safe fallback to prevent localhost usage
-function getApiBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  
-  // Detect production environment
-  const isProduction =
-    typeof window !== 'undefined'
-      ? window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1')
-      : process.env.NODE_ENV === 'production';
-  
-  // Production: Use safe fallback if env var is missing or invalid
-  if (isProduction) {
-    // Check if env var is missing, empty, localhost, or HTTP (not HTTPS)
-    const isInvalid =
-      !envUrl ||
-      envUrl.trim() === '' ||
-      envUrl.includes('localhost') ||
-      envUrl.includes('127.0.0.1') ||
-      envUrl.startsWith('http://');
-    
-    if (isInvalid) {
-      if (!envUrl) {
-        console.error('[AUTH_CLIENT] ⚠️ NEXT_PUBLIC_API_BASE_URL not set in production. Using safe fallback.');
-      } else {
-        console.error(`[AUTH_CLIENT] ⚠️ NEXT_PUBLIC_API_BASE_URL is invalid in production: ${envUrl}. Using safe fallback.`);
-      }
-      // Safe production fallback - hardcoded to prevent localhost usage
-      return 'https://api.iphonealcosto.com/api';
-    }
-    
-    // Env var is valid, use it
-    return envUrl.replace(/\/+$/, '');
-  }
-  
-  // Development: Allow localhost fallback
-  const baseUrl = envUrl || 'http://localhost:4000/api';
-  
-  // Ensure no double slashes and proper trailing
-  return baseUrl.replace(/\/+$/, '');
-}
+import { getApiBaseUrl } from '../runtime-config';
+import { fetchWithDiagnostics, RedirectError, OpaqueResponseError } from './fetch-with-diagnostics';
 
 // Build endpoint URL safely (avoid //api/api)
 function buildEndpointUrl(endpoint: string): string {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = getApiBaseUrlForRequest();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${baseUrl}${cleanEndpoint}`;
 }
 
-const API_BASE_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT = 30000; // 30 seconds
+
+// Get API base URL (single source of truth)
+function getApiBaseUrlForRequest(): string {
+  return getApiBaseUrl();
+}
 
 export enum ErrorType {
   NETWORK = 'NETWORK',
@@ -228,7 +192,10 @@ export async function apiRequest<T>(
   let responseRequestId: string | null = null;
 
   try {
-    const fetchPromise = fetch(buildEndpointUrl(endpoint), {
+    const url = buildEndpointUrl(endpoint);
+    
+    // Use fetchWithDiagnostics to detect redirects
+    const fetchPromise = fetchWithDiagnostics(url, {
       ...options,
       headers,
       credentials: 'include',
@@ -340,6 +307,30 @@ export async function apiRequest<T>(
 
     if (error instanceof ApiError) {
       throw error;
+    }
+
+    // Handle redirect errors
+    if (error instanceof RedirectError) {
+      throw new ApiError(
+        `REDIRECT_DETECTED: Request was redirected to ${error.location || 'unknown location'}`,
+        0,
+        ErrorType.CORS, // Redirects often break CORS
+        { redirectLocation: error.location, diagnostics: error.diagnostics },
+        requestId || undefined,
+        error
+      );
+    }
+
+    // Handle opaque response errors (CORS issue)
+    if (error instanceof OpaqueResponseError) {
+      throw new ApiError(
+        'OPAQUE_RESPONSE: Response is opaque (possible CORS/proxy issue)',
+        0,
+        ErrorType.CORS,
+        { diagnostics: error.diagnostics },
+        requestId || undefined,
+        error
+      );
     }
 
     // Handle network errors
