@@ -25,10 +25,10 @@ export function useCreateLedgerAccount() {
       queryClient.invalidateQueries({ queryKey: ['ledger-accounts'] });
       toast({ title: 'Cuenta creada', description: 'La cuenta contable ha sido creada correctamente.' });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = getErrorMessage(error);
       const requestId = getRequestIdFromError(error);
-      if (error?.status === 403 || (error as any)?.response?.status === 403) {
+      if (error?.status === 403 || error?.response?.status === 403) {
         toast({
           title: 'Permisos insuficientes',
           description: React.createElement(

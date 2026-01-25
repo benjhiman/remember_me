@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateLedgerAccount } from '@/lib/api/hooks/use-ledger-account-mutations';
 import { usePermissions } from '@/lib/auth/use-permissions';
@@ -44,7 +43,6 @@ export default function NewLedgerAccountPage() {
     watch,
     formState: { errors },
   } = useForm<AccountFormData>({
-    resolver: zodResolver(accountSchema),
     defaultValues: {
       isActive: true,
     },

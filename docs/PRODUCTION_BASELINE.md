@@ -260,15 +260,25 @@ Este documento define el "safe point" de producción: un estado conocido y valid
 # Verificar producción
 ./scripts/prod-check.sh https://api.iphonealcosto.com https://app.iphonealcosto.com
 
-# Con token de smoke test (opcional)
+# Con token de smoke test (opcional, habilita checks de endpoints autenticados)
 SMOKE_TOKEN=xxx ./scripts/prod-check.sh https://api.iphonealcosto.com https://app.iphonealcosto.com
 ```
+
+**Nota sobre `SMOKE_TOKEN`:**
+- Si se proporciona, el script ejecutará checks adicionales en endpoints autenticados:
+  - `GET /api/users/me` (validación básica de autenticación)
+  - `GET /api/ledger/accounts` (validación de módulo contable, requiere `ledger.read`)
+  - `GET /api/purchases` (validación de módulo de compras, requiere `purchases.read`)
+- Si no se proporciona, estos checks se omiten con un warning (no fallan el script).
+- El token debe ser un JWT válido con permisos suficientes para los endpoints opcionales.
 
 **Qué valida:**
 1. API `/api/health` → `200 OK`
 2. API `/api/health/extended` → `db: "ok"`
 3. Web carga → `200 OK`
-4. (Opcional) Request autenticada → `200 OK`
+4. (Opcional, requiere `SMOKE_TOKEN`) Request autenticada → `200 OK`
+5. (Opcional, requiere `SMOKE_TOKEN`) Ledger endpoint → `200 OK` o `403` (permisos)
+6. (Opcional, requiere `SMOKE_TOKEN`) Purchases endpoint → `200 OK` o `403` (permisos)
 
 **Exit code:**
 - `0` = Todo OK

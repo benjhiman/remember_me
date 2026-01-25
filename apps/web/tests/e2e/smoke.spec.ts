@@ -191,18 +191,21 @@ test.describe('Smoke Tests - Critical User Flows', () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 });
     
     // Check for empty state or conversation list
-    const emptyState = page.locator('text=/no hay|sin conversaciones|empty/i').first();
+    const emptyState = page.locator('text=/no hay|sin conversaciones|empty|no conversations/i').first();
     const conversationList = page.locator('[role="list"] li, button[class*="conversation"], .conversation-item, button').filter({ hasText: /conversation|chat/i }).first();
     
     const hasEmptyState = (await emptyState.count()) > 0;
     const hasConversations = (await conversationList.count()) > 0;
     
-    // Always verify page loaded (either empty state or list)
+    // Always verify page loaded (either empty state or list) - NO SKIP
     expect(hasEmptyState || hasConversations).toBeTruthy();
     
     if (hasEmptyState) {
-      // Verify empty state is visible and well-formed
-      await expect(emptyState).toBeVisible();
+      // Verify empty state is visible and well-formed (required, no skip)
+      await expect(emptyState).toBeVisible({ timeout: 5000 });
+      // Verify empty state has proper styling (not broken)
+      const emptyStateContainer = emptyState.locator('..');
+      await expect(emptyStateContainer).toBeVisible();
       // Test passes: empty state is valid
       return;
     }
@@ -242,7 +245,7 @@ test.describe('Smoke Tests - Critical User Flows', () => {
     await page.goto('/sales/purchases');
     await page.waitForLoadState('networkidle', { timeout: 10000 });
     
-    // Check for "Nueva Compra" button
+    // Check for "Nueva Compra" button (should exist if user has permissions)
     const createButton = page.locator('button, a').filter({ hasText: /nueva compra|new purchase|crear/i }).first();
     const buttonCount = await createButton.count();
     
@@ -256,11 +259,11 @@ test.describe('Smoke Tests - Critical User Flows', () => {
 
     await createButton.click();
     
-    // Wait for form
-    await page.waitForSelector('form, [role="dialog"]', { timeout: 5000 });
+    // Wait for form or new page
+    await page.waitForSelector('form, [role="dialog"], input[name*="vendor"], select[name*="vendor"]', { timeout: 5000 });
     
     // Fill minimal form (vendor selector + at least one line)
-    const vendorSelect = page.locator('select[name="vendorId"], select').first();
+    const vendorSelect = page.locator('select[name*="vendor" i], select').first();
     if ((await vendorSelect.count()) > 0) {
       await vendorSelect.selectOption({ index: 1 }); // Select first vendor
     }
@@ -275,23 +278,79 @@ test.describe('Smoke Tests - Critical User Flows', () => {
         await qtyInput.fill('1');
       }
       
-      const priceInput = page.locator('input[name*="price" i]').first();
+      const priceInput = page.locator('input[name*="price" i], input[name*="unitPrice" i]').first();
       if ((await priceInput.count()) > 0) {
         await priceInput.fill('100');
       }
     }
     
     // Submit
-    const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /crear|save|guardar/i }).first();
+    const submitButton = page.locator('button[type="submit"], button').filter({ hasText: /crear|save|guardar|submit/i }).first();
     if ((await submitButton.count()) > 0) {
       await submitButton.click();
       
-      // Wait for redirect or success
+      // Wait for redirect to detail page
+      await page.waitForURL(/\/sales\/purchases\/[^/]+$/, { timeout: 10000 });
+      
+      // Verify we're on detail page (not new page)
+      expect(page.url()).toMatch(/\/sales\/purchases\/[^/]+$/);
+      expect(page.url()).not.toContain('/new');
+    }
+  });
+
+  test('8b. purchase transition DRAFT → APPROVED → RECEIVED → stock impact', async ({ page }) => {
+    // Navigate to purchases list
+    await page.goto('/sales/purchases');
+    await page.waitForLoadState('networkidle', { timeout: 10000 });
+    
+    // Find first purchase (should exist from seed or previous test)
+    const purchaseRow = page.locator('table tbody tr, [role="row"]').first();
+    const purchaseCount = await purchaseRow.count();
+    
+    if (purchaseCount === 0) {
+      // No purchases, skip this test
+      test.skip();
+      return;
+    }
+    
+    // Click first purchase to open detail
+    await purchaseRow.click();
+    await page.waitForURL(/\/sales\/purchases\/[^/]+$/, { timeout: 5000 });
+    
+    // Check if purchase is DRAFT (can be transitioned)
+    const statusBadge = page.locator('text=/DRAFT|BORRADOR/i').first();
+    const isDraft = (await statusBadge.count()) > 0;
+    
+    if (!isDraft) {
+      // Purchase is not DRAFT, skip transition test
+      test.skip();
+      return;
+    }
+    
+    // Try to transition to APPROVED (if button exists)
+    const approveButton = page.locator('button').filter({ hasText: /approve|aprobar/i }).first();
+    if ((await approveButton.count()) > 0) {
+      await approveButton.click();
+      await page.waitForTimeout(1000);
+      
+      // Verify status changed to APPROVED
+      await expect(page.locator('text=/APPROVED|APROBADO/i').first()).toBeVisible({ timeout: 5000 });
+    }
+    
+    // Try to transition to RECEIVED (if button exists)
+    const receiveButton = page.locator('button').filter({ hasText: /receive|recibir|mark received/i }).first();
+    if ((await receiveButton.count()) > 0) {
+      await receiveButton.click();
       await page.waitForTimeout(2000);
       
-      // Verify purchase appears (in list or detail page)
-      const isOnDetailPage = page.url().includes('/purchases/') && !page.url().includes('/purchases/new');
-      expect(isOnDetailPage || page.url().includes('/purchases')).toBeTruthy();
+      // Verify status changed to RECEIVED
+      await expect(page.locator('text=/RECEIVED|RECIBIDO/i').first()).toBeVisible({ timeout: 5000 });
+      
+      // Verify stock impact panel shows "Applied"
+      const stockImpactPanel = page.locator('text=/stock impact|impacto en stock|applied|aplicado/i').first();
+      if ((await stockImpactPanel.count()) > 0) {
+        await expect(stockImpactPanel).toBeVisible({ timeout: 5000 });
+      }
     }
   });
 

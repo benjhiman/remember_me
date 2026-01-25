@@ -180,6 +180,38 @@ if [ -n "$SMOKE_TOKEN" ]; then
   if [ "$status_code" = "200" ]; then
     log_info "Authenticated request successful (HTTP 200)"
     PASSED=$((PASSED + 1))
+    
+    # Optional: Check ledger endpoint (requires ledger.read permission)
+    echo ""
+    echo "4a. Checking Ledger Endpoint (Optional)..."
+    ledger_response=$(curl -s -w "\n%{http_code}" --max-time "$TIMEOUT" \
+      -H "Authorization: Bearer $SMOKE_TOKEN" \
+      -H "X-Organization-Id: $(echo "$response" | head -n -1 | jq -r '.org.id // empty' 2>/dev/null || echo '')" \
+      "$API_URL/api/ledger/accounts?limit=1" || echo -e "\n000")
+    ledger_status=$(echo "$ledger_response" | tail -n 1)
+    
+    if [ "$ledger_status" = "200" ] || [ "$ledger_status" = "403" ]; then
+      log_info "Ledger endpoint accessible (HTTP $ledger_status)"
+      PASSED=$((PASSED + 1))
+    else
+      log_warning "Ledger endpoint check failed (HTTP $ledger_status) - may require permissions"
+    fi
+    
+    # Optional: Check purchases list
+    echo ""
+    echo "4b. Checking Purchases Endpoint (Optional)..."
+    purchases_response=$(curl -s -w "\n%{http_code}" --max-time "$TIMEOUT" \
+      -H "Authorization: Bearer $SMOKE_TOKEN" \
+      -H "X-Organization-Id: $(echo "$response" | head -n -1 | jq -r '.org.id // empty' 2>/dev/null || echo '')" \
+      "$API_URL/api/purchases?limit=1" || echo -e "\n000")
+    purchases_status=$(echo "$purchases_response" | tail -n 1)
+    
+    if [ "$purchases_status" = "200" ] || [ "$purchases_status" = "403" ]; then
+      log_info "Purchases endpoint accessible (HTTP $purchases_status)"
+      PASSED=$((PASSED + 1))
+    else
+      log_warning "Purchases endpoint check failed (HTTP $purchases_status) - may require permissions"
+    fi
   else
     log_error "Authenticated request failed (HTTP $status_code)"
   fi
