@@ -450,6 +450,7 @@ async function auditPurchaseStockApplicationMigration(prisma: PrismaClient): Pro
     const hasPurchaseLineStockItemIdIndex = (indexCheck[0] as any).exists === true;
 
     // Check if PurchaseStockApplication indexes exist
+    // Note: UNIQUE INDEX appears in pg_indexes, not as a constraint
     const psaIndexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
       SELECT indexname 
       FROM pg_indexes 
@@ -457,10 +458,24 @@ async function auditPurchaseStockApplicationMigration(prisma: PrismaClient): Pro
         AND tablename = 'PurchaseStockApplication'
     `;
     const indexNames = psaIndexes.map((i) => i.indexname);
+    
+    // Also check unique constraints (which may appear as indexes)
+    const uniqueConstraints = await prisma.$queryRaw<Array<{ constraint_name: string }>>`
+      SELECT constraint_name 
+      FROM information_schema.table_constraints 
+      WHERE table_schema = 'public' 
+        AND table_name = 'PurchaseStockApplication'
+        AND constraint_type = 'UNIQUE'
+    `;
+    const constraintNames = uniqueConstraints.map((c) => c.constraint_name);
+    
     const hasPurchaseStockApplicationIndexes = 
-      indexNames.includes('PurchaseStockApplication_purchaseId_key') &&
-      indexNames.some((n) => n.includes('organizationId_appliedAt')) &&
-      indexNames.some((n) => n.includes('purchaseId'));
+      (indexNames.includes('PurchaseStockApplication_purchaseId_key') || 
+       constraintNames.includes('PurchaseStockApplication_purchaseId_key')) &&
+      (indexNames.some((n) => n.includes('organizationId_appliedAt')) ||
+       indexNames.some((n) => n.includes('organizationId') && n.includes('appliedAt'))) &&
+      (indexNames.some((n) => n.includes('purchaseId')) || 
+       indexNames.some((n) => n === 'PurchaseStockApplication_purchaseId_key'));
 
     // Check if foreign keys exist
     const fkCheck = await prisma.$queryRaw<Array<{ constraint_name: string }>>`
@@ -713,7 +728,89 @@ async function main() {
     // CASO B: DB NO VACÍA - Continuar con recovery normal
     console.log('✅ Database has data - using normal migration flow\n');
 
-    // Check migration status
+    // Check for ALL failed migrations (P3009 detection) - PRIORITY
+    console.log('📋 Checking for failed migrations (P3009)...');
+    const failedMigrations = await getAllFailedMigrations(prisma);
+    
+    if (failedMigrations.length > 0) {
+      console.log(`⚠️  Found ${failedMigrations.length} failed migration(s):`);
+      failedMigrations.forEach((m) => {
+        console.log(`   - ${m.migration_name} (started: ${m.started_at}, steps: ${m.applied_steps_count})`);
+        if (m.logs) {
+          console.log(`     Logs (last 200 chars): ${m.logs.substring(Math.max(0, m.logs.length - 200))}`);
+        }
+      });
+      
+      // Handle PurchaseStockApplication migration specifically
+      const purchaseStockMigration = failedMigrations.find(
+        (m) => m.migration_name === PURCHASE_STOCK_MIGRATION
+      );
+      
+      if (purchaseStockMigration) {
+        console.log(`\n🔍 Auditing ${PURCHASE_STOCK_MIGRATION} migration state...`);
+        const psaAudit = await auditPurchaseStockApplicationMigration(prisma);
+        
+        console.log('   Migration audit results:');
+        console.log(`   - PurchaseStockApplication table: ${psaAudit.hasPurchaseStockApplicationTable ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - PurchaseLine.stockItemId column: ${psaAudit.hasPurchaseLineStockItemIdColumn ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - PurchaseLine_stockItemId_idx index: ${psaAudit.hasPurchaseLineStockItemIdIndex ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - PurchaseStockApplication indexes: ${psaAudit.hasPurchaseStockApplicationIndexes ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - PurchaseStockApplication foreign keys: ${psaAudit.hasPurchaseStockApplicationForeignKeys ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - All changes applied: ${psaAudit.allChangesApplied ? '✅ YES' : '❌ NO'}`);
+        
+        if (psaAudit.allChangesApplied) {
+          console.log('\n✅ All changes from migration are already applied');
+          console.log('   → Marking migration as applied...');
+          
+          const resolved = await resolveMigrationViaPrisma('applied', PURCHASE_STOCK_MIGRATION);
+          if (!resolved) {
+            console.error('❌ Failed to resolve migration as applied');
+            await printMigrationStatus(prisma, PURCHASE_STOCK_MIGRATION);
+            await prisma.$disconnect();
+            process.exit(1);
+          }
+          
+          const cleared = await verifyMigrationCleared(prisma, PURCHASE_STOCK_MIGRATION);
+          if (!cleared) {
+            console.error('❌ Migration still appears as failed after resolve');
+            await printMigrationStatus(prisma, PURCHASE_STOCK_MIGRATION);
+            await prisma.$disconnect();
+            process.exit(1);
+          }
+          
+          console.log('✅ Migration resolved as applied');
+          console.log('   → Continuing with other migrations...\n');
+        } else {
+          console.error('\n❌ Migration changes are NOT fully applied');
+          console.error('   → Cannot safely mark as applied');
+          console.error('   → Manual intervention required');
+          console.error('\n📋 To fix manually:');
+          console.error('   1. Review the migration SQL: packages/prisma/migrations/20250124130000_add_purchase_stock_application/migration.sql');
+          console.error('   2. Apply missing changes manually or create a hotfix migration');
+          console.error('   3. Then run: pnpm --filter @remember-me/prisma exec prisma migrate resolve --applied 20250124130000_add_purchase_stock_application');
+          await printMigrationStatus(prisma, PURCHASE_STOCK_MIGRATION);
+          await prisma.$disconnect();
+          process.exit(1);
+        }
+      }
+      
+      // Check if there are other failed migrations (besides PurchaseStockApplication)
+      const otherFailedMigrations = failedMigrations.filter(
+        (m) => m.migration_name !== PURCHASE_STOCK_MIGRATION
+      );
+      
+      if (otherFailedMigrations.length > 0) {
+        console.log(`⚠️  ${otherFailedMigrations.length} other failed migration(s) detected`);
+        otherFailedMigrations.forEach((m) => {
+          console.log(`   - ${m.migration_name}`);
+        });
+        console.log('   → These will be handled by standard recovery logic\n');
+      }
+    } else {
+      console.log('✅ No failed migrations found\n');
+    }
+
+    // Check migration status for TARGET_MIGRATION (existing logic)
     console.log(`📋 Checking migration status for: ${TARGET_MIGRATION}`);
     const migrationRecord = await getMigrationRecord(prisma);
 
