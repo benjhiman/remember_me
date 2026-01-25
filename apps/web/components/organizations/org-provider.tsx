@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgStore } from '@/lib/store/org-store';
-import { useOrganizations } from '@/lib/api/hooks/use-organizations';
+import { useOrganizations, AuthError } from '@/lib/api/hooks/use-organizations';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 
 const ORG_LOAD_TIMEOUT = 8000; // 8 seconds max for org loading
+const AUTH_RETRY_DELAY = 1000; // 1 second before retry on AUTH error
 
 /**
  * Organization Provider
@@ -21,12 +23,15 @@ const ORG_LOAD_TIMEOUT = 8000; // 8 seconds max for org loading
  * - Production logging
  */
 export function OrgProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
+  const router = useRouter();
+  const { user, clearAuth } = useAuthStore();
   const { currentOrganizationId, setMemberships, error: orgError } = useOrgStore();
   const { data: orgs, isLoading, error } = useOrganizations();
   const queryClient = useQueryClient();
   const [configError, setConfigError] = useState<string | null>(null);
   const [loadTimeout, setLoadTimeout] = useState(false);
+  const [authRetryAttempted, setAuthRetryAttempted] = useState(false);
+  const authRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check for API configuration error on mount
   useEffect(() => {
@@ -55,6 +60,45 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, orgs]);
 
+  // Handle AUTH_ERROR with intelligent recovery
+  useEffect(() => {
+    if (error instanceof AuthError || (error as any)?.status === 401 || (error as any)?.status === 403) {
+      // Production logging
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+        console.log('[ORG_PROVIDER] 🔐 AUTH_ERROR detected, attempting recovery...');
+      }
+
+      // Retry once after delay
+      if (!authRetryAttempted) {
+        setAuthRetryAttempted(true);
+        
+        authRetryTimeoutRef.current = setTimeout(() => {
+          // Production logging
+          if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+            console.log('[ORG_PROVIDER] 🔄 Retrying organizations fetch after AUTH error...');
+          }
+          
+          // Force refetch
+          queryClient.invalidateQueries({ queryKey: ['organizations'] });
+        }, AUTH_RETRY_DELAY);
+      } else {
+        // Retry failed, logout and redirect
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+          console.error('[ORG_PROVIDER] ❌ AUTH retry failed, logging out...');
+        }
+        
+        clearAuth();
+        router.push('/login');
+      }
+    }
+
+    return () => {
+      if (authRetryTimeoutRef.current) {
+        clearTimeout(authRetryTimeoutRef.current);
+      }
+    };
+  }, [error, authRetryAttempted, queryClient, clearAuth, router]);
+
   // Production logging
   useEffect(() => {
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
@@ -62,7 +106,8 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
         console.log('[ORG_PROVIDER] ✅ Organizations loaded:', orgs.length);
         console.log('[ORG_PROVIDER] Current org:', currentOrganizationId);
       } else if (user && error) {
-        console.error('[ORG_PROVIDER] ❌ Failed to load organizations:', error);
+        const errorType = error instanceof AuthError ? 'AUTH_ERROR' : 'NETWORK_ERROR';
+        console.error(`[ORG_PROVIDER] ❌ Failed to load organizations (${errorType}):`, error);
       }
     }
   }, [user, orgs, error, currentOrganizationId]);
@@ -134,8 +179,33 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Show error state instead of infinite loading
+  // Show error state - differentiate AUTH_ERROR from NETWORK_ERROR
   if (user && (error || orgError)) {
+    const isAuthError = error instanceof AuthError || (error as any)?.status === 401 || (error as any)?.status === 403;
+    
+    // If AUTH_ERROR and retry is in progress, show retry message
+    if (isAuthError && authRetryAttempted && isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center max-w-md p-6">
+            <div className="text-sm text-muted-foreground">Sesión inválida. Reintentando...</div>
+          </div>
+        </div>
+      );
+    }
+    
+    // If AUTH_ERROR and retry failed, redirect will happen via useEffect
+    if (isAuthError && authRetryAttempted && !isLoading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center max-w-md p-6">
+            <div className="text-sm text-muted-foreground">Redirigiendo al login...</div>
+          </div>
+        </div>
+      );
+    }
+    
+    // NETWORK_ERROR - show error with retry
     const errorMessage = (error as Error)?.message || orgError || 'Failed to load organizations';
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

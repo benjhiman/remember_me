@@ -1,13 +1,27 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useOrgStore } from '@/lib/store/org-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Instagram, MessageCircle } from 'lucide-react';
+import { MessageSquare, Instagram, MessageCircle, Loader2 } from 'lucide-react';
 
 export default function InboxPage() {
   const router = useRouter();
+  const { currentOrganization, isLoading } = useOrgStore();
   // Auth is handled by RouteGuard in layout
+  
+  // HARDENING: Don't render Inbox UI without active organization
+  if (isLoading || !currentOrganization) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+          <div className="text-sm text-muted-foreground">Cargando organización...</div>
+        </div>
+      </div>
+    );
+  }
 
   const channels = [
     {

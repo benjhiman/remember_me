@@ -70,6 +70,15 @@ export function AuthHydrationGate({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           clearTimeout(maxTimeout);
           setIsHydrated(true);
+          // Mark auth as ready once hydration is complete
+          useAuthStore.getState().setAuthReady(true);
+          
+          // Production logging
+          if (process.env.NODE_ENV === 'production') {
+            const hasToken = !!state.accessToken;
+            const hasUser = !!state.user;
+            console.log('[AUTH_HYDRATION] ✅ Auth ready:', { hasToken, hasUser });
+          }
         }, 0);
       } catch (error) {
         // If there's an error, wait a bit more
