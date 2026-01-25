@@ -2,8 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['@remember-me/shared'],
-  // Enable standalone output for Docker
-  output: 'standalone',
+  // Note: output: 'standalone' removed - not compatible with Vercel
+  // Vercel handles Next.js deployments automatically
+  // If Docker is needed, use a separate config or conditional
 };
 
 module.exports = nextConfig;
