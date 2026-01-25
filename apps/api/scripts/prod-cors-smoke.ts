@@ -241,6 +241,7 @@ async function verifyDebugCors(): Promise<SmokeResult> {
     const headers = extractHeaders(response);
     const status = response.status;
     const allowOrigin = headers['access-control-allow-origin'];
+    const allowCredentials = headers['access-control-allow-credentials'];
     const appCommit = headers['x-app-commit'];
     
     let body: any = null;
@@ -261,6 +262,7 @@ async function verifyDebugCors(): Promise<SmokeResult> {
       };
     }
 
+    // Check response header ACAO
     if (allowOrigin !== TEST_ORIGIN) {
       return {
         step: 'GET /debug/cors',
@@ -268,10 +270,11 @@ async function verifyDebugCors(): Promise<SmokeResult> {
         status,
         headers,
         body,
-        error: `Expected access-control-allow-origin: ${TEST_ORIGIN}, got: ${allowOrigin || 'missing'}`,
+        error: `Expected access-control-allow-origin in response header: ${TEST_ORIGIN}, got: ${allowOrigin || 'missing'}`,
       };
     }
 
+    // Check body.originReceived
     if (!body || body.originReceived !== TEST_ORIGIN) {
       return {
         step: 'GET /debug/cors',
@@ -283,12 +286,37 @@ async function verifyDebugCors(): Promise<SmokeResult> {
       };
     }
 
+    // Check body.responseHeaders.access-control-allow-origin
+    if (!body.responseHeaders || body.responseHeaders['access-control-allow-origin'] !== TEST_ORIGIN) {
+      return {
+        step: 'GET /debug/cors',
+        success: false,
+        status,
+        headers,
+        body,
+        error: `Expected body.responseHeaders.access-control-allow-origin: ${TEST_ORIGIN}, got: ${body?.responseHeaders?.['access-control-allow-origin'] || 'missing'}`,
+      };
+    }
+
+    // Check corsDecision
+    if (!body.corsDecision || !body.corsDecision.allowed) {
+      return {
+        step: 'GET /debug/cors',
+        success: false,
+        status,
+        headers,
+        body,
+        error: `Expected body.corsDecision.allowed: true, got: ${body?.corsDecision?.allowed || false}`,
+      };
+    }
+
     return {
       step: 'GET /debug/cors',
       success: true,
       status,
       headers: {
         'access-control-allow-origin': allowOrigin,
+        'access-control-allow-credentials': allowCredentials || 'not-set',
         'x-app-commit': appCommit || 'not-set',
       },
       body,
@@ -371,9 +399,12 @@ async function main() {
   if (debugResult.success) {
     console.log(`   ✅ ${debugResult.step} - Status: ${debugResult.status}`);
     console.log(`      - access-control-allow-origin: ${debugResult.headers?.['access-control-allow-origin']}`);
+    console.log(`      - access-control-allow-credentials: ${debugResult.headers?.['access-control-allow-credentials']}`);
     console.log(`      - x-app-commit: ${debugResult.headers?.['x-app-commit']}`);
     console.log(`      - body.originReceived: ${debugResult.body?.originReceived}`);
-    console.log(`      - body.corsAllowed: ${debugResult.body?.corsAllowed}`);
+    console.log(`      - body.originNormalized: ${debugResult.body?.originNormalized}`);
+    console.log(`      - body.corsDecision: ${JSON.stringify(debugResult.body?.corsDecision)}`);
+    console.log(`      - body.responseHeaders.access-control-allow-origin: ${debugResult.body?.responseHeaders?.['access-control-allow-origin']}`);
     console.log(`      - body.requestId: ${debugResult.body?.requestId}`);
   } else {
     console.error(`   ❌ ${debugResult.step}`);

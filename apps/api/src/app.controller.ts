@@ -55,23 +55,53 @@ export class AppController {
 
   @Public()
   @Get('debug/cors')
-  getCorsDebug(@Req() req: Request) {
+  getCorsDebug(@Req() req: Request, @Res() res: Response) {
     const originReceived = (req.headers as any).origin || null;
     const requestId = (req as any).requestId || (req.headers as any)['x-request-id'] || null;
     
-    // Note: allowOriginHeader will be set by CORS middleware, we can't read it here
-    // But we can check if origin was received and if it matches expected pattern
-    const corsAllowed = originReceived 
-      ? (originReceived === 'https://app.iphonealcosto.com' || 
-         originReceived.includes('.iphonealcosto.com') ||
-         originReceived.includes('.vercel.app'))
-      : null;
+    // Normalize origin (same logic as CORS callback)
+    function normalizeOrigin(origin: string): string {
+      return origin.trim().replace(/\/+$/, '');
+    }
+    
+    const originNormalized = originReceived ? normalizeOrigin(originReceived) : null;
+    
+    // Determine CORS decision (same logic as callback)
+    let corsDecision: { allowed: boolean; reason: string } | null = null;
+    if (originReceived) {
+      if (originNormalized === 'https://app.iphonealcosto.com') {
+        corsDecision = { allowed: true, reason: 'exact_match_app_iphonealcosto' };
+      } else if (originNormalized === 'https://iphonealcosto.com' || originNormalized === 'https://www.iphonealcosto.com') {
+        corsDecision = { allowed: true, reason: 'exact_match_main_domains' };
+      } else if (originNormalized?.endsWith('.vercel.app')) {
+        corsDecision = { allowed: true, reason: 'vercel_preview' };
+      } else if (originNormalized?.endsWith('.iphonealcosto.com')) {
+        corsDecision = { allowed: true, reason: 'iphonealcosto_subdomain' };
+      } else if (originNormalized?.startsWith('http://localhost:') || originNormalized?.startsWith('http://127.0.0.1:')) {
+        corsDecision = { allowed: true, reason: 'localhost_dev' };
+      } else {
+        corsDecision = { allowed: false, reason: 'not_allowed' };
+      }
+    }
+    
+    // Read actual response headers set by CORS middleware
+    const responseHeaders = {
+      'access-control-allow-origin': res.getHeader('access-control-allow-origin') || null,
+      'access-control-allow-credentials': res.getHeader('access-control-allow-credentials') || null,
+      'access-control-allow-headers': res.getHeader('access-control-allow-headers') || null,
+      'access-control-allow-methods': res.getHeader('access-control-allow-methods') || null,
+    };
+    
+    const appCommit = res.getHeader('x-app-commit') || null;
     
     return {
       originReceived,
-      corsAllowed,
+      originNormalized,
+      corsDecision,
+      responseHeaders,
       requestId,
-      note: 'cors debug - check response headers for access-control-allow-origin',
+      appCommit,
+      note: 'cors debug - responseHeaders show actual CORS headers sent to browser',
       timestamp: new Date().toISOString(),
     };
   }
