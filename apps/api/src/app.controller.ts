@@ -85,14 +85,22 @@ export class AppController {
     }
     
     // Read actual response headers set by CORS middleware
-    const responseHeaders = {
-      'access-control-allow-origin': res.getHeader('access-control-allow-origin') || null,
-      'access-control-allow-credentials': res.getHeader('access-control-allow-credentials') || null,
-      'access-control-allow-headers': res.getHeader('access-control-allow-headers') || null,
-      'access-control-allow-methods': res.getHeader('access-control-allow-methods') || null,
+    // Note: getHeader returns string | string[] | number | undefined
+    const getHeaderString = (name: string): string | null => {
+      const value = res.getHeader(name);
+      if (value === undefined) return null;
+      if (Array.isArray(value)) return value[0] || null;
+      return String(value);
     };
     
-    const appCommit = res.getHeader('x-app-commit') || null;
+    const responseHeaders = {
+      'access-control-allow-origin': getHeaderString('access-control-allow-origin'),
+      'access-control-allow-credentials': getHeaderString('access-control-allow-credentials'),
+      'access-control-allow-headers': getHeaderString('access-control-allow-headers'),
+      'access-control-allow-methods': getHeaderString('access-control-allow-methods'),
+    };
+    
+    const appCommit = getHeaderString('x-app-commit');
     
     return {
       originReceived,
