@@ -55,8 +55,8 @@ export class AppController {
   @Public()
   @Get('debug/cors')
   getCorsDebug(@Req() req: Request) {
-    const originReceived = (req.headers.origin as string) || null;
-    const requestId = (req as any).requestId || (req.headers['x-request-id'] as string) || null;
+    const originReceived = req.get('origin') || null;
+    const requestId = (req as any).requestId || req.get('x-request-id') || null;
     
     // Note: allowOriginHeader will be set by CORS middleware, we can't read it here
     // But we can check if origin was received and if it matches expected pattern
