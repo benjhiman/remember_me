@@ -39,6 +39,38 @@ interface DatabaseAudit {
   organizationCount: number | null;
   coreTablesMissing: string[];
   hasPurchaseTable: boolean;
+  allTables: string[];
+  emptyReason: string;
+}
+
+interface DatabaseFingerprint {
+  host: string;
+  port: string;
+  database: string;
+  username: string;
+  fingerprint: string;
+}
+
+function getDatabaseFingerprint(dbUrl: string): DatabaseFingerprint {
+  try {
+    const parsed = new URL(dbUrl);
+    const fingerprint = `host=${parsed.hostname} port=${parsed.port || '5432'} db=${parsed.pathname.replace('/', '')} user=${parsed.username}`;
+    return {
+      host: parsed.hostname || 'unknown',
+      port: parsed.port || '5432',
+      database: parsed.pathname.replace('/', '') || 'unknown',
+      username: parsed.username || 'unknown',
+      fingerprint,
+    };
+  } catch (error) {
+    return {
+      host: 'unknown',
+      port: 'unknown',
+      database: 'unknown',
+      username: 'unknown',
+      fingerprint: 'unknown',
+    };
+  }
 }
 
 function redactDatabaseUrl(dbUrl: string): string {
@@ -51,7 +83,6 @@ function redactDatabaseUrl(dbUrl: string): string {
     }
     return url.format(parsed);
   } catch {
-    // If parsing fails, just redact after @
     const atIndex = dbUrl.indexOf('@');
     if (atIndex > 0) {
       const beforeAt = dbUrl.substring(0, dbUrl.indexOf(':', dbUrl.indexOf('://') + 3) + 1);
@@ -67,6 +98,30 @@ function getDatabaseHostname(dbUrl: string): string {
     return parsed.hostname || 'unknown';
   } catch {
     return 'unknown';
+  }
+}
+
+let initialFingerprint: DatabaseFingerprint | null = null;
+
+function verifyFingerprintConsistency(dbUrl: string, step: string): void {
+  const currentFingerprint = getDatabaseFingerprint(dbUrl);
+  
+  if (!initialFingerprint) {
+    initialFingerprint = currentFingerprint;
+    return;
+  }
+
+  if (
+    initialFingerprint.host !== currentFingerprint.host ||
+    initialFingerprint.port !== currentFingerprint.port ||
+    initialFingerprint.database !== currentFingerprint.database ||
+    initialFingerprint.username !== currentFingerprint.username
+  ) {
+    throw new Error(
+      `DATABASE_URL MISMATCH BETWEEN STEPS\n` +
+      `Initial: ${initialFingerprint.fingerprint}\n` +
+      `Current (${step}): ${currentFingerprint.fingerprint}`
+    );
   }
 }
 
@@ -107,11 +162,30 @@ function isFailed(record: MigrationRecord): boolean {
 
 async function auditDatabase(prisma: PrismaClient): Promise<DatabaseAudit> {
   try {
-    // Check if Organization table exists
-    const orgTable = await prisma.$queryRaw<Array<{ exists: boolean }>>`
-      SELECT (to_regclass('public."Organization"') IS NOT NULL) as exists
+    // Query ALL tables from information_schema (REAL query, no assumptions)
+    const tablesResult = await prisma.$queryRaw<Array<{ tablename: string }>>`
+      SELECT tablename 
+      FROM pg_tables 
+      WHERE schemaname = 'public' 
+      ORDER BY tablename
     `;
-    const hasOrganizationTable = (orgTable[0] as any).exists === true;
+
+    const allTables = tablesResult.map((t) => t.tablename);
+    
+    // Check specific core tables
+    const hasOrganizationTable = allTables.includes('Organization');
+    const hasPurchaseTable = allTables.includes('Purchase');
+    const hasUserTable = allTables.includes('User');
+
+    // Check core tables
+    const coreTables = ['Organization', 'User', 'Purchase', 'PurchaseLine', 'Customer', 'Vendor'];
+    const coreTablesMissing: string[] = [];
+    
+    for (const table of coreTables) {
+      if (!allTables.includes(table)) {
+        coreTablesMissing.push(table);
+      }
+    }
 
     let organizationCount: number | null = null;
     if (hasOrganizationTable) {
@@ -125,29 +199,25 @@ async function auditDatabase(prisma: PrismaClient): Promise<DatabaseAudit> {
       }
     }
 
-    // Check core tables
-    const coreTables = ['Organization', 'User', 'Purchase', 'PurchaseLine', 'Customer', 'Vendor'];
-    const coreTablesMissing: string[] = [];
-    
-    for (const table of coreTables) {
-      const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
-        SELECT (to_regclass($1) IS NOT NULL) as exists
-      `, `public."${table}"`);
-      if (!(result[0] as any).exists) {
-        coreTablesMissing.push(table);
-      }
+    // Determine if database is empty/incomplete (IRREFUTABLE LOGIC)
+    let isDatabaseEmpty = false;
+    let emptyReason = '';
+
+    if (allTables.length <= 1 && allTables.includes('_prisma_migrations')) {
+      isDatabaseEmpty = true;
+      emptyReason = 'Only _prisma_migrations table exists';
+    } else if (!hasPurchaseTable) {
+      isDatabaseEmpty = true;
+      emptyReason = 'Purchase table missing';
+    } else if (!hasOrganizationTable) {
+      isDatabaseEmpty = true;
+      emptyReason = 'Organization table missing';
+    } else if (!hasUserTable) {
+      isDatabaseEmpty = true;
+      emptyReason = 'User table missing';
+    } else {
+      emptyReason = 'Database has core tables';
     }
-
-    const hasPurchaseTable = !coreTablesMissing.includes('Purchase');
-
-    // Database is empty if:
-    // - Organization table doesn't exist
-    // - OR Organization exists but has 0 rows
-    // - OR missing core tables (especially Purchase)
-    const isDatabaseEmpty = 
-      !hasOrganizationTable || 
-      (hasOrganizationTable && organizationCount === 0) ||
-      (coreTablesMissing.length > 0 && !hasOrganizationTable);
 
     return {
       isDatabaseEmpty,
@@ -155,6 +225,8 @@ async function auditDatabase(prisma: PrismaClient): Promise<DatabaseAudit> {
       organizationCount,
       coreTablesMissing,
       hasPurchaseTable,
+      allTables: allTables.slice(0, 30), // First 30 tables
+      emptyReason,
     };
   } catch (error) {
     console.error('❌ Error auditing database:', error);
@@ -229,8 +301,6 @@ async function cleanupPartialTables(prisma: PrismaClient, state: DatabaseState):
   console.log('🧹 Cleaning up partial tables (if needed)...');
 
   try {
-    // Only drop tables if they exist and might cause issues
-    // We keep columns in Purchase as they're safe
     if (state.hasCustomerBalanceSnapshot) {
       console.log('   → Dropping CustomerBalanceSnapshot table...');
       await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "CustomerBalanceSnapshot" CASCADE;');
@@ -264,6 +334,11 @@ async function resolveMigrationViaPrisma(action: 'rolled-back' | 'applied', migr
   console.log(`📝 Attempting to resolve migration as ${action} via Prisma CLI...`);
   try {
     const monorepoRoot = getMonorepoRoot();
+    
+    // Verify fingerprint before executing
+    if (process.env.DATABASE_URL) {
+      verifyFingerprintConsistency(process.env.DATABASE_URL, `resolve-${action}`);
+    }
     
     execSync(
       `pnpm --filter @remember-me/prisma exec prisma migrate resolve --${action} ${migrationName}`,
@@ -331,17 +406,41 @@ async function printMigrationStatus(prisma: PrismaClient): Promise<void> {
 
 async function runDbPush(): Promise<void> {
   console.log('🔨 Running prisma db push --accept-data-loss...');
+  
+  // Verify fingerprint before db push
+  if (process.env.DATABASE_URL) {
+    verifyFingerprintConsistency(process.env.DATABASE_URL, 'db-push');
+    const fingerprint = getDatabaseFingerprint(process.env.DATABASE_URL);
+    console.log(`DB_FINGERPRINT (before db push) => ${fingerprint.fingerprint}`);
+  }
+  
   try {
     const monorepoRoot = getMonorepoRoot();
     
-    execSync(
-      `pnpm --filter @remember-me/prisma exec prisma db push --accept-data-loss`,
-      { 
-        stdio: 'inherit', 
-        cwd: monorepoRoot,
-        env: { ...process.env }
-      }
-    );
+    // Capture stdout and stderr
+    let stdout = '';
+    let stderr = '';
+    
+    try {
+      const output = execSync(
+        `pnpm --filter @remember-me/prisma exec prisma db push --accept-data-loss`,
+        { 
+          stdio: 'pipe',
+          encoding: 'utf8',
+          cwd: monorepoRoot,
+          env: { ...process.env }
+        }
+      );
+      stdout = output.toString();
+      console.log(stdout);
+    } catch (error: any) {
+      stdout = error.stdout?.toString() || '';
+      stderr = error.stderr?.toString() || '';
+      console.log('STDOUT:', stdout);
+      console.error('STDERR:', stderr);
+      throw error;
+    }
+    
     console.log('✅ prisma db push completed successfully');
   } catch (error) {
     console.error('❌ prisma db push failed:', error);
@@ -349,8 +448,41 @@ async function runDbPush(): Promise<void> {
   }
 }
 
+async function validatePurchaseTableWithSQL(prisma: PrismaClient): Promise<boolean> {
+  console.log('🔍 Validating Purchase table with SQL (to_regclass)...');
+  try {
+    const result = await prisma.$queryRaw<Array<{ purchase_table: string | null }>>`
+      SELECT to_regclass('public."Purchase"') AS purchase_table
+    `;
+    
+    const purchaseTable = result[0]?.purchase_table;
+    const exists = purchaseTable !== null && purchaseTable !== '';
+    
+    console.log(`   → to_regclass('public."Purchase"') = ${purchaseTable || 'NULL'}`);
+    
+    if (!exists) {
+      console.error('❌ Purchase table validation FAILED - table does not exist');
+      return false;
+    }
+    
+    console.log('✅ DB PUSH VALIDATED — Purchase table exists');
+    return true;
+  } catch (error) {
+    console.error('❌ Error validating Purchase table:', error);
+    return false;
+  }
+}
+
 async function runMigrateDeploy(rescueMode: boolean = false): Promise<boolean> {
   console.log('🚀 Running prisma migrate deploy...');
+  
+  // Verify fingerprint before migrate deploy
+  if (process.env.DATABASE_URL) {
+    verifyFingerprintConsistency(process.env.DATABASE_URL, 'migrate-deploy');
+    const fingerprint = getDatabaseFingerprint(process.env.DATABASE_URL);
+    console.log(`DB_FINGERPRINT (before migrate deploy) => ${fingerprint.fingerprint}`);
+  }
+  
   try {
     const monorepoRoot = getMonorepoRoot();
     
@@ -364,24 +496,26 @@ async function runMigrateDeploy(rescueMode: boolean = false): Promise<boolean> {
     );
     console.log('✅ prisma migrate deploy completed successfully');
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ prisma migrate deploy failed:', error);
+    
+    // Check if error is about Purchase not existing (DATABASE_URL mismatch)
+    const errorMessage = error.message || error.toString() || '';
+    if (errorMessage.includes('relation "Purchase" does not exist') || errorMessage.includes('42P01')) {
+      console.error('\n🚨 CRITICAL ERROR: DATABASE_URL USED BY MIGRATE DEPLOY IS DIFFERENT FROM DB PUSH');
+      if (initialFingerprint) {
+        const currentFingerprint = getDatabaseFingerprint(process.env.DATABASE_URL || '');
+        console.error(`Initial fingerprint: ${initialFingerprint.fingerprint}`);
+        console.error(`Current fingerprint: ${currentFingerprint.fingerprint}`);
+      }
+      throw new Error('DATABASE_URL mismatch detected - Purchase table exists but migrate deploy cannot see it');
+    }
+    
     if (rescueMode) {
       console.log('⚠️  RESCUE MODE: Continuing despite migration failure');
       return false;
     }
     throw error;
-  }
-}
-
-async function validatePurchaseTable(prisma: PrismaClient): Promise<boolean> {
-  try {
-    const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
-      SELECT (to_regclass('public."Purchase"') IS NOT NULL) as exists
-    `;
-    return (result[0] as any).exists === true;
-  } catch {
-    return false;
   }
 }
 
@@ -394,49 +528,61 @@ async function main() {
     process.exit(1);
   }
 
-  // PASO 1: Log DATABASE_URL (redactado) y hostname
+  // PASO 1: Fingerprint IRREFUTABLE del DATABASE_URL
+  const fingerprint = getDatabaseFingerprint(process.env.DATABASE_URL);
+  initialFingerprint = fingerprint;
+  
+  console.log('📡 DATABASE FINGERPRINT:');
+  console.log(`DB_FINGERPRINT => ${fingerprint.fingerprint}`);
+  console.log(`   - host: ${fingerprint.host}`);
+  console.log(`   - port: ${fingerprint.port}`);
+  console.log(`   - database: ${fingerprint.database}`);
+  console.log(`   - username: ${fingerprint.username}`);
+  console.log(`   - process.cwd(): ${process.cwd()}`);
+  console.log(`   - NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+  console.log(`   - RAILWAY_ENVIRONMENT: ${process.env.RAILWAY_ENVIRONMENT || 'not set'}\n`);
+
   const redactedUrl = redactDatabaseUrl(process.env.DATABASE_URL);
-  const hostname = getDatabaseHostname(process.env.DATABASE_URL);
-  console.log(`📡 Database connection:`);
-  console.log(`   - DATABASE_URL: ${redactedUrl}`);
-  console.log(`   - Hostname: ${hostname}\n`);
+  console.log(`   - DATABASE_URL (redacted): ${redactedUrl}\n`);
 
   const prisma = new PrismaClient();
   const rescueMode = process.env.PRISMA_MIGRATE_MODE === 'rescue';
 
   try {
-    // FASE 2: Detectar DB vacía PRIMERO
-    console.log('📊 Auditing database state...');
+    // PASO 2: Auditoría REAL de la base (SIN SUPOSICIONES)
+    console.log('📊 Auditing database state (REAL queries to information_schema)...');
     const dbAudit = await auditDatabase(prisma);
     
     console.log('\n📋 Database Audit Results:');
-    console.log(`   - isDatabaseEmpty: ${dbAudit.isDatabaseEmpty}`);
+    console.log(`   - allTables (first 30): ${dbAudit.allTables.join(', ') || 'none'}`);
+    console.log(`   - totalTables: ${dbAudit.allTables.length}`);
     console.log(`   - hasOrganizationTable: ${dbAudit.hasOrganizationTable}`);
-    console.log(`   - organizationCount: ${dbAudit.organizationCount}`);
     console.log(`   - hasPurchaseTable: ${dbAudit.hasPurchaseTable}`);
+    console.log(`   - organizationCount: ${dbAudit.organizationCount}`);
     console.log(`   - coreTablesMissing: ${dbAudit.coreTablesMissing.join(', ') || 'none'}`);
+    console.log(`   - isDatabaseEmpty: ${dbAudit.isDatabaseEmpty}`);
+    console.log(`   - emptyReason: ${dbAudit.emptyReason}\n`);
 
-    // CASO A: DB VACÍA
+    // CASO A: DB VACÍA O INCOMPLETA
     if (dbAudit.isDatabaseEmpty) {
-      console.log('\n⚠️  EMPTY DATABASE DETECTED — SAFE REBUILD MODE');
-      console.log('   → Executing db push --accept-data-loss to rebuild schema...\n');
+      console.log('⚠️  EMPTY OR INCOMPLETE DATABASE DETECTED — FORCING DB PUSH');
+      console.log(`   Reason: ${dbAudit.emptyReason}\n`);
       
       await prisma.$disconnect();
       await runDbPush();
       
-      // Validate Purchase table exists
+      // PASO 3: VALIDACIÓN SQL OBLIGATORIA (NO Prisma)
       const prisma2 = new PrismaClient();
-      const purchaseExists = await validatePurchaseTable(prisma2);
+      const purchaseExists = await validatePurchaseTableWithSQL(prisma2);
       await prisma2.$disconnect();
       
       if (!purchaseExists) {
-        console.error('❌ Purchase table still missing after db push');
-        process.exit(1);
+        throw new Error('DB PUSH FAILED — Purchase table still missing after db push');
       }
       
-      console.log('✅ Purchase table validated');
-      console.log('   → Proceeding with migrate deploy...\n');
+      console.log('✅ Purchase table validated with SQL\n');
       
+      // PASO 4: MIGRATE DEPLOY (UNA SOLA VEZ, SIN LOOP)
       const deploySuccess = await runMigrateDeploy(rescueMode);
       if (!deploySuccess && !rescueMode) {
         process.exit(1);
@@ -445,9 +591,9 @@ async function main() {
     }
 
     // CASO B: DB NO VACÍA - Continuar con recovery normal
-    console.log('\n✅ Database has data - using normal migration flow\n');
+    console.log('✅ Database has data - using normal migration flow\n');
 
-    // PASO 2: Query directo a _prisma_migrations
+    // Check migration status
     console.log(`📋 Checking migration status for: ${TARGET_MIGRATION}`);
     const migrationRecord = await getMigrationRecord(prisma);
 
@@ -491,8 +637,8 @@ async function main() {
       console.log(`   → Logs: ${migrationRecord.logs.substring(0, 300)}...`);
     }
 
-    // PASO 3: Check database state
-    console.log('\n📊 Checking database state...');
+    // Check database state for migration recovery
+    console.log('\n📊 Checking database state for migration recovery...');
     const dbState = await checkDatabaseState(prisma);
     console.log('   Database state:');
     console.log(`   - LedgerAccount table: ${dbState.hasLedgerAccount ? '✅ exists' : '❌ missing'}`);
