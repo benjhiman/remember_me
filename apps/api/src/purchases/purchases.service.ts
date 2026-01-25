@@ -415,6 +415,11 @@ export class PurchasesService {
       updateData.cancelledAt = new Date();
     }
 
+    // Apply stock impact if transitioning to RECEIVED
+    if (dto.status === PurchaseStatus.RECEIVED) {
+      await this.applyPurchaseToStock(organizationId, id, userId);
+    }
+
     const updated = await this.prisma.purchase.update({
       where: { id },
       data: updateData,

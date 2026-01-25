@@ -174,6 +174,132 @@ describe('PurchasesService', () => {
     });
   });
 
+  describe('applyPurchaseToStock', () => {
+    it('should apply stock when transitioning to RECEIVED (idempotent)', async () => {
+      const orgId = 'org-123';
+      const userId = 'user-123';
+      const purchaseId = 'purchase-123';
+      const vendorId = 'vendor-123';
+
+      // Mock purchase
+      mockPrisma.purchase.findFirst.mockResolvedValue({
+        id: purchaseId,
+        organizationId: orgId,
+        vendorId,
+        status: 'APPROVED',
+        lines: [
+          {
+            id: 'line-1',
+            quantity: 5,
+            unitPriceCents: 10000,
+            description: 'Test Item',
+            sku: 'TEST-SKU',
+            stockItemId: null,
+          },
+        ],
+        vendor: { id: vendorId, name: 'Test Vendor' },
+      });
+
+      // Mock idempotency check (not applied yet)
+      mockPrisma.purchaseStockApplication.findUnique.mockResolvedValue(null);
+
+      // Mock stock item creation
+      mockPrisma.stockItem.findFirst.mockResolvedValue(null);
+      mockPrisma.stockItem.create.mockResolvedValue({
+        id: 'stock-1',
+        organizationId: orgId,
+        quantity: 0,
+      });
+
+      // Mock transaction
+      mockPrisma.$transaction.mockImplementation(async (callback) => {
+        return callback({
+          purchaseStockApplication: {
+            create: jest.fn().mockResolvedValue({ id: 'app-1', purchaseId }),
+          },
+          purchaseLine: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+          stockMovement: {
+            create: jest.fn().mockResolvedValue({ id: 'movement-1' }),
+          },
+          stockItem: {
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue({
+              id: 'stock-1',
+              quantity: 0,
+            }),
+            update: jest.fn().mockResolvedValue({ id: 'stock-1', quantity: 5 }),
+          },
+        });
+      });
+
+      // Call transition to RECEIVED
+      await service.transitionPurchase(orgId, purchaseId, userId, {
+        status: 'RECEIVED',
+      });
+
+      // Verify idempotency check was called
+      expect(mockPrisma.purchaseStockApplication.findUnique).toHaveBeenCalledWith({
+        where: { purchaseId },
+      });
+    });
+
+    it('should not duplicate stock movements on retry', async () => {
+      const orgId = 'org-123';
+      const userId = 'user-123';
+      const purchaseId = 'purchase-123';
+
+      // Mock purchase already applied
+      mockPrisma.purchase.findFirst.mockResolvedValue({
+        id: purchaseId,
+        organizationId: orgId,
+        status: 'RECEIVED',
+        receivedAt: new Date(),
+      });
+
+      // Mock idempotency: already applied
+      mockPrisma.purchaseStockApplication.findUnique.mockResolvedValue({
+        id: 'app-1',
+        purchaseId,
+        appliedAt: new Date(),
+      });
+
+      // Call transition again (should be idempotent)
+      await service.transitionPurchase(orgId, purchaseId, userId, {
+        status: 'RECEIVED',
+      });
+
+      // Verify transaction was not called (idempotent)
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('should not apply stock when transitioning to APPROVED', async () => {
+      const orgId = 'org-123';
+      const userId = 'user-123';
+      const purchaseId = 'purchase-123';
+
+      mockPrisma.purchase.findFirst.mockResolvedValue({
+        id: purchaseId,
+        organizationId: orgId,
+        status: 'DRAFT',
+      });
+
+      mockPrisma.purchase.update.mockResolvedValue({
+        id: purchaseId,
+        status: 'APPROVED',
+        approvedAt: new Date(),
+      });
+
+      await service.transitionPurchase(orgId, purchaseId, userId, {
+        status: 'APPROVED',
+      });
+
+      // Verify stock application was not checked
+      expect(mockPrisma.purchaseStockApplication.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
   describe('transitionPurchase', () => {
     it('should reject invalid transition from RECEIVED to CANCELLED', async () => {
       const organizationId = 'org-1';

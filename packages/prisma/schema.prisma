@@ -309,6 +309,7 @@ model StockItem {
   reservations      SaleItem[]
   movements         StockMovement[]
   stockReservations StockReservation[]
+  PurchaseLine      PurchaseLine[]
 
   @@index([organizationId, status])
   @@index([organizationId, model])
@@ -555,13 +556,16 @@ model PurchaseLine {
   unitPriceCents Int
   lineTotalCents Int
   sku            String? // Para futuro mapeo a StockItem
+  stockItemId    String? // Mapeo directo a StockItem si existe
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  purchase  Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  stockItem StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
 
   @@index([purchaseId])
+  @@index([stockItemId])
 }
 
 enum PurchaseStatus {
