@@ -105,6 +105,63 @@ function isFailed(record: MigrationRecord): boolean {
   );
 }
 
+async function auditDatabase(prisma: PrismaClient): Promise<DatabaseAudit> {
+  try {
+    // Check if Organization table exists
+    const orgTable = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      SELECT (to_regclass('public."Organization"') IS NOT NULL) as exists
+    `;
+    const hasOrganizationTable = (orgTable[0] as any).exists === true;
+
+    let organizationCount: number | null = null;
+    if (hasOrganizationTable) {
+      try {
+        const countResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::int as count FROM "Organization"
+        `;
+        organizationCount = Number(countResult[0]?.count || 0);
+      } catch {
+        organizationCount = null;
+      }
+    }
+
+    // Check core tables
+    const coreTables = ['Organization', 'User', 'Purchase', 'PurchaseLine', 'Customer', 'Vendor'];
+    const coreTablesMissing: string[] = [];
+    
+    for (const table of coreTables) {
+      const result = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT (to_regclass($1) IS NOT NULL) as exists
+      `, `public."${table}"`);
+      if (!(result[0] as any).exists) {
+        coreTablesMissing.push(table);
+      }
+    }
+
+    const hasPurchaseTable = !coreTablesMissing.includes('Purchase');
+
+    // Database is empty if:
+    // - Organization table doesn't exist
+    // - OR Organization exists but has 0 rows
+    // - OR missing core tables (especially Purchase)
+    const isDatabaseEmpty = 
+      !hasOrganizationTable || 
+      (hasOrganizationTable && organizationCount === 0) ||
+      (coreTablesMissing.length > 0 && !hasOrganizationTable);
+
+    return {
+      isDatabaseEmpty,
+      hasOrganizationTable,
+      organizationCount,
+      coreTablesMissing,
+      hasPurchaseTable,
+    };
+  } catch (error) {
+    console.error('❌ Error auditing database:', error);
+    throw error;
+  }
+}
+
 async function checkDatabaseState(prisma: PrismaClient): Promise<DatabaseState> {
   try {
     // Check tables using to_regclass (PostgreSQL native)
