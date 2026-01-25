@@ -52,6 +52,29 @@ export class AppController {
     };
   }
 
+  @Public()
+  @Get('debug/cors')
+  getCorsDebug(@Req() req: Request) {
+    const originReceived = (req.headers.origin as string) || null;
+    const requestId = (req as any).requestId || (req.headers['x-request-id'] as string) || null;
+    
+    // Note: allowOriginHeader will be set by CORS middleware, we can't read it here
+    // But we can check if origin was received and if it matches expected pattern
+    const corsAllowed = originReceived 
+      ? (originReceived === 'https://app.iphonealcosto.com' || 
+         originReceived.includes('.iphonealcosto.com') ||
+         originReceived.includes('.vercel.app'))
+      : null;
+    
+    return {
+      originReceived,
+      corsAllowed,
+      requestId,
+      note: 'cors debug - check response headers for access-control-allow-origin',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Get('test-org')
   @UseGuards(JwtAuthGuard)
   testOrganization(@CurrentOrganization() organizationId: string) {

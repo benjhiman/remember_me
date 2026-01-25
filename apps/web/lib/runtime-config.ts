@@ -152,6 +152,7 @@ export function getApiBaseUrl(): string {
 
   if (isProduction) {
     // Production: ALWAYS use hardcoded, ignore env var if different
+    // Normalize: ensure it ends with /api and no trailing slash
     const hardcodedUrl = 'https://api.iphonealcosto.com/api';
     
     if (envUrl && envUrl !== hardcodedUrl) {
@@ -164,7 +165,8 @@ export function getApiBaseUrl(): string {
       (window as any).__API_BASE_LOGGED = true;
     }
     
-    return hardcodedUrl;
+    // Ensure normalized (no trailing slash, always ends with /api)
+    return hardcodedUrl.replace(/\/+$/, '');
   }
 
   // Development/preview: use env var if exists, else localhost

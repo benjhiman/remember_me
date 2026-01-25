@@ -123,6 +123,16 @@ async function bootstrap() {
     console.log('[CORS] Development mode - Allowed origins:', Array.from(allowlist).join(', '));
   }
 
+  // Set X-App-Commit header for version tracking
+  app.use((req: any, res: any, next: any) => {
+    const commitSha = process.env.RAILWAY_GIT_COMMIT_SHA || 
+                      process.env.VERCEL_GIT_COMMIT_SHA || 
+                      process.env.GIT_COMMIT || 
+                      'unknown';
+    res.setHeader('X-App-Commit', commitSha);
+    next();
+  });
+
   // Belt & suspenders: Ensure OPTIONS requests return 204 before routes
   app.use((req: any, res: any, next: any) => {
     if (req.method === 'OPTIONS') {

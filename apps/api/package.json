@@ -36,7 +36,8 @@
     "prisma:diagnose": "ts-node -r tsconfig-paths/register scripts/prisma-diagnose.ts",
     "prisma:db-audit": "ts-node -r tsconfig-paths/register scripts/prisma-db-audit.ts",
     "prod:verify": "ts-node -r tsconfig-paths/register scripts/prod-verify.ts",
-    "cors:verify": "ts-node -r tsconfig-paths/register scripts/cors-verify.ts"
+    "cors:verify": "ts-node -r tsconfig-paths/register scripts/cors-verify.ts",
+    "prod:cors-smoke": "ts-node -r tsconfig-paths/register scripts/prod-cors-smoke.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
