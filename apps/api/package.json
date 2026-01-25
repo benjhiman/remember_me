@@ -34,7 +34,8 @@
     "ops:e2e-seed": "ts-node -r tsconfig-paths/register src/scripts/e2e-seed.ts",
     "prisma:recover": "ts-node -r tsconfig-paths/register scripts/prisma-recover.ts",
     "prisma:diagnose": "ts-node -r tsconfig-paths/register scripts/prisma-diagnose.ts",
-    "prisma:db-audit": "ts-node -r tsconfig-paths/register scripts/prisma-db-audit.ts"
+    "prisma:db-audit": "ts-node -r tsconfig-paths/register scripts/prisma-db-audit.ts",
+    "prod:verify": "ts-node -r tsconfig-paths/register scripts/prod-verify.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
