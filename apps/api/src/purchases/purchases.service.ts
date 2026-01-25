@@ -13,7 +13,7 @@ import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { TransitionPurchaseDto } from './dto/transition-purchase.dto';
 import { ListPurchasesDto } from './dto/list-purchases.dto';
-import { AuditAction, AuditEntityType, PurchaseStatus } from '@remember-me/prisma';
+import { AuditAction, AuditEntityType, PurchaseStatus, StockMovementType } from '@remember-me/prisma';
 
 @Injectable({ scope: Scope.REQUEST })
 export class PurchasesService {
@@ -449,5 +449,206 @@ export class PurchasesService {
     });
 
     return updated;
+  }
+
+  /**
+   * Apply purchase to stock (idempotent)
+   * Creates stock movements and updates stock items when purchase is received
+   */
+  private async applyPurchaseToStock(
+    organizationId: string,
+    purchaseId: string,
+    userId: string,
+  ): Promise<void> {
+    // Check idempotency: if already applied, skip
+    const existing = await this.prisma.purchaseStockApplication.findUnique({
+      where: { purchaseId },
+    });
+
+    if (existing) {
+      // Already applied, skip
+      return;
+    }
+
+    // Get purchase with lines
+    const purchase = await this.prisma.purchase.findFirst({
+      where: {
+        id: purchaseId,
+        organizationId,
+      },
+      include: {
+        lines: true,
+        vendor: true,
+      },
+    });
+
+    if (!purchase) {
+      throw new NotFoundException('Purchase not found');
+    }
+
+    // Use transaction to ensure atomicity
+    await this.prisma.$transaction(async (tx) => {
+      // Create idempotency record first
+      await tx.purchaseStockApplication.create({
+        data: {
+          organizationId,
+          purchaseId,
+          appliedByUserId: userId,
+        },
+      });
+
+      // Process each line
+      for (const line of purchase.lines) {
+        // Find or create stock item
+        let stockItem = null;
+
+        if (line.stockItemId) {
+          // Use existing stock item
+          stockItem = await tx.stockItem.findFirst({
+            where: {
+              id: line.stockItemId,
+              organizationId,
+            },
+          });
+        }
+
+        if (!stockItem && line.sku) {
+          // Try to find by SKU
+          stockItem = await tx.stockItem.findFirst({
+            where: {
+              organizationId,
+              sku: line.sku,
+            },
+          });
+        }
+
+        // If no stock item exists, create a placeholder
+        if (!stockItem) {
+          stockItem = await tx.stockItem.create({
+            data: {
+              organizationId,
+              sku: line.sku || `PURCHASE-${purchaseId}-${line.id}`,
+              model: line.description,
+              quantity: 0, // Will be updated by movement
+              costPrice: line.unitPriceCents / 100,
+              basePrice: line.unitPriceCents / 100,
+              status: 'AVAILABLE',
+              condition: 'NEW',
+              createdById: userId,
+            },
+          });
+
+          // Update PurchaseLine with stockItemId
+          await tx.purchaseLine.update({
+            where: { id: line.id },
+            data: { stockItemId: stockItem.id },
+          });
+        }
+
+        // Get current quantity
+        const quantityBefore = stockItem.quantity || 0;
+        const quantityAfter = quantityBefore + line.quantity;
+
+        // Create stock movement
+        await tx.stockMovement.create({
+          data: {
+            organizationId,
+            stockItemId: stockItem.id,
+            type: StockMovementType.IN,
+            quantity: line.quantity,
+            quantityBefore,
+            quantityAfter,
+            reason: `Purchase received: ${purchase.referenceNumber || purchaseId}`,
+            createdById: userId,
+            metadata: {
+              purchaseId,
+              purchaseLineId: line.id,
+              vendorId: purchase.vendorId,
+              unitPriceCents: line.unitPriceCents,
+              description: line.description,
+            },
+          },
+        });
+
+        // Update stock item quantity
+        await tx.stockItem.update({
+          where: { id: stockItem.id },
+          data: { quantity: quantityAfter },
+        });
+      }
+    });
+
+    // Audit log
+    const requestId = (this.request as any).requestId || null;
+    await this.auditLogService.log({
+      organizationId,
+      actorUserId: userId,
+      requestId,
+      entityType: AuditEntityType.Purchase,
+      entityId: purchaseId,
+      action: AuditAction.ADJUST, // Using ADJUST as closest match
+      metadata: {
+        purchaseId,
+        status: 'RECEIVED',
+        stockApplied: true,
+      },
+    });
+  }
+
+  /**
+   * Get stock impact information for a purchase
+   */
+  async getStockImpact(organizationId: string, purchaseId: string) {
+    const purchase = await this.prisma.purchase.findFirst({
+      where: {
+        id: purchaseId,
+        organizationId,
+      },
+      include: {
+        stockApplication: true,
+        lines: {
+          include: {
+            stockItem: {
+              include: {
+                movements: {
+                  where: {
+                    metadata: {
+                      path: ['purchaseId'],
+                      equals: purchaseId,
+                    },
+                  },
+                  orderBy: { createdAt: 'desc' },
+                  take: 10,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!purchase) {
+      throw new NotFoundException('Purchase not found');
+    }
+
+    const isApplied = !!purchase.stockApplication;
+    const movements = purchase.lines.flatMap((line) =>
+      line.stockItem?.movements || [],
+    );
+
+    return {
+      isApplied,
+      appliedAt: purchase.stockApplication?.appliedAt || null,
+      appliedBy: purchase.stockApplication?.appliedByUserId || null,
+      movements: movements.map((m) => ({
+        id: m.id,
+        stockItemId: m.stockItemId,
+        type: m.type,
+        quantity: m.quantity,
+        createdAt: m.createdAt,
+        reason: m.reason,
+      })),
+      totalMovements: movements.length,
+    };
   }
 }

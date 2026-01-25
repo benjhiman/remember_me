@@ -80,4 +80,14 @@ export class PurchasesController {
   ) {
     return this.purchasesService.transitionPurchase(organizationId, id, user.userId, dto);
   }
+
+  @Get(':id/stock-impact')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission['purchases.read'])
+  async getStockImpact(
+    @CurrentOrganization() organizationId: string,
+    @Param('id') id: string,
+  ) {
+    return this.purchasesService.getStockImpact(organizationId, id);
+  }
 }

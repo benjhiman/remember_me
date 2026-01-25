@@ -78,6 +78,7 @@ model Organization {
   customers                Customer[]
   vendors                  Vendor[]
   purchases                Purchase[]
+  purchaseStockApplications PurchaseStockApplication[] @relation("PurchaseStockApplier")
   ledgerAccounts           LedgerAccount[]
   ledgerCategories         LedgerCategory[]
   customerBalanceSnapshots CustomerBalanceSnapshot[]
