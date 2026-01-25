@@ -24,28 +24,98 @@ async function bootstrap() {
   // Security headers
   app.use(helmet());
 
-  // CORS configuration
-  // ⚠️ PROD SAFETY: Always include production domain in allowed origins
-  const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001'];
-  const prodOrigin = 'https://app.iphonealcosto.com';
+  // CORS configuration - Hardened with callback function for robust origin validation
+  // ⚠️ PROD SAFETY: Always include production domains in allowed origins
   
-  const corsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
-    : defaultOrigins;
-  
-  // Ensure production origin is always included if not in env var
+  // Normalize origin: trim and remove trailing slash
+  function normalizeOrigin(origin: string): string {
+    return origin.trim().replace(/\/+$/, '');
+  }
+
+  // Build allowlist with hardcoded production domains + env vars
   const isProduction = process.env.NODE_ENV === 'production';
-  const finalOrigins = isProduction && !corsOrigins.includes(prodOrigin)
-    ? [...corsOrigins, prodOrigin]
-    : corsOrigins;
+  
+  // Hardcoded production origins (always allowed in prod)
+  const hardcodedProdOrigins = [
+    'https://app.iphonealcosto.com',
+    'https://iphonealcosto.com',
+    'https://www.iphonealcosto.com',
+  ].map(normalizeOrigin);
+
+  // Development origins
+  const devOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+  ].map(normalizeOrigin);
+
+  // Parse CORS_ORIGINS from env (comma-separated)
+  const envOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map(normalizeOrigin).filter(Boolean)
+    : [];
+
+  // Build final allowlist
+  const allowlist = new Set<string>();
+  
+  // Always include dev origins
+  devOrigins.forEach(origin => allowlist.add(origin));
+  
+  // In production, always include hardcoded prod origins
+  if (isProduction) {
+    hardcodedProdOrigins.forEach(origin => allowlist.add(origin));
+  }
+  
+  // Add env origins (normalized)
+  envOrigins.forEach(origin => allowlist.add(origin));
+
+  // CORS origin callback function
+  const corsOriginCallback = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // A) If origin is undefined (curl/server-to-server) => allow
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    // B) Normalize origin
+    const normalizedOrigin = normalizeOrigin(origin);
+
+    // C) Check exact match in allowlist
+    if (allowlist.has(normalizedOrigin)) {
+      callback(null, true);
+      return;
+    }
+
+    // D) Allow Vercel previews (*.vercel.app)
+    if (normalizedOrigin.match(/^https:\/\/[^/]+\.vercel\.app$/)) {
+      callback(null, true);
+      return;
+    }
+
+    // E) Allow custom preview domains (*.iphonealcosto.com)
+    if (normalizedOrigin.match(/^https:\/\/[^/]+\.iphonealcosto\.com$/)) {
+      callback(null, true);
+      return;
+    }
+
+    // F) Origin not allowed
+    const error = new Error(`CORS_NOT_ALLOWED:${normalizedOrigin}`);
+    console.warn(`[CORS] Blocked origin: ${normalizedOrigin}`);
+    callback(error, false);
+  };
 
   app.enableCors({
-    origin: finalOrigins,
+    origin: corsOriginCallback,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'Idempotency-Key', 'X-Organization-Id'],
     exposedHeaders: ['X-Request-Id'],
   });
+
+  // Log CORS configuration on startup
+  if (isProduction) {
+    console.log('[CORS] Production mode - Allowed origins:', Array.from(allowlist).join(', '));
+  } else {
+    console.log('[CORS] Development mode - Allowed origins:', Array.from(allowlist).join(', '));
+  }
 
   // Global validation pipe (strict)
   app.useGlobalPipes(
