@@ -39,6 +39,7 @@ model User {
   createdCustomers      Customer[]         @relation("CustomerCreator")
   createdVendors        Vendor[]           @relation("VendorCreator")
   createdPurchases      Purchase[]         @relation("PurchaseCreator")
+  purchaseStockApplications PurchaseStockApplication[] @relation("PurchaseStockApplier")
 
   @@index([email])
 }
@@ -78,7 +79,6 @@ model Organization {
   customers                Customer[]
   vendors                  Vendor[]
   purchases                Purchase[]
-  purchaseStockApplications PurchaseStockApplication[] @relation("PurchaseStockApplier")
   ledgerAccounts           LedgerAccount[]
   ledgerCategories         LedgerCategory[]
   customerBalanceSnapshots CustomerBalanceSnapshot[]
