@@ -1,5 +1,6 @@
 import { Public } from './common/decorators/public.decorator';
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { CurrentOrganization } from './common/decorators/current-organization.decorator';
