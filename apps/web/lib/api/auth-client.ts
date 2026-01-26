@@ -326,6 +326,24 @@ export async function apiRequest<T>(
   } catch (error) {
     clearTimeout(timeoutId);
 
+    // Log error details in production for debugging
+    const isProduction = typeof window !== 'undefined' && 
+      window.location.hostname !== 'localhost' &&
+      !window.location.hostname.includes('127.0.0.1');
+    
+    if (isProduction && process.env.NODE_ENV === 'production') {
+      const errorDetails = {
+        endpoint,
+        url: buildEndpointUrl(endpoint),
+        errorName: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        requestId,
+        origin: typeof window !== 'undefined' ? window.location.origin : 'SSR',
+      };
+      console.error('[API_REQUEST_ERROR]', JSON.stringify(errorDetails));
+    }
+
     if (error instanceof ApiError) {
       throw error;
     }
@@ -345,7 +363,7 @@ export async function apiRequest<T>(
     // Handle opaque response errors (CORS issue)
     if (error instanceof OpaqueResponseError) {
       throw new ApiError(
-        'OPAQUE_RESPONSE: Response is opaque (possible CORS/proxy issue)',
+        'CORS bloqueado: El servidor no permite conexiones desde este dominio.',
         0,
         ErrorType.CORS,
         { diagnostics: error.diagnostics },
@@ -360,7 +378,7 @@ export async function apiRequest<T>(
     
     if (isAborted) {
       throw new ApiError(
-        'Request timeout. Please check your connection and try again.',
+        'El servidor no responde. Verificá que el API esté disponible.',
         0,
         ErrorType.TIMEOUT,
         undefined,
@@ -378,11 +396,22 @@ export async function apiRequest<T>(
     // Default to NETWORK for "Failed to fetch" unless we have explicit CORS evidence
     const finalErrorType = isCorsError ? ErrorType.CORS : ErrorType.NETWORK;
 
+    // Provide more helpful error message
+    const finalErrorMessage = error instanceof TypeError && errorMessage.includes('Failed to fetch')
+      ? 'No se pudo conectar con el servidor. Verificá tu conexión y que el API esté disponible.'
+      : errorMessage;
+
     throw new ApiError(
-      errorMessage,
+      finalErrorMessage,
       0,
       finalErrorType,
-      undefined,
+      { 
+        originalError: error instanceof Error ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        } : undefined,
+      },
       requestId || undefined,
       error as Error
     );
