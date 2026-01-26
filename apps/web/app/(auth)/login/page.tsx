@@ -153,12 +153,7 @@ function LoginPageContent() {
               }
               break;
             case ErrorType.NETWORK:
-              // Only show "No se pudo conectar" for real network errors (not AUTH)
-              if (!apiBaseUrl || apiBaseUrl.includes('localhost')) {
-                errorMessage = 'API URL no configurada correctamente. Verificá NEXT_PUBLIC_API_BASE_URL.';
-              } else {
-                errorMessage = `No se pudo conectar con el servidor (${apiBaseUrl}). Verificá tu conexión y la configuración del API.`;
-              }
+              errorMessage = 'No se pudo conectar con el servidor. Verificá tu conexión y que el API esté disponible.';
               if (diagnosticInfo) {
                 diagnosticInfo.errorType = 'NETWORK';
                 diagnosticInfo.status = String(status || 'N/A');

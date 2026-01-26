@@ -369,14 +369,14 @@ export async function apiRequest<T>(
       );
     }
 
-    // Check if it's a CORS error (fetch fails before response)
-    const errorMessage = error instanceof Error ? error.message : 'Network error';
+    // For TypeError "Failed to fetch", don't assume CORS - classify as NETWORK by default
+    // Only mark as CORS if we have explicit evidence (opaque response, redirect, etc.)
+    const errorMessage = error instanceof Error ? error.message : 'No se pudo conectar con el servidor. Verificá tu conexión.';
     const isCorsError = errorMessage.toLowerCase().includes('cors') || 
-                       errorMessage.toLowerCase().includes('cross-origin') ||
-                       (error instanceof TypeError && errorMessage.includes('fetch'));
+                       errorMessage.toLowerCase().includes('cross-origin');
 
-    // If it's a CORS-like error, classify as CORS, not generic NETWORK
-    const finalErrorType = isCorsError ? ErrorType.CORS : errorType;
+    // Default to NETWORK for "Failed to fetch" unless we have explicit CORS evidence
+    const finalErrorType = isCorsError ? ErrorType.CORS : ErrorType.NETWORK;
 
     throw new ApiError(
       errorMessage,
