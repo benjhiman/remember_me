@@ -19,7 +19,17 @@ import { fetchWithDiagnostics, RedirectError, OpaqueResponseError } from './fetc
 function buildEndpointUrl(endpoint: string): string {
   const baseUrl = getApiBaseUrlForRequest();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${baseUrl}${cleanEndpoint}`;
+  const fullUrl = `${baseUrl}${cleanEndpoint}`;
+  
+  // Validate URL format
+  try {
+    new URL(fullUrl);
+  } catch (e) {
+    console.error('[API_URL_ERROR] Invalid URL constructed:', { baseUrl, endpoint, fullUrl });
+    throw new Error(`Invalid API URL: ${fullUrl}`);
+  }
+  
+  return fullUrl;
 }
 
 const REQUEST_TIMEOUT = 30000; // 30 seconds
