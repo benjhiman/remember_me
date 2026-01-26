@@ -194,6 +194,11 @@ export async function apiRequest<T>(
   try {
     const url = buildEndpointUrl(endpoint);
     
+    // Logging in production (only on error, to avoid noise)
+    const isProduction = typeof window !== 'undefined' && 
+      window.location.hostname !== 'localhost' &&
+      !window.location.hostname.includes('127.0.0.1');
+    
     // Use fetchWithDiagnostics to detect redirects
     const fetchPromise = fetchWithDiagnostics(url, {
       ...options,
@@ -209,6 +214,22 @@ export async function apiRequest<T>(
 
     clearTimeout(timeoutId);
     responseRequestId = response.headers.get('X-Request-Id');
+    
+    // Log diagnostics in production if response is not OK (for debugging)
+    if (isProduction && !response.ok && process.env.NODE_ENV === 'production') {
+      const finalUrl = response.url || url;
+      const redirected = response.redirected || false;
+      const responseType = response.type;
+      console.warn('[API_REQUEST]', JSON.stringify({
+        endpoint,
+        finalUrl,
+        status: response.status,
+        redirected,
+        responseType,
+        requestId,
+        origin: typeof window !== 'undefined' ? window.location.origin : 'SSR',
+      }));
+    }
 
     // Handle 401 - try to refresh token (only once)
     if (response.status === 401 && refreshToken && accessToken) {

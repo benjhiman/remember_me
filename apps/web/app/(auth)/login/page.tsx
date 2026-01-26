@@ -121,7 +121,7 @@ function LoginPageContent() {
         } else {
           switch (errorType) {
             case ErrorType.CORS:
-              errorMessage = 'Error de configuración CORS. El servidor no permite conexiones desde este dominio.';
+              errorMessage = 'CORS bloqueado: El servidor no permite conexiones desde este dominio.';
               if (diagnosticInfo) {
                 diagnosticInfo.errorType = 'CORS';
               }

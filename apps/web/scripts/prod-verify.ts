@@ -24,9 +24,15 @@ async function verifyHealthEndpoint(): Promise<VerificationResult> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+    // Test with Origin header (simulating browser request)
+    const TEST_ORIGIN = 'https://app.iphonealcosto.com';
+    
     const response = await fetch(`${API_BASE_URL}/health`, {
       signal: controller.signal,
       credentials: 'include',
+      headers: {
+        'Origin': TEST_ORIGIN,
+      },
     });
 
     clearTimeout(timeoutId);
@@ -35,16 +41,28 @@ async function verifyHealthEndpoint(): Promise<VerificationResult> {
       throw new Error(`Health check failed: ${response.status} ${response.statusText}`);
     }
 
+    // Verify CORS headers
+    const allowOrigin = response.headers.get('access-control-allow-origin');
+    const allowCredentials = response.headers.get('access-control-allow-credentials');
+    
+    if (allowOrigin !== TEST_ORIGIN) {
+      throw new Error(`CORS header mismatch: expected ${TEST_ORIGIN}, got ${allowOrigin || 'missing'}`);
+    }
+    
+    if (allowCredentials !== 'true') {
+      throw new Error(`CORS credentials missing: expected true, got ${allowCredentials || 'missing'}`);
+    }
+
     const duration = Date.now() - startTime;
     return {
-      step: 'Health Check',
+      step: 'Health Check (with CORS)',
       success: true,
       duration,
     };
   } catch (error: any) {
     const duration = Date.now() - startTime;
     return {
-      step: 'Health Check',
+      step: 'Health Check (with CORS)',
       success: false,
       duration,
       error: error.message || 'Unknown error',
