@@ -163,13 +163,8 @@ async function bootstrap() {
     next();
   });
 
-  // Belt & suspenders: Ensure OPTIONS requests return 204 before routes
-  app.use((req: any, res: any, next: any) => {
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(204);
-    }
-    next();
-  });
+  // NOTE: enableCors already handles OPTIONS requests correctly
+  // We don't need a separate OPTIONS handler
 
   // Global validation pipe (strict)
   app.useGlobalPipes(
