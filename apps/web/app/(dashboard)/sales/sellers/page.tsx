@@ -3,6 +3,7 @@
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useMe } from '@/lib/api/hooks/use-me';
 import { PageShell } from '@/components/layout/page-shell';
+import { OwnerOnlyDenied } from '@/components/ui/owner-only-denied';
 import { Button } from '@/components/ui/button';
 import { Users, UserPlus } from 'lucide-react';
 
@@ -19,16 +20,8 @@ export default function SellersPage() {
 
   if (!isOwner) {
     return (
-      <PageShell title="Sin acceso" breadcrumbs={breadcrumbs}>
-        <div className="p-12 text-center">
-          <div className="max-w-sm mx-auto">
-            <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">No tenés acceso</h3>
-            <p className="text-xs text-gray-600 mb-4">
-              Esta sección está disponible solo para OWNER.
-            </p>
-          </div>
-        </div>
+      <PageShell title="Vendedores" breadcrumbs={breadcrumbs}>
+        <OwnerOnlyDenied backHref="/sales" />
       </PageShell>
     );
   }

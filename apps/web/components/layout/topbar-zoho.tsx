@@ -16,14 +16,14 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils/cn';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { OrgSwitcher } from '@/components/organizations/org-switcher';
-import { useTheme } from '@/components/providers/theme-provider';
+import { useTheme } from 'next-themes';
 import { Moon, Sun } from 'lucide-react';
 
 export function TopbarZoho() {
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
   const [searchFocused, setSearchFocused] = useState(false);
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const handleLogout = () => {
     clearAuth();
@@ -102,6 +102,19 @@ export function TopbarZoho() {
         <button className="h-9 w-9 p-0 text-white hover:bg-white/10 rounded-md transition-colors flex items-center justify-center relative">
           <Bell className="h-5 w-5" />
           <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full border border-blue-800" />
+        </button>
+
+        {/* Theme Toggle */}
+        <button
+          className="h-9 w-9 p-0 text-white hover:bg-white/10 rounded-md transition-colors flex items-center justify-center"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="h-5 w-5" />
+          ) : (
+            <Moon className="h-5 w-5" />
+          )}
         </button>
 
         {/* Settings */}

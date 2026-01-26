@@ -40,6 +40,7 @@ model User {
   createdVendors            Vendor[]                   @relation("VendorCreator")
   createdPurchases          Purchase[]                 @relation("PurchaseCreator")
   purchaseStockApplications PurchaseStockApplication[] @relation("PurchaseStockApplier")
+  createdJournalEntries     JournalEntry[]             @relation("JournalEntryCreator")
 
   @@index([email])
 }
@@ -77,9 +78,10 @@ model Organization {
   metaAttributionSnapshots MetaAttributionSnapshot[]
   MetaSpendDaily           MetaSpendDaily[]
   customers                Customer[]
+  ledgerAccounts           LedgerAccount[]
+  journalEntries           JournalEntry[]
   vendors                  Vendor[]
   purchases                Purchase[]
-  ledgerAccounts           LedgerAccount[]
   ledgerCategories         LedgerCategory[]
   customerBalanceSnapshots CustomerBalanceSnapshot[]
   PurchaseStockApplication PurchaseStockApplication[]
@@ -586,11 +588,13 @@ model LedgerAccount {
   code           String // Account code (e.g., "1000", "2000")
   name           String
   type           String // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  currency       String   @default("ARS") // ISO currency code
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  journalLines  JournalLine[]
 
   @@unique([organizationId, code])
   @@index([organizationId, type])
@@ -624,6 +628,45 @@ model CustomerBalanceSnapshot {
   @@unique([organizationId, customerId, asOfDate])
   @@index([organizationId, customerId])
   @@index([organizationId, asOfDate])
+}
+
+// ===== JOURNAL ENTRIES (Accounting-Lite) =====
+
+model JournalEntry {
+  id             String   @id @default(cuid())
+  organizationId String
+  date           DateTime @db.Date
+  memo           String?  @db.Text
+  sourceType     String? // "SALE", "PURCHASE", "MANUAL", etc.
+  sourceId       String? // ID of source record (saleId, purchaseId, etc.)
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation("JournalEntryCreator", fields: [createdById], references: [id])
+  lines        JournalLine[]
+
+  @@index([organizationId, date])
+  @@index([organizationId, sourceType, sourceId])
+  @@index([organizationId, createdById])
+}
+
+model JournalLine {
+  id            String   @id @default(cuid())
+  entryId       String
+  accountId     String
+  debit         Decimal  @db.Decimal(18, 2) @default(0)
+  credit        Decimal  @db.Decimal(18, 2) @default(0)
+  memo          String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  entry   JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([entryId])
+  @@index([accountId])
 }
 
 // ===== PURCHASE STOCK APPLICATION (Idempotency) =====

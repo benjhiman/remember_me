@@ -30,6 +30,10 @@ import {
   Wrench,
   ShoppingBag,
   BookOpen,
+  Lock,
+  List,
+  Receipt,
+  Gift,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -39,6 +43,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   permission: Permission;
   children?: NavItem[];
+  ownerOnly?: boolean; // If true, show owner badge/icon
 }
 
 const navItems: NavItem[] = [
@@ -57,6 +62,25 @@ const navItems: NavItem[] = [
   { href: '/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
   { href: '/leads/board', label: 'Kanban', icon: KanbanSquare, permission: Permission.VIEW_LEADS },
   {
+    href: '/items',
+    label: 'Items',
+    icon: Package,
+    permission: Permission.VIEW_DASHBOARD, // Visible if logged in
+    children: [
+      { href: '/items/items', label: 'Items', icon: Package, permission: Permission.VIEW_DASHBOARD },
+      { href: '/items/price-lists', label: 'Price Lists', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
+    ],
+  },
+  {
+    href: '/inventory',
+    label: 'Inventory',
+    icon: PackageCheck,
+    permission: Permission.VIEW_DASHBOARD, // Visible if logged in
+    children: [
+      { href: '/inventory/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_DASHBOARD },
+    ],
+  },
+  {
     href: '/stock',
     label: 'Stock',
     icon: Package,
@@ -73,21 +97,28 @@ const navItems: NavItem[] = [
     children: [
       { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
       { href: '/sales/customers', label: 'Clientes', icon: Users, permission: Permission.VIEW_CUSTOMERS },
-      { href: '/sales/sellers', label: 'Vendedores', icon: Users, permission: Permission.VIEW_SALES }, // Owner-only (checked in page)
+      { href: '/sales/sellers', label: 'Vendedores', icon: Users, permission: Permission.VIEW_SALES, ownerOnly: true }, // Owner-only (checked in page)
     ],
   },
   {
-    href: '/sales/purchases',
+    href: '/purchases',
     label: 'Purchases',
     icon: ShoppingBag,
     permission: Permission.VIEW_PURCHASES,
     children: [
-      { href: '/sales/vendors', label: 'Proveedores', icon: Building2, permission: Permission.VIEW_VENDORS },
-      { href: '/sales/purchases', label: 'Compras', icon: ShoppingBag, permission: Permission.VIEW_PURCHASES },
+      { href: '/purchases/vendors', label: 'Proveedores', icon: Building2, permission: Permission.VIEW_VENDORS },
+      { href: '/purchases/expenses', label: 'Gastos', icon: Receipt, permission: Permission.VIEW_PURCHASES },
+      { href: '/purchases/bills', label: 'Facturas', icon: FileText, permission: Permission.VIEW_PURCHASES },
+      { href: '/purchases/payments-made', label: 'Pagos Enviados', icon: CreditCard, permission: Permission.VIEW_PURCHASES },
+      { href: '/purchases/vendor-credits', label: 'Créditos a Favor', icon: Gift, permission: Permission.VIEW_PURCHASES },
+      // Legacy routes (keep for compatibility)
+      { href: '/sales/vendors', label: 'Proveedores (legacy)', icon: Building2, permission: Permission.VIEW_VENDORS },
+      { href: '/sales/purchases', label: 'Compras (legacy)', icon: ShoppingBag, permission: Permission.VIEW_PURCHASES },
     ],
   },
   { href: '/pricing', label: 'Pricing', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
   { href: '/ads', label: 'Meta Ads', icon: Megaphone, permission: Permission.VIEW_INTEGRATIONS },
+  { href: '/reports', label: 'Reports', icon: BarChart3, permission: Permission.VIEW_DASHBOARD },
   {
     href: '/settings',
     label: 'Settings',
@@ -130,10 +161,20 @@ function NavItemComponent({
     <>
       <Icon className="h-5 w-5 flex-shrink-0" />
       <span className="truncate">{item.label}</span>
+      {item.ownerOnly && !hasChildren && (
+        <div className="ml-auto" title="Solo Owner">
+          <Lock className="h-3.5 w-3.5 text-gray-400" />
+        </div>
+      )}
       {hasChildren && (
         <ChevronRight
           className={cn('ml-auto h-4 w-4 transition-transform', isOpen && 'rotate-90')}
         />
+      )}
+      {item.ownerOnly && hasChildren && (
+        <div className="ml-1" title="Solo Owner">
+          <Lock className="h-3.5 w-3.5 text-gray-400" />
+        </div>
       )}
     </>
   );
