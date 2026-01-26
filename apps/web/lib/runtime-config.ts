@@ -155,7 +155,8 @@ export function getApiBaseUrl(): string {
     // Normalize: ensure it ends with /api and no trailing slash
     const hardcodedUrl = 'https://api.iphonealcosto.com/api';
     
-    if (envUrl && envUrl !== hardcodedUrl) {
+    // Only warn if env var exists and is actually different (not just the same value)
+    if (envUrl && envUrl.trim() !== hardcodedUrl && envUrl.trim() !== hardcodedUrl.replace(/\/+$/, '')) {
       console.warn(`[API_BASE] ⚠️ NEXT_PUBLIC_API_BASE_URL differs from hardcoded: ${envUrl}. Using hardcoded: ${hardcodedUrl}`);
     }
     
