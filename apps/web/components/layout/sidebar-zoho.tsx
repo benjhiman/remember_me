@@ -34,6 +34,8 @@ import {
   List,
   Receipt,
   Gift,
+  ClipboardList,
+  Asterisk,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -71,15 +73,15 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    href: '/inventory',
+    href: '/inventory/stock',
     label: 'Inventory',
-    icon: PackageCheck,
+    icon: ClipboardList,
     permission: Permission.VIEW_DASHBOARD, // Visible if logged in
     children: [
-      { href: '/items', label: 'Items', icon: Package, permission: Permission.VIEW_DASHBOARD },
-      { href: '/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
-      { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
-      { href: '/items/price-lists', label: 'Price List', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
+      { href: '/inventory/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
+      { href: '/inventory/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
+      { href: '/inventory/items', label: 'Items', icon: Asterisk, permission: Permission.VIEW_DASHBOARD },
+      { href: '/inventory/price-lists', label: 'Price List', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
     ],
   },
   {
@@ -125,25 +127,101 @@ const navItems: NavItem[] = [
 
 const toolsItems: NavItem[] = [];
 
+// Helper to normalize pathname for legacy routes
+function normalizePathname(pathname: string | null): string | null {
+  if (!pathname) return null;
+  
+  // Map legacy routes to inventory routes for active state matching
+  const legacyMap: Record<string, string> = {
+    '/stock': '/inventory/stock',
+    '/stock/reservations': '/inventory/reservations',
+    '/items': '/inventory/items',
+    '/items/price-lists': '/inventory/price-lists',
+  };
+  
+  // Check if pathname matches a legacy route exactly or starts with it
+  for (const [legacy, inventory] of Object.entries(legacyMap)) {
+    if (pathname === legacy || pathname.startsWith(legacy + '/')) {
+      return pathname.replace(legacy, inventory);
+    }
+  }
+  
+  return pathname;
+}
+
+// Helper to check if a href matches pathname (most specific match)
+function isHrefActive(href: string | undefined, pathname: string | null): boolean {
+  if (!href || !pathname) return false;
+  const normalized = normalizePathname(pathname);
+  if (!normalized) return false;
+  
+  // Exact match
+  if (normalized === href) return true;
+  
+  // Starts with check (for nested routes)
+  if (normalized.startsWith(href + '/')) return true;
+  
+  return false;
+}
+
+// Helper to find the most specific active child
+function findMostSpecificActiveChild(children: NavItem[] | undefined, pathname: string | null): string | null {
+  const normalized = normalizePathname(pathname);
+  if (!normalized || !children) return null;
+  
+  let bestMatch: { href: string; length: number } | null = null;
+  
+  for (const child of children) {
+    if (!child.href) continue;
+    if (isHrefActive(child.href, normalized)) {
+      const length = child.href.length;
+      if (!bestMatch || length > bestMatch.length) {
+        bestMatch = { href: child.href, length };
+      }
+    }
+  }
+  
+  return bestMatch?.href || null;
+}
+
 function NavItemComponent({
   item,
   pathname,
   user,
   level = 0,
+  mostSpecificActiveHref,
 }: {
   item: NavItem;
   pathname: string | null;
   user: any;
   level?: number;
+  mostSpecificActiveHref?: string | null;
 }) {
+  const normalizedPathname = normalizePathname(pathname);
   const [isOpen, setIsOpen] = useState(() => {
     if (!item.children) return false;
-    return item.children.some((child) => pathname === child.href || pathname?.startsWith(child.href + '/'));
+    return item.children.some((child) => isHrefActive(child.href, normalizedPathname));
   });
 
   const Icon = item.icon;
   const hasChildren = item.children && item.children.length > 0;
-  const isActive = item.href && (pathname === item.href || pathname?.startsWith(item.href + '/'));
+  
+  // For parent items, check if any child is active
+  // For child items, check exact match with most specific logic
+  const mostSpecificChild = hasChildren ? findMostSpecificActiveChild(item.children, normalizedPathname) : null;
+  
+  // For child items (level > 0), only mark active if it's the most specific match
+  // For parent items, mark active if href matches or any child is active
+  let isActive: boolean;
+  if (level > 0) {
+    // This is a child item - only active if it's the most specific match
+    // Use the passed mostSpecificActiveHref from parent if available, otherwise calculate
+    const activeHref = mostSpecificActiveHref !== undefined ? mostSpecificActiveHref : mostSpecificChild;
+    isActive = item.href === activeHref;
+  } else {
+    // This is a parent item - active if href matches or any child is active
+    isActive = !!(item.href && (isHrefActive(item.href, normalizedPathname) || !!mostSpecificChild));
+  }
 
   // Purchases is always visible (legacy gating removed temporarily)
   if (item.label !== 'Purchases' && !userCan(user, item.permission)) {
@@ -212,6 +290,7 @@ function NavItemComponent({
                 pathname={pathname}
                 user={user}
                 level={level + 1}
+                mostSpecificActiveHref={mostSpecificChild}
               />
             ))}
           </div>
@@ -244,6 +323,7 @@ function NavItemComponent({
               pathname={pathname}
               user={user}
               level={level + 1}
+              mostSpecificActiveHref={mostSpecificChild}
             />
           ))}
         </div>
