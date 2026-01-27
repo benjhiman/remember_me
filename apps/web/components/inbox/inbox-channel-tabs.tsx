@@ -2,7 +2,8 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
-import { renderChannelIconSmall } from '@/lib/inbox/icons';
+import { MessageCircle } from 'lucide-react';
+import Image from 'next/image';
 import type { Channel } from '@/lib/inbox/mock';
 
 interface InboxChannelTabsProps {
@@ -15,12 +16,6 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
 
   const tabs = [
     {
-      id: 'unificado' as Channel,
-      label: 'Unificado',
-      icon: null, // Use lucide icon
-      href: '/inbox/unificado',
-    },
-    {
       id: 'whatsapp' as Channel,
       label: 'WhatsApp',
       icon: '/icons/whatsapp-mono.svg',
@@ -31,6 +26,12 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
       label: 'Instagram',
       icon: null, // Use lucide icon
       href: '/inbox/instagram',
+    },
+    {
+      id: 'unificado' as Channel,
+      label: 'Unificado',
+      icon: null, // Use lucide icon
+      href: '/inbox/unificado',
     },
   ];
 
@@ -50,7 +51,20 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               )}
             >
-              {renderChannelIconSmall(tab.id)}
+              {tab.icon ? (
+                <Image
+                  src={tab.icon}
+                  alt={tab.label}
+                  width={18}
+                  height={18}
+                  className="w-[18px] h-[18px] opacity-70"
+                  style={{ filter: 'brightness(0) saturate(100%)' }}
+                />
+              ) : tab.id === 'unificado' ? (
+                <MessageCircle className="h-[18px] w-[18px]" />
+              ) : (
+                <MessageCircle className="h-[18px] w-[18px]" />
+              )}
               <span>{tab.label}</span>
             </button>
           );
