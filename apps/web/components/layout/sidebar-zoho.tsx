@@ -35,7 +35,7 @@ import {
   Receipt,
   Gift,
   ClipboardList,
-  Asterisk,
+  Hash,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -79,9 +79,9 @@ const navItems: NavItem[] = [
     permission: Permission.VIEW_DASHBOARD, // Visible if logged in
     children: [
       { href: '/inventory/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
-      { href: '/inventory/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
-      { href: '/inventory/items', label: 'Items', icon: Asterisk, permission: Permission.VIEW_DASHBOARD },
-      { href: '/inventory/price-lists', label: 'Price List', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
+      { href: '/inventory/reservas', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
+      { href: '/inventory/items', label: 'Items', icon: Hash, permission: Permission.VIEW_DASHBOARD },
+      { href: '/inventory/pricelist', label: 'Price List', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
     ],
   },
   {
@@ -131,12 +131,14 @@ const toolsItems: NavItem[] = [];
 function normalizePathname(pathname: string | null): string | null {
   if (!pathname) return null;
   
-  // Map legacy routes to inventory routes for active state matching
+  // Map legacy routes to inventory canonical routes for active state matching
   const legacyMap: Record<string, string> = {
     '/stock': '/inventory/stock',
-    '/stock/reservations': '/inventory/reservations',
+    '/stock/reservations': '/inventory/reservas',
     '/items': '/inventory/items',
-    '/items/price-lists': '/inventory/price-lists',
+    '/items/price-lists': '/inventory/pricelist',
+    '/inventory/reservations': '/inventory/reservas',
+    '/inventory/price-lists': '/inventory/pricelist',
   };
   
   // Check if pathname matches a legacy route exactly or starts with it
