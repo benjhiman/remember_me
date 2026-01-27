@@ -19,6 +19,7 @@ import { VirtualizedConversationList } from '@/components/inbox/virtualized-conv
 import type { ConversationStatus, Message } from '@/types/api';
 import { InboxHeader } from '@/components/inbox/inbox-header';
 import { MessageSquare } from 'lucide-react';
+import Image from 'next/image';
 
 function InboxWhatsAppInner() {
   const router = useRouter();
