@@ -54,8 +54,8 @@ export function InboxHeader({ currentChannel }: { currentChannel?: string }) {
           <SelectTrigger className="w-[140px]">
             <div className="flex items-center gap-2">
               <Image
-                src={getChannelIcon(currentChannelValue as Channel, 'small')}
-                alt={getChannelLabel(currentChannelValue as Channel)}
+                src={getChannelIcon(currentChannelValue, 'small')}
+                alt={getChannelLabel(currentChannelValue)}
                 width={20}
                 height={20}
                 className="h-5 w-5 opacity-70"
