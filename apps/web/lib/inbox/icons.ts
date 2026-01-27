@@ -58,51 +58,12 @@ export const channelIcons: Record<Channel, ChannelIconConfig> = {
   },
 };
 
-// Helper: Render small icon (for tabs, dropdowns, badges)
-export function renderChannelIconSmall(channel: Channel, className?: string) {
-  const config = channelIcons[channel].small;
-  
-  if (config.type === 'svg' && config.src) {
-    return (
-      <Image
-        src={config.src}
-        alt={channelIcons[channel].label}
-        width={18}
-        height={18}
-        className={className || 'w-[18px] h-[18px] opacity-70'}
-        style={{ filter: 'brightness(0) saturate(100%)' }}
-      />
-    );
-  }
-  
-  if (config.type === 'lucide' && config.component) {
-    const Icon = config.component;
-    return <Icon className={className || 'h-[18px] w-[18px]'} />;
-  }
-  
-  return null;
+// Helper: Get small icon config (for tabs, dropdowns, badges)
+export function getChannelIconSmall(channel: Channel) {
+  return channelIcons[channel].small;
 }
 
-// Helper: Render large icon (for empty states, cards)
-export function renderChannelIconLarge(channel: Channel, className?: string) {
-  const config = channelIcons[channel].large;
-  
-  if (config.type === 'svg' && config.src) {
-    return (
-      <Image
-        src={config.src}
-        alt={channelIcons[channel].label}
-        width={64}
-        height={64}
-        className={className || 'w-16 h-16'}
-      />
-    );
-  }
-  
-  if (config.type === 'lucide' && config.component) {
-    const Icon = config.component;
-    return <Icon className={className || 'h-16 w-16 text-muted-foreground'} />;
-  }
-  
-  return null;
+// Helper: Get large icon config (for empty states, cards)
+export function getChannelIconLarge(channel: Channel) {
+  return channelIcons[channel].large;
 }
