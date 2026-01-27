@@ -18,7 +18,7 @@ export function InboxEmptyState({ channel, onOpenApp }: InboxEmptyStateProps) {
           title: 'Conversaciones de WhatsApp',
           description: 'Seleccioná una conversación para comenzar',
           buttonLabel: 'Abrir WhatsApp',
-          icon: '/icons/whatsapp.svg',
+          icon: null, // Use lucide icon instead of SVG with background
         };
       case 'instagram':
         return {
@@ -54,6 +54,10 @@ export function InboxEmptyState({ channel, onOpenApp }: InboxEmptyStateProps) {
             <Image src={content.icon} alt={content.title} width={64} height={64} className="w-16 h-16" />
           </div>
         ) : channel === 'unificado' ? (
+          <div className="flex justify-center mb-4">
+            <MessageSquare className="h-16 w-16 text-muted-foreground" />
+          </div>
+        ) : channel === 'whatsapp' ? (
           <div className="flex justify-center mb-4">
             <MessageSquare className="h-16 w-16 text-muted-foreground" />
           </div>
