@@ -245,7 +245,14 @@ function NavItemComponent({
           />
         </div>
       ) : (
-        <Icon className="h-5 w-5 flex-shrink-0" />
+        <Icon
+          className={cn(
+            'h-5 w-5 flex-shrink-0 transition-colors duration-150',
+            isActive
+              ? 'text-[hsl(var(--nav-active-fg))]'
+              : 'text-muted-foreground/70 group-hover:text-foreground'
+          )}
+        />
       )}
       <span className="truncate text-sm font-normal tracking-tight">{item.label}</span>
       {item.ownerOnly && !hasChildren && (
@@ -272,7 +279,7 @@ function NavItemComponent({
         <Link
           href={item.href}
             className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-normal transition-colors duration-150',
+              'group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-normal transition-colors duration-150',
               isActive
                 ? 'bg-[hsl(var(--nav-active-bg))] text-[hsl(var(--nav-active-fg))]'
                 : 'text-foreground hover:bg-muted/60',
@@ -439,7 +446,7 @@ export function SidebarZoho() {
   const visibleTools = toolsItems.filter((item) => userCan(user, item.permission));
 
   return (
-    <div className="flex flex-col h-full bg-white border-r border-gray-200 w-64">
+    <div className="flex flex-col h-full bg-white border-r border-gray-200 w-64 relative z-10">
       {/* Header - Dark like Zoho */}
       <div className="px-4 py-3 bg-[hsl(var(--sidebar-header))]">
         <div className="flex items-center gap-2.5">
@@ -452,18 +459,27 @@ export function SidebarZoho() {
 
       {/* Navigation */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 bg-white">
-        {visibleItems.map((item) => {
+        {visibleItems.map((item, index) => {
           const sectionId = getSectionIdFromNavItem(item);
+          const isMainSection = !item.href || item.href === '/dashboard' || (item.children && item.children.length > 0);
+          const prevItem = index > 0 ? visibleItems[index - 1] : null;
+          const prevIsMainSection = prevItem && (!prevItem.href || prevItem.href === '/dashboard' || (prevItem.children && prevItem.children.length > 0));
+          
           return (
-            <NavItemComponent
-              key={item.href || item.label}
-              item={item}
-              pathname={pathname}
-              user={user}
-              openSection={openSection}
-              setOpenSection={handleSetOpenSection}
-              sectionId={sectionId}
-            />
+            <div key={item.href || item.label}>
+              {/* Divider between main sections */}
+              {index > 0 && isMainSection && prevIsMainSection && (
+                <div className="my-2 h-px bg-border/40" />
+              )}
+              <NavItemComponent
+                item={item}
+                pathname={pathname}
+                user={user}
+                openSection={openSection}
+                setOpenSection={handleSetOpenSection}
+                sectionId={sectionId}
+              />
+            </div>
           );
         })}
       </div>
