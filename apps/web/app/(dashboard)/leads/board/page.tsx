@@ -126,43 +126,6 @@ export default function LeadsBoardPage() {
     }
   };
 
-  // Loading state
-  if (pipelinesLoading) {
-    return (
-      <PageShell
-        title="Kanban"
-        description="Gestioná tus leads por etapas"
-        breadcrumbs={[
-          { label: 'Leads', href: '/leads' },
-          { label: 'Kanban', href: '/leads/board' },
-        ]}
-      >
-        <div className="space-y-4">
-          <div className="flex gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex-shrink-0 w-[280px]">
-                <Skeleton className="h-[600px] rounded-lg" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </PageShell>
-    );
-  }
-
-  // No pipelines
-  if (!pipelines || pipelines.length === 0) {
-    return (
-      <ZohoEmptyState
-        title="Kanban"
-        headline="No hay pipelines configurados"
-        description="Crea un pipeline primero para comenzar a gestionar tus leads en el Kanban."
-        primaryActionLabel="Volver a Leads"
-        onPrimaryAction={() => router.push('/leads')}
-      />
-    );
-  }
-
   // Prepare owners list (from org users)
   const owners = orgUsers
     .filter((u) => 
@@ -173,6 +136,18 @@ export default function LeadsBoardPage() {
       id: u.id,
       name: u.name!,
     }));
+
+  // Mock stages for UI preview when no pipelines exist (TODO: remove when real data is available)
+  const mockStages = [
+    { id: 'mock-1', name: 'Nuevo', order: 0 },
+    { id: 'mock-2', name: 'Contactado', order: 1 },
+    { id: 'mock-3', name: 'Cerrado', order: 2 },
+  ];
+
+  const hasPipelines = pipelines && pipelines.length > 0;
+  const hasStages = stages && stages.length > 0;
+  const displayStages = hasStages ? stages : (hasPipelines ? [] : mockStages);
+  const displayLeadsByStage = hasPipelines ? leadsByStage : {};
 
   return (
     <PageShell
@@ -204,13 +179,13 @@ export default function LeadsBoardPage() {
       }
       toolbar={
         <ZohoKanbanToolbar
-          pipelines={pipelines}
+          pipelines={pipelines || []}
           selectedPipelineId={selectedPipelineId}
           onPipelineChange={setSelectedPipelineId}
           owners={owners}
           selectedOwnerId={selectedOwnerId}
           onOwnerChange={setSelectedOwnerId}
-          stages={stages}
+          stages={displayStages}
           selectedStageId={selectedStageId}
           onStageChange={setSelectedStageId}
           searchQuery={searchQuery}
@@ -220,8 +195,8 @@ export default function LeadsBoardPage() {
         />
       }
     >
-      {/* Board */}
-      {leadsLoading ? (
+      {/* Loading state */}
+      {pipelinesLoading ? (
         <div className="flex gap-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex-shrink-0 w-[280px]">
@@ -229,21 +204,69 @@ export default function LeadsBoardPage() {
             </div>
           ))}
         </div>
-      ) : !selectedPipelineId || stages.length === 0 ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-            <h3 className="text-sm font-semibold text-foreground mb-1">
-              {!selectedPipelineId
-                ? 'Selecciona un pipeline para ver el board'
-                : 'Este pipeline no tiene stages configurados'}
+      ) : !hasPipelines ? (
+        /* No pipelines - show empty state inside PageShell */
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="max-w-md text-center">
+            <Users className="h-16 w-16 text-muted-foreground/40 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              No hay pipelines configurados
             </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Crea un pipeline primero para comenzar a gestionar tus leads en el Kanban.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast({
+                    title: 'Próximamente',
+                    description: 'La creación de pipelines estará disponible pronto',
+                  });
+                }}
+              >
+                Crear pipeline
+              </Button>
+              <Button
+                onClick={() => router.push('/leads')}
+              >
+                Volver a Leads
+              </Button>
+            </div>
           </div>
         </div>
+      ) : !hasStages ? (
+        /* Has pipelines but no stages - show empty state inside PageShell */
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="max-w-md text-center">
+            <Users className="h-16 w-16 text-muted-foreground/40 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              Este pipeline no tiene stages configurados
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Configura stages en tu pipeline para comenzar a usar el Kanban.
+            </p>
+            <Button
+              onClick={() => router.push('/leads')}
+            >
+              Volver a Leads
+            </Button>
+          </div>
+        </div>
+      ) : leadsLoading ? (
+        /* Loading leads */
+        <div className="flex gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex-shrink-0 w-[280px]">
+              <Skeleton className="h-[600px] rounded-lg" />
+            </div>
+          ))}
+        </div>
       ) : (
+        /* Board with data */
         <ZohoKanbanBoard
-          stages={stages}
-          leadsByStage={leadsByStage}
+          stages={displayStages}
+          leadsByStage={displayLeadsByStage}
           isCompact={isCompact}
           activeLeadId={activeLeadId}
           onLeadClick={handleLeadClick}

@@ -50,6 +50,15 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
   {
+    href: '/leads/board',
+    label: 'Kanban',
+    icon: KanbanSquare,
+    permission: Permission.VIEW_LEADS,
+    children: [
+      { href: '/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
+    ],
+  },
+  {
     href: '/inbox',
     label: 'Inbox',
     icon: Inbox,
@@ -60,8 +69,6 @@ const navItems: NavItem[] = [
       { href: '/inbox/unified', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
     ],
   },
-  { href: '/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
-  { href: '/leads/board', label: 'Kanban', icon: KanbanSquare, permission: Permission.VIEW_LEADS },
   {
     href: '/items',
     label: 'Items',

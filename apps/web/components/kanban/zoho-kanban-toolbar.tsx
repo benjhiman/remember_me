@@ -71,6 +71,7 @@ export function ZohoKanbanToolbar({
             onPipelineChange?.(value);
           }
         }}
+        disabled={!pipelines || pipelines.length === 0}
       >
         <SelectTrigger className="w-[140px] h-9 text-sm">
           <SelectValue placeholder="Pipeline" />
@@ -119,6 +120,7 @@ export function ZohoKanbanToolbar({
             onStageChange?.(value);
           }
         }}
+        disabled={!stages || stages.length === 0}
       >
         <SelectTrigger className="w-[120px] h-9 text-sm">
           <SelectValue placeholder="Stage" />
