@@ -19,7 +19,6 @@ import { VirtualizedConversationList } from '@/components/inbox/virtualized-conv
 import type { ConversationStatus, Message } from '@/types/api';
 import { InboxHeader } from '@/components/inbox/inbox-header';
 import { MessageSquare } from 'lucide-react';
-import Image from 'next/image';
 
 function InboxWhatsAppInner() {
   const router = useRouter();
@@ -405,17 +404,11 @@ function InboxWhatsAppInner() {
             {!conversationId ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-[#ECE5DD]">
                 <div className="mb-6">
-                  <div className="flex items-center justify-center mx-auto mb-4">
-                    <Image
-                      src="/icons/whatsapp-empty.png"
-                      alt="WhatsApp"
-                      width={96}
-                      height={96}
-                      className="w-24 h-24"
-                    />
+                  <div className="h-24 w-24 rounded-full bg-white/80 flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="h-12 w-12 text-muted-foreground/40" />
                   </div>
                 </div>
-                <h3 className="text-2xl font-semibold text-foreground mb-2">WhatsApp</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2">WhatsApp</h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
                   Seleccioná una conversación de la lista para empezar a chatear.
                 </p>
