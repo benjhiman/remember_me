@@ -292,14 +292,7 @@ function InboxUnifiedInner() {
           ) : allConversations.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center">
               <div className="mb-4">
-                <Image
-                  src="/icons/unified-mono.svg"
-                  alt="Unificado"
-                  width={48}
-                  height={48}
-                  className="h-12 w-12 mx-auto opacity-40"
-                  style={{ filter: 'brightness(0) saturate(100%)' }}
-                />
+                <MessageCircle className="h-12 w-12 text-muted-foreground/40 mx-auto" />
               </div>
               <h3 className="text-sm font-semibold text-foreground mb-1">No hay conversaciones</h3>
               <p className="text-xs text-muted-foreground max-w-xs">
