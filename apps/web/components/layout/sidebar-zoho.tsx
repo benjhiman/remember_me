@@ -51,11 +51,12 @@ const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
   {
     href: '/board',
-    label: 'Board',
+    label: 'Kanban',
     icon: KanbanSquare,
     permission: Permission.VIEW_LEADS,
     children: [
       { href: '/board/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
+      { href: '/board/pipelines', label: 'Pipelines', icon: KanbanSquare, permission: Permission.VIEW_LEADS },
     ],
   },
   {

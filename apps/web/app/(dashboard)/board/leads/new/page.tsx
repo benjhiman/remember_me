@@ -38,7 +38,7 @@ export default function NewLeadPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <Breadcrumb items={[{ label: 'Board', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: 'Crear Lead' }]} />
+      <Breadcrumb items={[{ label: 'Kanban', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: 'Crear Lead' }]} />
       <div className="mb-6 mt-4">
         <h1 className="text-3xl font-bold">Crear Lead</h1>
         <p className="text-gray-600">Agregar un nuevo lead al CRM</p>

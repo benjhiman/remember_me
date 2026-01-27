@@ -52,8 +52,8 @@ export default function NewPipelinePage() {
         description="Crear un nuevo pipeline"
         breadcrumbs={[
           { label: 'Home', href: '/dashboard' },
-          { label: 'Board', href: '/board' },
-          { label: 'Pipelines', href: '/board' },
+          { label: 'Kanban', href: '/board' },
+          { label: 'Pipelines', href: '/board/pipelines' },
           { label: 'New', href: '/board/pipelines/new' },
         ]}
       >

@@ -191,14 +191,38 @@ export default function BoardPage() {
 
   return (
     <PageShell
-      title="Board"
+      title="Kanban"
       description="Gestioná tus leads por etapas"
       breadcrumbs={[
         { label: 'Home', href: '/dashboard' },
-        { label: 'Board', href: '/board' },
+        { label: 'Kanban', href: '/board' },
       ]}
       actions={
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/board/leads')}
+          >
+            Leads
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/board/pipelines')}
+          >
+            Pipelines
+          </Button>
+          {userCan(user, Permission.EDIT_LEADS) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/board/pipelines/new')}
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Pipeline
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -257,16 +281,24 @@ export default function BoardPage() {
               Crea un pipeline primero para comenzar a gestionar tus leads en el Kanban.
             </p>
             <div className="flex items-center justify-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => router.push('/board/pipelines/new')}
-              >
-                Crear pipeline
-              </Button>
+              {userCan(user, Permission.EDIT_LEADS) && (
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/board/pipelines/new')}
+                >
+                  Crear pipeline
+                </Button>
+              )}
               <Button
                 onClick={() => router.push('/board/leads')}
               >
                 Ver Leads
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/board/pipelines')}
+              >
+                Gestionar Pipelines
               </Button>
             </div>
           </div>
@@ -286,6 +318,12 @@ export default function BoardPage() {
               onClick={() => router.push('/board/leads')}
             >
               Ver Leads
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/board/pipelines')}
+            >
+              Gestionar Pipelines
             </Button>
           </div>
         </div>

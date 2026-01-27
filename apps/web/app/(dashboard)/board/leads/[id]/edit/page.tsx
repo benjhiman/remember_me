@@ -44,7 +44,7 @@ export default function EditLeadPage() {
   if (error || !lead) {
     return (
       <div className="max-w-3xl mx-auto p-6">
-        <Breadcrumb items={[{ label: 'Board', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: 'Error' }]} />
+        <Breadcrumb items={[{ label: 'Kanban', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: 'Error' }]} />
         <Card className="mt-4">
           <CardContent className="p-6">
             <div className="text-center">
@@ -77,7 +77,7 @@ export default function EditLeadPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <Breadcrumb items={[{ label: 'Board', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: lead.name, href: `/board/leads/${leadId}` }, { label: 'Editar' }]} />
+      <Breadcrumb items={[{ label: 'Kanban', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: lead.name, href: `/board/leads/${leadId}` }, { label: 'Editar' }]} />
       <div className="mb-6 mt-4">
         <h1 className="text-3xl font-bold">Editar Lead</h1>
         <p className="text-gray-600">Modificar información del lead</p>

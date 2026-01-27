@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Inject,
   Scope,
   forwardRef,
@@ -149,6 +150,45 @@ export class LeadsService {
           },
         },
       });
+    });
+  }
+
+  async deletePipeline(organizationId: string, userId: string, pipelineId: string) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can delete pipelines');
+    }
+
+    // Verify pipeline belongs to organization
+    const pipeline = await this.prisma.pipeline.findFirst({
+      where: {
+        id: pipelineId,
+        organizationId,
+        deletedAt: null,
+      },
+      include: {
+        _count: {
+          select: { leads: true },
+        },
+      },
+    });
+
+    if (!pipeline) {
+      throw new NotFoundException('Pipeline not found');
+    }
+
+    // Prevent deletion if pipeline has leads
+    if (pipeline._count.leads > 0) {
+      throw new ConflictException(
+        `Cannot delete pipeline "${pipeline.name}" because it has ${pipeline._count.leads} lead(s) associated. Please reassign or delete the leads first.`
+      );
+    }
+
+    // Soft delete pipeline (stages will be cascade deleted)
+    await this.prisma.pipeline.update({
+      where: { id: pipelineId },
+      data: { deletedAt: new Date() },
     });
   }
 

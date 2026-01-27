@@ -120,7 +120,7 @@ export default function LeadDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <Breadcrumb items={[{ label: 'Board', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: lead.name }]} />
+      <Breadcrumb items={[{ label: 'Kanban', href: '/board' }, { label: 'Leads', href: '/board/leads' }, { label: lead.name }]} />
       {/* Header */}
       <div className="mb-6 mt-4 flex items-start justify-between">
           <div>

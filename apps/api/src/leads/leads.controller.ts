@@ -60,6 +60,18 @@ export class LeadsController {
     return this.leadsService.createPipeline(organizationId, user.userId, dto);
   }
 
+  @Delete('pipelines/:id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deletePipeline(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.leadsService.deletePipeline(organizationId, user.userId, id);
+  }
+
   // Stages
   @Post('stages')
   @UseGuards(RolesGuard)

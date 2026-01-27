@@ -33,7 +33,7 @@ export default function BoardLeadsPage() {
 
   const breadcrumbs = [
     { label: 'Home', href: '/dashboard' },
-    { label: 'Board', href: '/board' },
+    { label: 'Kanban', href: '/board' },
     { label: 'Leads', href: '/board/leads' },
   ];
 
@@ -41,7 +41,7 @@ export default function BoardLeadsPage() {
     <>
       {userCan(user, Permission.VIEW_LEADS) && (
         <Button variant="outline" size="sm" onClick={() => router.push('/board')}>
-          Board
+          Kanban
         </Button>
       )}
       {can('leads.write') && (
