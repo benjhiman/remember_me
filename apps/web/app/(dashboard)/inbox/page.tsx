@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useOrgStore } from '@/lib/store/org-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageSquare, Instagram, MessageCircle, Loader2 } from 'lucide-react';
+import { MessageCircle, Loader2 } from 'lucide-react';
+import Image from 'next/image';
 
 export default function InboxPage() {
   const router = useRouter();
@@ -28,22 +29,21 @@ export default function InboxPage() {
       id: 'whatsapp',
       name: 'WhatsApp',
       description: 'Conversaciones de WhatsApp',
-      icon: MessageSquare,
+      iconSrc: '/icons/whatsapp.svg',
       href: '/inbox/whatsapp',
-      color: 'bg-green-500',
     },
     {
       id: 'instagram',
       name: 'Instagram',
       description: 'Mensajes directos de Instagram',
-      icon: Instagram,
+      iconSrc: '/icons/instagram.svg',
       href: '/inbox/instagram',
-      color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600',
     },
     {
       id: 'unified',
       name: 'Unificado',
       description: 'Vista unificada de todos los canales',
+      iconSrc: null,
       icon: MessageCircle,
       href: '/inbox/unified',
       color: 'bg-blue-500',
@@ -61,7 +61,6 @@ export default function InboxPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {channels.map((channel) => {
-          const Icon = channel.icon;
           return (
             <Card
               key={channel.id}
@@ -70,10 +69,22 @@ export default function InboxPage() {
             >
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className={`${channel.color} p-3 rounded-lg text-white`}>
-                    <Icon className="h-6 w-6" />
-                  </div>
-                  <div>
+                  {channel.iconSrc ? (
+                    <div className="flex-shrink-0">
+                      <Image
+                        src={channel.iconSrc}
+                        alt={channel.name}
+                        width={48}
+                        height={48}
+                        className="w-12 h-12"
+                      />
+                    </div>
+                  ) : channel.icon ? (
+                    <div className={`${channel.color} p-3 rounded-lg text-white flex-shrink-0`}>
+                      <channel.icon className="h-6 w-6" />
+                    </div>
+                  ) : null}
+                  <div className="flex-1 min-w-0">
                     <CardTitle>{channel.name}</CardTitle>
                     <CardDescription>{channel.description}</CardDescription>
                   </div>

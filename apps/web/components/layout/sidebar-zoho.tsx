@@ -41,6 +41,7 @@ interface NavItem {
   href?: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  iconSrc?: string; // Optional: path to SVG/PNG icon (for custom icons like WhatsApp mono)
   permission: Permission;
   children?: NavItem[];
   ownerOnly?: boolean; // If true, show owner badge/icon
@@ -54,7 +55,7 @@ const navItems: NavItem[] = [
     icon: Inbox,
     permission: Permission.VIEW_INBOX,
     children: [
-      { href: '/inbox/whatsapp', label: 'WhatsApp', icon: MessageSquare, permission: Permission.VIEW_INBOX },
+      { href: '/inbox/whatsapp', label: 'WhatsApp', icon: MessageSquare, iconSrc: '/icons/whatsapp-mono.svg', permission: Permission.VIEW_INBOX },
       { href: '/inbox/instagram', label: 'Instagram', icon: Instagram, permission: Permission.VIEW_INBOX },
       { href: '/inbox/unified', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
     ],
@@ -159,7 +160,18 @@ function NavItemComponent({
 
   const content = (
     <>
-      <Icon className="h-5 w-5 flex-shrink-0" />
+      {item.iconSrc ? (
+        <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center">
+          <img
+            src={item.iconSrc}
+            alt={item.label}
+            className="h-5 w-5 opacity-70"
+            style={{ filter: 'brightness(0) saturate(100%)' }}
+          />
+        </div>
+      ) : (
+        <Icon className="h-5 w-5 flex-shrink-0" />
+      )}
       <span className="truncate">{item.label}</span>
       {item.ownerOnly && !hasChildren && (
         <div className="ml-auto" title="Solo Owner">
