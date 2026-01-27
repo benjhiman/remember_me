@@ -3,7 +3,6 @@
 import { MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import type { Channel } from './mock';
-import type React from 'react';
 
 export interface ChannelIconConfig {
   // For small icons (tabs, dropdowns, badges)
