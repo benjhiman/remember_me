@@ -71,31 +71,15 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    href: '/items',
-    label: 'Items',
-    icon: Package,
-    permission: Permission.VIEW_DASHBOARD, // Visible if logged in
-    children: [
-      { href: '/items/items', label: 'Items', icon: Package, permission: Permission.VIEW_DASHBOARD },
-      { href: '/items/price-lists', label: 'Price Lists', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
-    ],
-  },
-  {
     href: '/inventory',
     label: 'Inventory',
     icon: PackageCheck,
     permission: Permission.VIEW_DASHBOARD, // Visible if logged in
     children: [
-      { href: '/inventory/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_DASHBOARD },
-    ],
-  },
-  {
-    href: '/stock',
-    label: 'Stock',
-    icon: Package,
-    permission: Permission.VIEW_STOCK,
-    children: [
+      { href: '/items', label: 'Items', icon: Package, permission: Permission.VIEW_DASHBOARD },
+      { href: '/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
       { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
+      { href: '/items/price-lists', label: 'Price List', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
     ],
   },
   {
