@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useAttribution } from '@/lib/api/hooks/use-attribution';
+import { PageShell } from '@/components/layout/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/components/ui/use-toast';
+import { RefreshCw } from 'lucide-react';
 import type { AttributionGroupBy } from '@/types/api';
 
 function exportToCSV(data: any[], groupBy: AttributionGroupBy) {
@@ -45,13 +52,16 @@ function exportToCSV(data: any[], groupBy: AttributionGroupBy) {
 
 export default function RoasPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { toast } = useToast();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [groupBy, setGroupBy] = useState<AttributionGroupBy>('campaign');
   const [includeZeroRevenue, setIncludeZeroRevenue] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data, isLoading, error } = useAttribution({
+  const { data, isLoading, error, refetch } = useAttribution({
     from: from || undefined,
     to: to || undefined,
     groupBy,
@@ -65,149 +75,192 @@ export default function RoasPage() {
     }
   }, [user, router]);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['attribution'] });
+      await refetch();
+      toast({
+        title: 'Actualizado',
+        description: 'Los datos de ROAS se han actualizado',
+      });
+    } catch (error) {
+      console.error('Error refreshing ROAS:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar los datos de ROAS',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (!user) {
     return null;
   }
 
+  const breadcrumbs = [
+    { label: 'Dashboard', href: '/dashboard' },
+    { label: 'ROAS', href: '/dashboard/roas' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard ROAS</h1>
-            <p className="text-gray-600">Métricas de atribución Meta Ads</p>
-          </div>
+    <PageShell
+      title="Dashboard ROAS"
+      description="Métricas de atribución Meta Ads"
+      breadcrumbs={breadcrumbs}
+      actions={
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Button>
           {data && data.length > 0 && (
-            <Button onClick={() => exportToCSV(data, groupBy)} variant="outline">
+            <Button onClick={() => exportToCSV(data, groupBy)} variant="outline" size="sm">
               Exportar CSV
             </Button>
           )}
         </div>
-
-        {/* Filters */}
-        <Card className="p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Desde</label>
-              <Input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Hasta</label>
-              <Input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Agrupar por</label>
-              <select
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={groupBy}
-                onChange={(e) => setGroupBy(e.target.value as AttributionGroupBy)}
-              >
-                <option value="campaign">Campaign</option>
-                <option value="adset">Adset</option>
-                <option value="ad">Ad</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={includeZeroRevenue}
-                  onChange={(e) => setIncludeZeroRevenue(e.target.checked)}
-                />
-                <span className="text-sm">Incluir sin revenue</span>
-              </label>
-            </div>
+      }
+      toolbar={
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Desde</label>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-9"
+            />
           </div>
-        </Card>
+          <div>
+            <label className="block text-sm font-medium mb-1">Hasta</label>
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Agrupar por</label>
+            <Select value={groupBy} onValueChange={(value) => setGroupBy(value as AttributionGroupBy)}>
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="campaign">Campaign</SelectItem>
+                <SelectItem value="adset">Adset</SelectItem>
+                <SelectItem value="ad">Ad</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Switch
+                checked={includeZeroRevenue}
+                onCheckedChange={setIncludeZeroRevenue}
+              />
+              <span className="text-sm">Incluir sin revenue</span>
+            </label>
+          </div>
+        </div>
+      }
+    >
 
-        {/* Table */}
-        <Card className="overflow-hidden">
-          {isLoading && (
-            <div className="p-8 text-center text-gray-500">Cargando métricas...</div>
-          )}
-          {error && (
-            <div className="p-8 text-center text-red-500">
-              Error: {(error as Error).message}
+      {/* Table */}
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <CardTitle>Métricas de Atribución</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
-          )}
-          {data && (
+          ) : error ? (
+            <div className="p-8 text-center">
+              <p className="text-sm text-destructive mb-3">
+                Error: {(error as Error).message || 'No se pudo cargar los datos'}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : data && data.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-muted/50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       {groupBy === 'campaign' ? 'Campaign' : groupBy === 'adset' ? 'Adset' : 'Ad'} ID
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Leads
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Sales
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Revenue
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Spend
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       ROAS
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Conv. Rate
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Avg Ticket
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {data.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
-                        No hay datos para mostrar
+                <tbody className="bg-background divide-y divide-border">
+                  {data.map((metric, idx) => (
+                    <tr key={idx} className="hover:bg-muted/30">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {metric[`${groupBy}Id`] || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{metric.leadsCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">{metric.salesCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        ${metric.revenue.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        ${metric.spend.toFixed(2)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {metric.roas ? metric.roas.toFixed(2) : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {(metric.conversionRate * 100).toFixed(2)}%
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        ${metric.avgTicket.toFixed(2)}
                       </td>
                     </tr>
-                  ) : (
-                    data.map((metric, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          {metric[`${groupBy}Id`] || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">{metric.leadsCount}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">{metric.salesCount}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          ${metric.revenue.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          ${metric.spend.toFixed(2)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {metric.roas ? metric.roas.toFixed(2) : '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {(metric.conversionRate * 100).toFixed(2)}%
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          ${metric.avgTicket.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
+          ) : (
+            <div className="p-8 text-center">
+              <p className="text-sm text-muted-foreground">No hay datos para mostrar</p>
+            </div>
           )}
-        </Card>
-      </div>
-    </div>
+        </CardContent>
+      </Card>
+    </PageShell>
   );
 }

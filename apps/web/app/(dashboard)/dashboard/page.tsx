@@ -17,6 +17,7 @@ import { formatCurrency, formatNumber } from '@/lib/utils/date-range';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { parseDashboardFilters, toSearchParams, getPreviousPeriodRange, type DashboardFilters } from '@/lib/dashboard/filters';
+import { useToast } from '@/components/ui/use-toast';
 import { RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
 import {
   LineChart,
@@ -174,16 +175,46 @@ export default function DashboardPage() {
   const { data: recentLeads } = useLeads({ limit: 10, sort: 'createdAt', order: 'desc', enabled: !!user });
   const { data: activeReservations } = useStockReservations({ status: 'ACTIVE', limit: 10, enabled: !!user });
 
-  // Refresh handler
-  const handleRefresh = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-leads'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-stock'] });
-    refetchOverview();
-    refetchLeads();
-    refetchSales();
-  }, [queryClient, refetchOverview, refetchLeads, refetchSales]);
+  // Refresh handler with loading state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
+  
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      // Invalidate all dashboard-related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-leads'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stock'] }),
+        queryClient.invalidateQueries({ queryKey: ['sales'] }),
+        queryClient.invalidateQueries({ queryKey: ['leads'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-reservations'] }),
+      ]);
+      
+      // Refetch main queries
+      await Promise.all([
+        refetchOverview(),
+        refetchLeads(),
+        refetchSales(),
+      ]);
+      
+      toast({
+        title: 'Actualizado',
+        description: 'Los datos del dashboard se han actualizado',
+      });
+    } catch (error) {
+      console.error('Error refreshing dashboard:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el dashboard',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [queryClient, refetchOverview, refetchLeads, refetchSales, toast]);
 
   // Permission check
   if (user && !userCan(user, Permission.VIEW_DASHBOARD)) {
@@ -217,9 +248,14 @@ export default function DashboardPage() {
 
   const actions = (
     <div className="flex items-center gap-2">
-      <Button variant="outline" size="sm" onClick={handleRefresh}>
-        <RefreshCw className="h-4 w-4 mr-1.5" />
-        Refresh
+      <Button 
+        variant="outline" 
+        size="sm" 
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+      >
+        <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+        {isRefreshing ? 'Refreshing...' : 'Refresh'}
       </Button>
       <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/roas')}>
         Ver ROAS
