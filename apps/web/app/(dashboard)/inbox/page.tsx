@@ -31,6 +31,7 @@ export default function InboxPage() {
       description: 'Conversaciones de WhatsApp',
       iconSrc: '/icons/whatsapp.svg',
       href: '/inbox/whatsapp',
+      color: 'bg-green-500',
     },
     {
       id: 'instagram',
@@ -38,6 +39,7 @@ export default function InboxPage() {
       description: 'Mensajes directos de Instagram',
       iconSrc: '/icons/instagram.svg',
       href: '/inbox/instagram',
+      color: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600',
     },
     {
       id: 'unified',
@@ -70,13 +72,13 @@ export default function InboxPage() {
               <CardHeader>
                 <div className="flex items-center gap-3">
                   {channel.iconSrc ? (
-                    <div className="flex-shrink-0">
+                    <div className={`${channel.color} p-3 rounded-lg text-white flex-shrink-0`}>
                       <Image
                         src={channel.iconSrc}
                         alt={channel.name}
-                        width={48}
-                        height={48}
-                        className="w-12 h-12"
+                        width={24}
+                        height={24}
+                        className="w-6 h-6"
                       />
                     </div>
                   ) : channel.icon ? (
