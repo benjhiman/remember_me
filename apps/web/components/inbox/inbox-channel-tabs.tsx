@@ -2,9 +2,8 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
-import { getChannelIconSmall } from '@/lib/inbox/icons';
+import { getChannelIcon, getChannelLabel, type Channel } from '@/lib/inbox/channel-icons';
 import Image from 'next/image';
-import type { Channel } from '@/lib/inbox/mock';
 
 interface InboxChannelTabsProps {
   currentChannel: Channel;
@@ -14,23 +13,20 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const tabs = [
+  const tabs: Array<{ id: Channel; label: string; href: string }> = [
     {
-      id: 'unificado' as Channel,
-      label: 'Unificado',
-      icon: null, // Use lucide icon
+      id: 'unificado',
+      label: getChannelLabel('unificado'),
       href: '/inbox/unificado',
     },
     {
-      id: 'whatsapp' as Channel,
-      label: 'WhatsApp',
-      icon: '/icons/whatsapp-mono.svg',
+      id: 'whatsapp',
+      label: getChannelLabel('whatsapp'),
       href: '/inbox/whatsapp',
     },
     {
-      id: 'instagram' as Channel,
-      label: 'Instagram',
-      icon: null, // Use lucide icon
+      id: 'instagram',
+      label: getChannelLabel('instagram'),
       href: '/inbox/instagram',
     },
   ];
@@ -51,26 +47,14 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground'
               )}
             >
-              {(() => {
-                const iconConfig = getChannelIconSmall(tab.id);
-                if (iconConfig.type === 'svg' && iconConfig.src) {
-                  return (
-                    <Image
-                      src={iconConfig.src}
-                      alt={tab.label}
-                      width={18}
-                      height={18}
-                      className="w-[18px] h-[18px] opacity-70"
-                      style={{ filter: 'brightness(0) saturate(100%)' }}
-                    />
-                  );
-                }
-                if (iconConfig.type === 'lucide' && iconConfig.component) {
-                  const Icon = iconConfig.component;
-                  return <Icon className="h-[18px] w-[18px]" />;
-                }
-                return null;
-              })()}
+              <Image
+                src={getChannelIcon(tab.id, 'small')}
+                alt={tab.label}
+                width={20}
+                height={20}
+                className="h-5 w-5 opacity-70"
+                style={{ filter: 'brightness(0) saturate(100%)' }}
+              />
               <span>{tab.label}</span>
             </button>
           );
