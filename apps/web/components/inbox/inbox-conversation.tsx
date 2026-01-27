@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils/cn';
 import { Paperclip, Send, User, UserCheck, CheckCircle2 } from 'lucide-react';
+import Image from 'next/image';
 import type { Thread, Message } from '@/lib/inbox/mock';
 import { formatRelativeTime } from '@/lib/inbox/mock';
 
@@ -44,7 +45,7 @@ export function InboxConversation({ thread, messages, onSendMessage }: InboxConv
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
             {thread.contactAvatar ? (
-              <img src={thread.contactAvatar} alt={thread.contactName} className="h-full w-full rounded-full" />
+              <Image src={thread.contactAvatar} alt={thread.contactName} width={40} height={40} className="h-full w-full rounded-full" />
             ) : (
               thread.contactName.substring(0, 2).toUpperCase()
             )}
