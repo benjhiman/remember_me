@@ -36,11 +36,11 @@ export function TopbarZoho() {
     : '66ce982';
 
   return (
-    <div className="h-14 bg-primary border-b border-primary/20 flex items-center px-4 gap-4">
+    <div className="h-14 bg-[hsl(var(--topbar))] border-b border-[hsl(var(--topbar))]/30 flex items-center px-4 gap-4">
       {/* Build Badge - Visible indicator that ZohoShell is mounted */}
       <div className="flex items-center gap-2 px-2.5 py-1 bg-green-500/20 border border-green-400/30 rounded-md">
         <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-        <span className="text-xs font-medium text-white">BautiSeLaCome</span>
+        <span className="text-xs font-normal text-white tracking-tight">BautiSeLaCome</span>
       </div>
 
       {/* Search */}

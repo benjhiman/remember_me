@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
@@ -247,7 +247,7 @@ function NavItemComponent({
       ) : (
         <Icon className="h-5 w-5 flex-shrink-0" />
       )}
-      <span className="truncate">{item.label}</span>
+      <span className="truncate text-sm font-normal tracking-tight">{item.label}</span>
       {item.ownerOnly && !hasChildren && (
         <div className="ml-auto" title="Solo Owner">
           <Lock className="h-3.5 w-3.5 text-gray-400" />
@@ -255,7 +255,7 @@ function NavItemComponent({
       )}
       {hasChildren && (
         <ChevronRight
-          className={cn('ml-auto h-4 w-4 transition-transform', isOpen && 'rotate-90')}
+          className={cn('ml-auto h-4 w-4 transition-transform duration-200 ease-out', isOpen && 'rotate-90')}
         />
       )}
       {item.ownerOnly && hasChildren && (
@@ -272,10 +272,10 @@ function NavItemComponent({
         <Link
           href={item.href}
             className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-normal transition-colors duration-150',
               isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-foreground hover:bg-muted',
+                ? 'bg-[hsl(var(--nav-active-bg))] text-[hsl(var(--nav-active-fg))]'
+                : 'text-foreground hover:bg-muted/60',
               level > 0 && 'pl-9'
             )}
           onClick={() => {
@@ -287,8 +287,13 @@ function NavItemComponent({
         >
           {content}
         </Link>
-        {isOpen && hasChildren && (
-          <div className="mt-1 ml-6 space-y-0.5">
+        {hasChildren && (
+          <div
+            className={cn(
+              'mt-1 ml-6 space-y-0.5 overflow-hidden transition-all duration-200 ease-out',
+              isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+            )}
+          >
             {item.children?.map((child) => (
               <NavItemComponent
                 key={child.href}
@@ -327,8 +332,13 @@ function NavItemComponent({
       >
         {content}
       </button>
-      {isOpen && hasChildren && (
-        <div className="mt-1 ml-6 space-y-0.5">
+      {hasChildren && (
+        <div
+          className={cn(
+            'mt-1 ml-6 space-y-0.5 overflow-hidden transition-all duration-200 ease-out',
+            isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+          )}
+        >
           {item.children?.map((child) => (
             <NavItemComponent
               key={child.href}
@@ -386,13 +396,37 @@ export function SidebarZoho() {
     return getSectionIdFromPathname(pathname);
   });
 
+  // Ref to maintain scroll position
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   // Auto-expand section based on current pathname
   useEffect(() => {
     const sectionId = getSectionIdFromPathname(pathname);
     if (sectionId) {
+      // Save scroll position before changing section
+      const prevScrollTop = scrollRef.current?.scrollTop ?? 0;
+      
       setOpenSection(sectionId);
+      
+      // Restore scroll position after DOM update
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = prevScrollTop;
+        }
+      });
     }
   }, [pathname]);
+
+  // Handle section change with scroll preservation
+  const handleSetOpenSection = (section: string | null) => {
+    const prevScrollTop = scrollRef.current?.scrollTop ?? 0;
+    setOpenSection(section);
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = prevScrollTop;
+      }
+    });
+  };
 
   // Filter nav items based on permissions
   // Purchases is always visible (legacy gating removed temporarily)
@@ -407,7 +441,7 @@ export function SidebarZoho() {
   return (
     <div className="flex flex-col h-full bg-white border-r border-gray-200 w-64">
       {/* Header - Dark like Zoho */}
-      <div className="px-4 py-3 bg-gray-800">
+      <div className="px-4 py-3 bg-[hsl(var(--sidebar-header))]">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center w-8 h-8 rounded bg-white text-gray-800 font-bold text-sm">
             B
@@ -417,7 +451,7 @@ export function SidebarZoho() {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 bg-white">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 bg-white">
         {visibleItems.map((item) => {
           const sectionId = getSectionIdFromNavItem(item);
           return (
@@ -427,7 +461,7 @@ export function SidebarZoho() {
               pathname={pathname}
               user={user}
               openSection={openSection}
-              setOpenSection={setOpenSection}
+              setOpenSection={handleSetOpenSection}
               sectionId={sectionId}
             />
           );
@@ -450,7 +484,7 @@ export function SidebarZoho() {
                   pathname={pathname}
                   user={user}
                   openSection={openSection}
-                  setOpenSection={setOpenSection}
+                  setOpenSection={handleSetOpenSection}
                   sectionId={sectionId}
                 />
               );
