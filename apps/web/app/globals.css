@@ -5,13 +5,13 @@
 @layer base {
   :root {
     /* Zoho-like color scheme */
-    --background: 0 0% 98%; /* Light gray background like Zoho */
+    --background: 210 20% 98%; /* Very light blue tint background */
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%; /* White cards */
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 217 91% 60%; /* Zoho blue */
+    --primary: 217 70% 55%; /* Softer Zoho blue (less saturated, less bright) */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -23,7 +23,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%; /* Subtle borders */
     --input: 214.3 31.8% 91.4%;
-    --ring: 217 91% 60%; /* Zoho blue for focus */
+    --ring: 217 70% 55%; /* Softer blue for focus */
     --radius: 0.375rem; /* Slightly smaller radius for compact look */
   }
 

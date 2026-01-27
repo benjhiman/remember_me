@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
@@ -192,18 +192,21 @@ function NavItemComponent({
   user,
   level = 0,
   mostSpecificActiveHref,
+  openSection,
+  setOpenSection,
+  sectionId,
 }: {
   item: NavItem;
   pathname: string | null;
   user: any;
   level?: number;
   mostSpecificActiveHref?: string | null;
+  openSection: string | null;
+  setOpenSection: (section: string | null) => void;
+  sectionId: string | null;
 }) {
   const normalizedPathname = normalizePathname(pathname);
-  const [isOpen, setIsOpen] = useState(() => {
-    if (!item.children) return false;
-    return item.children.some((child) => isHrefActive(child.href, normalizedPathname));
-  });
+  const isOpen = sectionId !== null && openSection === sectionId;
 
   const Icon = item.icon;
   const hasChildren = item.children && item.children.length > 0;
@@ -276,8 +279,9 @@ function NavItemComponent({
               level > 0 && 'pl-9'
             )}
           onClick={() => {
-            if (hasChildren) {
-              setIsOpen(!isOpen);
+            if (hasChildren && sectionId) {
+              // Accordion behavior: if clicking the same section, close it; otherwise open it and close others
+              setOpenSection(openSection === sectionId ? null : sectionId);
             }
           }}
         >
@@ -293,6 +297,9 @@ function NavItemComponent({
                 user={user}
                 level={level + 1}
                 mostSpecificActiveHref={mostSpecificChild}
+                openSection={openSection}
+                setOpenSection={setOpenSection}
+                sectionId={null}
               />
             ))}
           </div>
@@ -305,7 +312,11 @@ function NavItemComponent({
     <div>
       <button
         type="button"
-        onClick={() => hasChildren && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (hasChildren && sectionId) {
+            setOpenSection(openSection === sectionId ? null : sectionId);
+          }
+        }}
         className={cn(
           'flex w-full items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
           isOpen
@@ -326,6 +337,9 @@ function NavItemComponent({
               user={user}
               level={level + 1}
               mostSpecificActiveHref={mostSpecificChild}
+              openSection={openSection}
+              setOpenSection={setOpenSection}
+              sectionId={null}
             />
           ))}
         </div>
@@ -334,12 +348,51 @@ function NavItemComponent({
   );
 }
 
+// Helper to get section ID from pathname
+function getSectionIdFromPathname(pathname: string | null): string | null {
+  if (!pathname) return null;
+  
+  if (pathname.startsWith('/board')) return 'kanban';
+  if (pathname.startsWith('/inbox')) return 'inbox';
+  if (pathname.startsWith('/inventory')) return 'inventory';
+  if (pathname.startsWith('/sales')) return 'sales';
+  if (pathname.startsWith('/purchases')) return 'purchases';
+  if (pathname.startsWith('/settings')) return 'settings';
+  
+  return null;
+}
+
+// Helper to get section ID from nav item
+function getSectionIdFromNavItem(item: NavItem): string | null {
+  const label = item.label.toLowerCase();
+  if (label === 'kanban') return 'kanban';
+  if (label === 'inbox') return 'inbox';
+  if (label === 'inventory') return 'inventory';
+  if (label === 'sales') return 'sales';
+  if (label === 'purchases') return 'purchases';
+  if (label === 'settings') return 'settings';
+  return null;
+}
+
 export function SidebarZoho() {
   const pathname = usePathname();
   const { user } = useAuthStore();
   const { data: settings } = useOrgSettings(!!user);
 
   const orgName = settings?.crm?.branding?.name || user?.organizationName || 'Remember Me';
+
+  // Accordion state: only one section open at a time
+  const [openSection, setOpenSection] = useState<string | null>(() => {
+    return getSectionIdFromPathname(pathname);
+  });
+
+  // Auto-expand section based on current pathname
+  useEffect(() => {
+    const sectionId = getSectionIdFromPathname(pathname);
+    if (sectionId) {
+      setOpenSection(sectionId);
+    }
+  }, [pathname]);
 
   // Filter nav items based on permissions
   // Purchases is always visible (legacy gating removed temporarily)
@@ -365,9 +418,20 @@ export function SidebarZoho() {
 
       {/* Navigation */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 bg-white">
-        {visibleItems.map((item) => (
-          <NavItemComponent key={item.href || item.label} item={item} pathname={pathname} user={user} />
-        ))}
+        {visibleItems.map((item) => {
+          const sectionId = getSectionIdFromNavItem(item);
+          return (
+            <NavItemComponent
+              key={item.href || item.label}
+              item={item}
+              pathname={pathname}
+              user={user}
+              openSection={openSection}
+              setOpenSection={setOpenSection}
+              sectionId={sectionId}
+            />
+          );
+        })}
       </div>
 
       {/* Tools Section */}
@@ -377,9 +441,20 @@ export function SidebarZoho() {
             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Tools</span>
           </div>
           <div className="space-y-0.5">
-            {visibleTools.map((item) => (
-              <NavItemComponent key={item.href || item.label} item={item} pathname={pathname} user={user} />
-            ))}
+            {visibleTools.map((item) => {
+              const sectionId = getSectionIdFromNavItem(item);
+              return (
+                <NavItemComponent
+                  key={item.href || item.label}
+                  item={item}
+                  pathname={pathname}
+                  user={user}
+                  openSection={openSection}
+                  setOpenSection={setOpenSection}
+                  sectionId={sectionId}
+                />
+              );
+            })}
           </div>
         </div>
       )}
