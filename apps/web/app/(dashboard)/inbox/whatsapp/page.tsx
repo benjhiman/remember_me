@@ -406,10 +406,10 @@ function InboxWhatsAppInner() {
               <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-[#ECE5DD]">
                 <div className="mb-6">
                   <div className="flex items-center justify-center mx-auto mb-4">
-                    <Image src="/icons/whatsapp.svg" alt="WhatsApp" width={64} height={64} className="w-16 h-16" />
+                    <MessageSquare className="w-28 h-28 text-[#25D366]" strokeWidth={1.5} />
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">WhatsApp</h3>
+                <h3 className="text-5xl font-semibold text-[#25D366] mb-2">WhatsApp</h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
                   Seleccioná una conversación de la lista para empezar a chatear.
                 </p>
