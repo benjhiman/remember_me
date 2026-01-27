@@ -133,23 +133,11 @@ function InboxUnifiedInner() {
           <div className="flex-shrink-0">
             {provider === 'WHATSAPP' ? (
               <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
-                <Image
-                  src="/icons/whatsapp.svg"
-                  alt="WhatsApp"
-                  width={20}
-                  height={20}
-                  className="h-5 w-5"
-                />
+                <MessageSquare className="h-5 w-5 text-white" />
               </div>
             ) : (
               <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center">
-                <Image
-                  src="/icons/instagram.svg"
-                  alt="Instagram"
-                  width={20}
-                  height={20}
-                  className="h-5 w-5"
-                />
+                <Instagram className="h-5 w-5 text-white" />
               </div>
             )}
           </div>
@@ -335,23 +323,11 @@ function InboxUnifiedInner() {
                     <div className="flex-shrink-0">
                       {provider === 'WHATSAPP' ? (
                         <div className="h-10 w-10 rounded-full bg-green-500 flex items-center justify-center">
-                          <Image
-                            src="/icons/whatsapp.svg"
-                            alt="WhatsApp"
-                            width={20}
-                            height={20}
-                            className="h-5 w-5"
-                          />
+                          <MessageSquare className="h-5 w-5 text-white" />
                         </div>
                       ) : (
                         <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center">
-                          <Image
-                            src="/icons/instagram.svg"
-                            alt="Instagram"
-                            width={20}
-                            height={20}
-                            className="h-5 w-5"
-                          />
+                          <Instagram className="h-5 w-5 text-white" />
                         </div>
                       )}
                     </div>

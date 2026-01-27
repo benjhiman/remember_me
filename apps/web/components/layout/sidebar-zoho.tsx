@@ -162,14 +162,14 @@ function NavItemComponent({
   const content = (
     <>
       {item.iconSrc ? (
-        <Image
-          src={item.iconSrc}
-          alt={item.label}
-          width={20}
-          height={20}
-          className="h-5 w-5 flex-shrink-0 opacity-70"
-          style={{ filter: 'brightness(0) saturate(100%)' }}
-        />
+        <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center">
+          <img
+            src={item.iconSrc}
+            alt={item.label}
+            className="h-5 w-5 opacity-70"
+            style={{ filter: 'brightness(0) saturate(100%)' }}
+          />
+        </div>
       ) : (
         <Icon className="h-5 w-5 flex-shrink-0" />
       )}
