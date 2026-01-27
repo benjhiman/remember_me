@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { MessageSquare } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import Image from 'next/image';
 import type { Channel } from '@/lib/inbox/mock';
 
@@ -53,11 +53,11 @@ export function InboxEmptyState({ channel, onOpenApp }: InboxEmptyStateProps) {
           <div className="flex justify-center mb-4">
             <Image src={content.icon} alt={content.title} width={64} height={64} className="w-16 h-16" />
           </div>
-        ) : (
+        ) : channel === 'unificado' ? (
           <div className="flex justify-center mb-4">
-            <MessageSquare className="h-16 w-16 text-muted-foreground" />
+            <MessageCircle className="h-16 w-16 text-muted-foreground" />
           </div>
-        )}
+        ) : null}
         <h3 className="text-lg font-semibold text-foreground mb-2">{content.title}</h3>
         <p className="text-sm text-muted-foreground mb-4">{content.description}</p>
         {content.buttonLabel && onOpenApp && (

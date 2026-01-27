@@ -15,6 +15,7 @@ import { EnterpriseChatListItem } from '@/components/inbox/enterprise-chat-list-
 import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
 import { Instagram } from 'lucide-react';
+import Image from 'next/image';
 import type { ConversationStatus, Message } from '@/types/api';
 import { InboxHeader } from '@/components/inbox/inbox-header';
 
@@ -157,8 +158,8 @@ function InboxInstagramInner() {
         {/* LEFT */}
         <div className="border-r bg-background flex flex-col" style={{ width: leftWidth }}>
           <div className="p-3 border-b">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Instagram className="h-4 w-4" /> Instagram
+            <div className="text-sm font-semibold">
+              Instagram
             </div>
             <div className="mt-2">
               <Input
@@ -284,11 +285,11 @@ function InboxInstagramInner() {
             {!conversationId ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-white">
                 <div className="mb-6">
-                  <div className="h-24 w-24 rounded-full bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
-                    <Instagram className="h-12 w-12 text-white" />
+                  <div className="flex items-center justify-center mx-auto mb-4">
+                    <Image src="/icons/instagram.svg" alt="Instagram" width={64} height={64} className="w-16 h-16" />
                   </div>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">Instagram Direct</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Instagram</h3>
                 <p className="text-sm text-muted-foreground max-w-sm">
                   Seleccioná una conversación de la lista para ver los mensajes.
                 </p>

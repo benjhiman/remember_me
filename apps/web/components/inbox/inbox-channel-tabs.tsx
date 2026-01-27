@@ -16,6 +16,12 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
 
   const tabs = [
     {
+      id: 'unificado' as Channel,
+      label: 'Unificado',
+      icon: null, // Use lucide icon
+      href: '/inbox/unificado',
+    },
+    {
       id: 'whatsapp' as Channel,
       label: 'WhatsApp',
       icon: '/icons/whatsapp-mono.svg',
@@ -26,12 +32,6 @@ export function InboxChannelTabs({ currentChannel }: InboxChannelTabsProps) {
       label: 'Instagram',
       icon: null, // Use lucide icon
       href: '/inbox/instagram',
-    },
-    {
-      id: 'unificado' as Channel,
-      label: 'Unificado',
-      icon: null, // Use lucide icon
-      href: '/inbox/unificado',
     },
   ];
 

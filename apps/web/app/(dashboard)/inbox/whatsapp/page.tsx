@@ -404,8 +404,8 @@ function InboxWhatsAppInner() {
             {!conversationId ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-[#ECE5DD]">
                 <div className="mb-6">
-                  <div className="h-24 w-24 rounded-full bg-white/80 flex items-center justify-center mx-auto mb-4">
-                    <MessageSquare className="h-12 w-12 text-muted-foreground/40" />
+                  <div className="flex items-center justify-center mx-auto mb-4">
+                    <Image src="/icons/whatsapp.svg" alt="WhatsApp" width={64} height={64} className="w-16 h-16" />
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">WhatsApp</h3>
