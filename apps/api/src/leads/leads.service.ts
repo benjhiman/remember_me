@@ -115,16 +115,40 @@ export class LeadsService {
 
     const order = maxOrderPipeline ? maxOrderPipeline.order + 1 : 0;
 
-    return this.prisma.pipeline.create({
-      data: {
-        organizationId,
-        name: dto.name,
-        color: dto.color || '#6366f1',
-        order,
-      },
-      include: {
-        stages: true,
-      },
+    // Create pipeline with stages in a transaction
+    return this.prisma.$transaction(async (tx) => {
+      const pipeline = await tx.pipeline.create({
+        data: {
+          organizationId,
+          name: dto.name,
+          color: dto.color || '#6366f1',
+          order,
+        },
+      });
+
+      // Create stages if provided
+      if (dto.stages && dto.stages.length > 0) {
+        const stagesData = dto.stages.map((stage, index) => ({
+          pipelineId: pipeline.id,
+          name: stage.name,
+          color: stage.color || '#94a3b8',
+          order: index,
+        }));
+
+        await tx.stage.createMany({
+          data: stagesData,
+        });
+      }
+
+      // Return pipeline with stages
+      return tx.pipeline.findUnique({
+        where: { id: pipeline.id },
+        include: {
+          stages: {
+            orderBy: { order: 'asc' },
+          },
+        },
+      });
     });
   }
 

@@ -37,6 +37,7 @@ export default function BoardPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isCompact, setIsCompact] = useState<boolean>(false);
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   // Get leads with filters
   const { data: leadsData, isLoading: leadsLoading } = useLeads({
@@ -48,13 +49,26 @@ export default function BoardPage() {
     enabled: !!selectedPipelineId,
   });
 
-  // Auto-select first pipeline if available
+  // Auto-select first pipeline if available or from query param
   useEffect(() => {
-    if (pipelines && pipelines.length > 0 && !selectedPipelineId) {
-      const defaultPipeline = pipelines.find((p) => p.isDefault) || pipelines[0];
-      setSelectedPipelineId(defaultPipeline.id);
+    if (typeof window === 'undefined') return;
+    
+    const searchParams = new URLSearchParams(window.location.search);
+    const pipelineIdFromUrl = searchParams.get('pipelineId');
+    
+    if (pipelines && pipelines.length > 0) {
+      if (pipelineIdFromUrl && pipelines.find((p) => p.id === pipelineIdFromUrl)) {
+        // Select pipeline from URL
+        setSelectedPipelineId(pipelineIdFromUrl);
+        // Clean URL
+        router.replace('/board', { scroll: false });
+      } else if (!selectedPipelineId) {
+        // Auto-select default or first
+        const defaultPipeline = pipelines.find((p) => p.isDefault) || pipelines[0];
+        setSelectedPipelineId(defaultPipeline.id);
+      }
     }
-  }, [pipelines, selectedPipelineId]);
+  }, [pipelines, selectedPipelineId, router]);
 
   // Group leads by stageId
   const leadsByStage = (leadsData?.data || []).reduce(
@@ -109,9 +123,35 @@ export default function BoardPage() {
   };
 
   // Handle refresh
-  const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['leads'] });
-    queryClient.invalidateQueries({ queryKey: ['pipelines'] });
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leads'] }),
+        queryClient.invalidateQueries({ queryKey: ['pipelines'] }),
+        queryClient.invalidateQueries({ queryKey: ['org-users'] }),
+      ]);
+      
+      // Refetch main queries
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['pipelines'] }),
+        queryClient.refetchQueries({ queryKey: ['leads'] }),
+      ]);
+      
+      toast({
+        title: 'Actualizado',
+        description: 'Los datos del board se han actualizado',
+      });
+    } catch (error) {
+      console.error('Error refreshing board:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el board',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Handle new lead
@@ -163,9 +203,10 @@ export default function BoardPage() {
             variant="secondary"
             size="sm"
             onClick={handleRefresh}
+            disabled={isRefreshing}
           >
-            <RefreshCw className="h-4 w-4 mr-1.5" />
-            Refresh
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
           <Button
             size="sm"
@@ -218,12 +259,7 @@ export default function BoardPage() {
             <div className="flex items-center justify-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => {
-                  toast({
-                    title: 'Próximamente',
-                    description: 'La creación de pipelines estará disponible pronto',
-                  });
-                }}
+                onClick={() => router.push('/board/pipelines/new')}
               >
                 Crear pipeline
               </Button>
