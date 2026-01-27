@@ -55,9 +55,9 @@ const navItems: NavItem[] = [
     icon: Inbox,
     permission: Permission.VIEW_INBOX,
     children: [
+      { href: '/inbox/unificado', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
       { href: '/inbox/whatsapp', label: 'WhatsApp', icon: MessageSquare, iconSrc: '/icons/whatsapp-mono.svg', permission: Permission.VIEW_INBOX },
       { href: '/inbox/instagram', label: 'Instagram', icon: Instagram, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/unified', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
     ],
   },
   { href: '/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },

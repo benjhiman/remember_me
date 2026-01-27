@@ -12,9 +12,9 @@ import {
 } from '@/components/ui/select';
 
 const channels = [
+  { value: 'unified', label: 'Unificado', icon: MessageCircle, href: '/inbox/unified' },
   { value: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: '/inbox/whatsapp' },
   { value: 'instagram', label: 'Instagram', icon: Instagram, href: '/inbox/instagram' },
-  { value: 'unified', label: 'Unificado', icon: MessageCircle, href: '/inbox/unified' },
 ];
 
 export function InboxHeader({ currentChannel }: { currentChannel?: string }) {
