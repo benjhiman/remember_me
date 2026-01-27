@@ -7,8 +7,7 @@ import { InboxThreadList } from '@/components/inbox/inbox-thread-list';
 import { InboxConversation } from '@/components/inbox/inbox-conversation';
 import { InboxEmptyState } from '@/components/inbox/inbox-empty-state';
 import { Loader2 } from 'lucide-react';
-import { threadsByChannel, messagesByThreadId, type Thread, type Message } from '@/lib/inbox/mock';
-import type { Channel } from '@/lib/inbox/channel-icons';
+import { threadsByChannel, messagesByThreadId, type Channel, type Thread, type Message } from '@/lib/inbox/mock';
 
 export default function InboxChannelPage({ params }: { params: { channel: string } }) {
   const router = useRouter();

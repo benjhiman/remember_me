@@ -2,8 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
-import Image from 'next/image';
+import { ChevronLeft, MessageSquare, Instagram, MessageCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -11,12 +10,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getChannelIcon, getChannelLabel, type Channel } from '@/lib/inbox/channel-icons';
 
-const channels: Array<{ value: Channel; label: string; href: string }> = [
-  { value: 'unificado', label: getChannelLabel('unificado'), href: '/inbox/unificado' },
-  { value: 'whatsapp', label: getChannelLabel('whatsapp'), href: '/inbox/whatsapp' },
-  { value: 'instagram', label: getChannelLabel('instagram'), href: '/inbox/instagram' },
+const channels = [
+  { value: 'unified', label: 'Unificado', icon: MessageCircle, href: '/inbox/unified' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: '/inbox/whatsapp' },
+  { value: 'instagram', label: 'Instagram', icon: Instagram, href: '/inbox/instagram' },
 ];
 
 export function InboxHeader({ currentChannel }: { currentChannel?: string }) {
@@ -52,34 +50,20 @@ export function InboxHeader({ currentChannel }: { currentChannel?: string }) {
         <span className="text-sm text-muted-foreground">Canal:</span>
         <Select value={currentChannelValue} onValueChange={handleChannelChange}>
           <SelectTrigger className="w-[140px]">
-            <div className="flex items-center gap-2">
-              <Image
-                src={getChannelIcon(currentChannelValue as Channel, 'small')}
-                alt={getChannelLabel(currentChannelValue as Channel)}
-                width={20}
-                height={20}
-                className="h-5 w-5 opacity-70"
-                style={{ filter: 'brightness(0) saturate(100%)' }}
-              />
-              <SelectValue />
-            </div>
+            <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {channels.map((channel) => (
-              <SelectItem key={channel.value} value={channel.value}>
-                <div className="flex items-center gap-2">
-                  <Image
-                    src={getChannelIcon(channel.value, 'small')}
-                    alt={channel.label}
-                    width={20}
-                    height={20}
-                    className="h-5 w-5 opacity-70"
-                    style={{ filter: 'brightness(0) saturate(100%)' }}
-                  />
-                  <span>{channel.label}</span>
-                </div>
-              </SelectItem>
-            ))}
+            {channels.map((channel) => {
+              const Icon = channel.icon;
+              return (
+                <SelectItem key={channel.value} value={channel.value}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4" />
+                    <span>{channel.label}</span>
+                  </div>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>

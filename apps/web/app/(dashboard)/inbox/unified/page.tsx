@@ -9,8 +9,7 @@ import { EnterpriseChatListItem } from '@/components/inbox/enterprise-chat-list-
 import { InboxHeader } from '@/components/inbox/inbox-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
-import Image from 'next/image';
+import { MessageSquare, Instagram, MessageCircle, Search } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { VirtualizedConversationList } from '@/components/inbox/virtualized-conversation-list';
@@ -211,14 +210,7 @@ function InboxUnifiedInner() {
               onClick={() => setProviderFilter('ALL')}
               className="h-8 text-xs"
             >
-              <Image
-                src="/icons/unified-mono.svg"
-                alt="Todos"
-                width={12}
-                height={12}
-                className="h-3 w-3 mr-1 opacity-70"
-                style={{ filter: 'brightness(0) saturate(100%)' }}
-              />
+              <MessageCircle className="h-3 w-3 mr-1" />
               Todos
             </Button>
             <Button
@@ -227,14 +219,7 @@ function InboxUnifiedInner() {
               onClick={() => setProviderFilter('WHATSAPP')}
               className="h-8 text-xs"
             >
-              <Image
-                src="/icons/whatsapp-mono.svg"
-                alt="WhatsApp"
-                width={12}
-                height={12}
-                className="h-3 w-3 mr-1 opacity-70"
-                style={{ filter: 'brightness(0) saturate(100%)' }}
-              />
+              <MessageSquare className="h-3 w-3 mr-1" />
               WhatsApp
             </Button>
             <Button
@@ -243,14 +228,7 @@ function InboxUnifiedInner() {
               onClick={() => setProviderFilter('INSTAGRAM')}
               className="h-8 text-xs"
             >
-              <Image
-                src="/icons/instagram-mono.svg"
-                alt="Instagram"
-                width={12}
-                height={12}
-                className="h-3 w-3 mr-1 opacity-70"
-                style={{ filter: 'brightness(0) saturate(100%)' }}
-              />
+              <Instagram className="h-3 w-3 mr-1" />
               Instagram
             </Button>
             {(['OPEN', 'PENDING', 'CLOSED'] as const).map((s) => (
