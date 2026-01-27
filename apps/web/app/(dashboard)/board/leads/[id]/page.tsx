@@ -145,7 +145,7 @@ export default function LeadDetailPage() {
             </div>
           </div>
           {userCan(user, Permission.EDIT_LEADS) && (
-            <Button onClick={() => router.push(`/leads/${leadId}/edit`)}>Editar</Button>
+            <Button onClick={() => router.push(`/board/leads/${leadId}/edit`)}>Editar</Button>
           )}
         </div>
 

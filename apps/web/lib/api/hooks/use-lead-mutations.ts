@@ -48,7 +48,7 @@ export function useCreateLead() {
         title: 'Lead creado',
         description: 'El lead se creó exitosamente.',
       });
-      router.push(`/leads/${lead.id}`);
+      router.push(`/board/leads/${lead.id}`);
     },
     onError: (error) => {
       toast({
@@ -77,7 +77,7 @@ export function useUpdateLead(leadId: string) {
         title: 'Lead actualizado',
         description: 'Los cambios se guardaron exitosamente.',
       });
-      router.push(`/leads/${lead.id}`);
+      router.push(`/board/leads/${lead.id}`);
     },
     onError: (error) => {
       toast({

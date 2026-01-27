@@ -50,12 +50,12 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
   {
-    href: '/leads/board',
-    label: 'Kanban',
+    href: '/board',
+    label: 'Board',
     icon: KanbanSquare,
     permission: Permission.VIEW_LEADS,
     children: [
-      { href: '/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
+      { href: '/board/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
     ],
   },
   {

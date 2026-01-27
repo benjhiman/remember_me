@@ -88,7 +88,7 @@ export default function SaleDetailPage() {
                 <div>
                   Lead:{' '}
                   <button
-                    onClick={() => router.push(`/leads/${sale.leadId}`)}
+                    onClick={() => router.push(`/board/leads/${sale.leadId}`)}
                     className="text-blue-600 hover:underline"
                   >
                     {sale.lead.name}

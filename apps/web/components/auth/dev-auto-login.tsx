@@ -43,7 +43,7 @@ export function DevAutoLogin() {
         if (typeof window !== 'undefined') {
           const currentPath = window.location.pathname;
           if (currentPath === '/login' || currentPath === '/') {
-            router.push('/leads');
+            router.push('/board/leads');
           }
         }
       }

@@ -64,7 +64,7 @@ export function CommandPalette() {
           )}
           {userCan(user, Permission.VIEW_LEADS) && (
             <CommandItem
-              onSelect={() => runCommand(() => router.push('/leads'))}
+              onSelect={() => runCommand(() => router.push('/board/leads'))}
             >
               <Users className="mr-2 h-4 w-4" />
               <span>Ir a Leads</span>
@@ -100,7 +100,7 @@ export function CommandPalette() {
         {userCan(user, Permission.EDIT_LEADS) && (
           <CommandGroup heading="Acciones">
             <CommandItem
-              onSelect={() => runCommand(() => router.push('/leads/new'))}
+              onSelect={() => runCommand(() => router.push('/board/leads/new'))}
             >
               <Plus className="mr-2 h-4 w-4" />
               <span>Crear Lead</span>

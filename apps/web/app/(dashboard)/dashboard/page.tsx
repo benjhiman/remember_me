@@ -696,7 +696,7 @@ export default function DashboardPage() {
                   <div
                     key={lead.id}
                     className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/leads/${lead.id}`)}
+                    onClick={() => router.push(`/board/leads/${lead.id}`)}
                   >
                     <div className="text-sm font-medium">{lead.name}</div>
                     <div className="text-xs text-gray-600">
