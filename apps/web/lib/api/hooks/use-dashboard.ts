@@ -9,6 +9,9 @@ interface DashboardFilters {
   tz?: string;
 }
 
+const DEFAULT_STALE_TIME = 30 * 1000; // 30 seconds
+const DEFAULT_CACHE_TIME = 5 * 60 * 1000; // 5 minutes
+
 export function useDashboardOverview(filters: DashboardFilters = {}, enabled: boolean = true) {
   const queryParams = new URLSearchParams();
   if (filters.from) queryParams.set('from', filters.from);
@@ -19,7 +22,10 @@ export function useDashboardOverview(filters: DashboardFilters = {}, enabled: bo
   return useQuery({
     queryKey: ['dashboard-overview', filters],
     queryFn: () => api.get<DashboardOverview>(`/dashboard/overview?${queryParams.toString()}`),
-    enabled,
+    enabled: enabled && !!filters.from && !!filters.to,
+    staleTime: DEFAULT_STALE_TIME,
+    gcTime: DEFAULT_CACHE_TIME,
+    retry: 1,
   });
 }
 
@@ -33,7 +39,10 @@ export function useDashboardLeads(filters: DashboardFilters = {}, enabled: boole
   return useQuery({
     queryKey: ['dashboard-leads', filters],
     queryFn: () => api.get<LeadsDashboard>(`/dashboard/leads?${queryParams.toString()}`),
-    enabled,
+    enabled: enabled && !!filters.from && !!filters.to,
+    staleTime: DEFAULT_STALE_TIME,
+    gcTime: DEFAULT_CACHE_TIME,
+    retry: 1,
   });
 }
 
@@ -47,7 +56,10 @@ export function useDashboardSales(filters: DashboardFilters = {}, enabled: boole
   return useQuery({
     queryKey: ['dashboard-sales', filters],
     queryFn: () => api.get<SalesDashboard>(`/dashboard/sales?${queryParams.toString()}`),
-    enabled,
+    enabled: enabled && !!filters.from && !!filters.to,
+    staleTime: DEFAULT_STALE_TIME,
+    gcTime: DEFAULT_CACHE_TIME,
+    retry: 1,
   });
 }
 
@@ -61,6 +73,9 @@ export function useDashboardStock(filters: DashboardFilters = {}, enabled: boole
   return useQuery({
     queryKey: ['dashboard-stock', filters],
     queryFn: () => api.get<StockDashboard>(`/dashboard/stock?${queryParams.toString()}`),
-    enabled,
+    enabled: enabled && !!filters.from && !!filters.to,
+    staleTime: DEFAULT_STALE_TIME,
+    gcTime: DEFAULT_CACHE_TIME,
+    retry: 1,
   });
 }
