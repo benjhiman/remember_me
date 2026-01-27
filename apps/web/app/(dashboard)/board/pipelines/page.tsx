@@ -67,12 +67,17 @@ export default function PipelinesPage() {
       description="Gestiona tus pipelines y stages"
       breadcrumbs={breadcrumbs}
       actions={
-        canManagePipelines && (
-          <Button size="sm" onClick={() => router.push('/board/pipelines/new')}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            New Pipeline
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push('/board')}>
+            Kanban
           </Button>
-        )
+          {canManagePipelines && (
+            <Button size="sm" onClick={() => router.push('/board/pipelines/new')}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Pipeline
+            </Button>
+          )}
+        </div>
       }
     >
       {/* Loading */}
