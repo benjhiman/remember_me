@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { InboxChannelTabs } from '@/components/inbox/inbox-channel-tabs';
 import { InboxThreadList } from '@/components/inbox/inbox-thread-list';
 import { InboxConversation } from '@/components/inbox/inbox-conversation';
 import { InboxEmptyState } from '@/components/inbox/inbox-empty-state';
@@ -31,7 +30,6 @@ export default function InboxUnificadoPage() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <InboxChannelTabs currentChannel="unificado" />
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Thread List */}
         <div className="w-80 flex-shrink-0">

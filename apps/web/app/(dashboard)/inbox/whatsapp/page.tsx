@@ -17,7 +17,6 @@ import { cn } from '@/lib/utils/cn';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { VirtualizedConversationList } from '@/components/inbox/virtualized-conversation-list';
 import type { ConversationStatus, Message } from '@/types/api';
-import { InboxHeader } from '@/components/inbox/inbox-header';
 import { MessageSquare } from 'lucide-react';
 
 function InboxWhatsAppInner() {
@@ -236,7 +235,6 @@ function InboxWhatsAppInner() {
 
   return (
     <div className="flex flex-col h-full">
-      <InboxHeader currentChannel="whatsapp" />
       <div className="flex-1 flex overflow-hidden bg-[#F0F2F5]">
         {/* LEFT: chat list */}
         <div

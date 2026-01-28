@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { InboxChannelTabs } from '@/components/inbox/inbox-channel-tabs';
+import { InboxTopbar } from '@/components/inbox/inbox-topbar';
 import type { Channel } from '@/lib/inbox/mock';
 
 export default function InboxLayout({ children }: { children: React.ReactNode }) {
@@ -15,11 +15,13 @@ export default function InboxLayout({ children }: { children: React.ReactNode })
     currentChannel = 'instagram';
   } else if (pathname?.includes('/unificado')) {
     currentChannel = 'unificado';
+  } else if (pathname?.includes('/unified')) {
+    currentChannel = 'unificado'; // unified maps to unificado
   }
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <InboxChannelTabs currentChannel={currentChannel} />
+      <InboxTopbar currentChannel={currentChannel} />
       <div className="flex-1 overflow-hidden">{children}</div>
     </div>
   );

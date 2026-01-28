@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 import { useConversationsInfinite } from '@/lib/api/hooks/use-conversations-infinite';
-import { InboxHeader } from '@/components/inbox/inbox-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Phone, Instagram, MessageCircle, Search } from 'lucide-react';
@@ -184,7 +183,6 @@ export default function InboxUnifiedInner() {
 
   return (
     <div className="flex flex-col h-full">
-      <InboxHeader currentChannel="unified" />
       <div className="flex-1 flex flex-col bg-background">
         {/* Filters */}
         <div className="p-4 border-b bg-background space-y-3">

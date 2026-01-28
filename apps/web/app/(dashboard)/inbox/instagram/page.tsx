@@ -16,7 +16,6 @@ import { groupByDay, formatTimeHHMM } from '@/lib/utils/inbox-format';
 import { cn } from '@/lib/utils/cn';
 import { Instagram } from 'lucide-react';
 import type { ConversationStatus, Message } from '@/types/api';
-import { InboxHeader } from '@/components/inbox/inbox-header';
 
 function InboxInstagramInner() {
   const router = useRouter();
@@ -152,7 +151,6 @@ function InboxInstagramInner() {
 
   return (
     <div className="flex flex-col h-full">
-      <InboxHeader currentChannel="instagram" />
       <div className="flex-1 flex overflow-hidden bg-white">
         {/* LEFT */}
         <div className="border-r bg-background flex flex-col" style={{ width: leftWidth }}>
