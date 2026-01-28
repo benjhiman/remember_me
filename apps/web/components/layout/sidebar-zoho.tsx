@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Instagram,
   MessageCircle,
+  Phone,
   ChevronRight,
   ChevronDown,
   DollarSign,
@@ -67,7 +68,7 @@ const navItems: NavItem[] = [
     icon: Inbox,
     permission: Permission.VIEW_INBOX,
     children: [
-      { href: '/inbox/whatsapp', label: 'WhatsApp', icon: MessageSquare, iconSrc: '/icons/whatsapp-mono.svg', permission: Permission.VIEW_INBOX },
+      { href: '/inbox/whatsapp', label: 'WhatsApp', icon: Phone, permission: Permission.VIEW_INBOX },
       { href: '/inbox/instagram', label: 'Instagram', icon: Instagram, permission: Permission.VIEW_INBOX },
       { href: '/inbox/unified', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
     ],
@@ -459,27 +460,18 @@ export function SidebarZoho() {
 
       {/* Navigation */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5 bg-white">
-        {visibleItems.map((item, index) => {
+        {visibleItems.map((item) => {
           const sectionId = getSectionIdFromNavItem(item);
-          const isMainSection = !item.href || item.href === '/dashboard' || (item.children && item.children.length > 0);
-          const prevItem = index > 0 ? visibleItems[index - 1] : null;
-          const prevIsMainSection = prevItem && (!prevItem.href || prevItem.href === '/dashboard' || (prevItem.children && prevItem.children.length > 0));
-          
           return (
-            <div key={item.href || item.label}>
-              {/* Divider between main sections */}
-              {index > 0 && isMainSection && prevIsMainSection && (
-                <div className="my-2 h-px bg-border/40" />
-              )}
-              <NavItemComponent
-                item={item}
-                pathname={pathname}
-                user={user}
-                openSection={openSection}
-                setOpenSection={handleSetOpenSection}
-                sectionId={sectionId}
-              />
-            </div>
+            <NavItemComponent
+              key={item.href || item.label}
+              item={item}
+              pathname={pathname}
+              user={user}
+              openSection={openSection}
+              setOpenSection={handleSetOpenSection}
+              sectionId={sectionId}
+            />
           );
         })}
       </div>
