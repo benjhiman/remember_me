@@ -8,15 +8,16 @@ export default function InboxLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
 
   // Determine current channel from pathname
-  let currentChannel: Channel = 'unificado';
+  // Note: 'general' is not a Channel type, but we handle it in InboxTopbar
+  let currentChannel: Channel | 'general' = 'unificado';
   if (pathname?.includes('/whatsapp')) {
     currentChannel = 'whatsapp';
   } else if (pathname?.includes('/instagram')) {
     currentChannel = 'instagram';
   } else if (pathname?.includes('/unificado')) {
     currentChannel = 'unificado';
-  } else if (pathname?.includes('/unified')) {
-    currentChannel = 'unificado'; // unified maps to unificado
+  } else if (pathname?.includes('/unified') || pathname === '/inbox') {
+    currentChannel = 'general'; // unified maps to general tab
   }
 
   return (

@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Phone, Instagram, MessageCircle } from 'lucide-react';
+import { ChevronLeft, Phone, Instagram, MessageCircle, Monitor } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -20,13 +20,13 @@ const channelDropdown = [
   { value: 'unificado', label: 'Unificado', icon: MessageCircle, href: '/inbox/unificado' },
 ];
 
-// Tabs (ordered: Unificado, WhatsApp, Instagram - as per current requirement)
+// Tabs (ordered: General, WhatsApp, Instagram, Unificado)
 const tabs = [
   {
-    id: 'unificado' as Channel,
-    label: 'Unificado',
-    icon: MessageCircle,
-    href: '/inbox/unificado',
+    id: 'general' as const,
+    label: 'General',
+    icon: Monitor,
+    href: '/inbox/unified',
   },
   {
     id: 'whatsapp' as Channel,
@@ -40,6 +40,12 @@ const tabs = [
     icon: Instagram,
     href: '/inbox/instagram',
   },
+  {
+    id: 'unificado' as Channel,
+    label: 'Unificado',
+    icon: MessageCircle,
+    href: '/inbox/unificado',
+  },
 ];
 
 interface InboxTopbarProps {
@@ -51,6 +57,7 @@ export function InboxTopbar({ currentChannel }: InboxTopbarProps) {
   const pathname = usePathname();
 
   // Determine current channel from pathname if not provided
+  // For dropdown, map unified to unificado
   let activeChannel: Channel = 'unificado';
   if (pathname?.includes('/whatsapp')) {
     activeChannel = 'whatsapp';
@@ -59,7 +66,7 @@ export function InboxTopbar({ currentChannel }: InboxTopbarProps) {
   } else if (pathname?.includes('/unificado')) {
     activeChannel = 'unificado';
   } else if (pathname?.includes('/unified')) {
-    activeChannel = 'unificado'; // unified maps to unificado for tabs
+    activeChannel = 'unificado'; // unified maps to unificado for dropdown
   }
 
   const currentChannelValue = currentChannel || activeChannel;
@@ -74,24 +81,24 @@ export function InboxTopbar({ currentChannel }: InboxTopbarProps) {
 
   return (
     <div className="flex flex-col border-b border-border bg-background">
-      {/* Row 1: Header (Volver a Inbox + Canal) */}
-      <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
+      {/* Row 1: Header (Volver a Inbox + Canal) - Fixed height */}
+      <div className="flex items-center justify-between gap-4 px-4 min-h-[44px] border-b border-border">
+        <div className="flex items-center gap-2 h-9">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/inbox/unified')}
-            className="gap-2"
+            className="gap-2 h-9"
           >
             <ChevronLeft className="h-4 w-4" />
             Volver a Inbox
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Canal:</span>
+        <div className="flex items-center gap-2 h-9">
+          <span className="text-sm text-muted-foreground leading-none">Canal:</span>
           <Select value={currentChannelValue} onValueChange={handleChannelChange}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -114,9 +121,12 @@ export function InboxTopbar({ currentChannel }: InboxTopbarProps) {
       {/* Row 2: Tabs */}
       <div className="flex items-center gap-1 px-4">
         {tabs.map((tab) => {
+          // Active state: exact match or starts with href
           const isActive =
             pathname === tab.href ||
-            (tab.id === 'unificado' && (pathname === '/inbox' || pathname === '/inbox/unified'));
+            (pathname?.startsWith(tab.href + '/')) ||
+            (tab.id === 'general' && (pathname === '/inbox' || pathname === '/inbox/unified')) ||
+            (tab.id === 'unificado' && pathname === '/inbox/unificado');
           const Icon = tab.icon;
           return (
             <button
