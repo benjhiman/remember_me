@@ -800,6 +800,7 @@ enum AuditEntityType {
   Purchase
   LedgerAccount
   LedgerCategory
+  Item
 }
 
 model AuditLog {

@@ -64,7 +64,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    href: '/inbox',
+    href: '/inbox/unified',
     label: 'Inbox',
     icon: Inbox,
     permission: Permission.VIEW_INBOX,
