@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, MessageSquare, Instagram, MessageCircle } from 'lucide-react';
+import { ChevronLeft, Phone, Instagram, MessageCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -12,9 +12,9 @@ import {
 } from '@/components/ui/select';
 
 const channels = [
-  { value: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: '/inbox/whatsapp' },
+  { value: 'unificado', label: 'Unificado', icon: MessageCircle, href: '/inbox/unificado' },
+  { value: 'whatsapp', label: 'WhatsApp', icon: Phone, href: '/inbox/whatsapp' },
   { value: 'instagram', label: 'Instagram', icon: Instagram, href: '/inbox/instagram' },
-  { value: 'unified', label: 'Unificado', icon: MessageCircle, href: '/inbox/unified' },
 ];
 
 export function InboxHeader({ currentChannel }: { currentChannel?: string }) {

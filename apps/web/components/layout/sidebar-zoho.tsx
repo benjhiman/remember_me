@@ -37,6 +37,7 @@ import {
   Gift,
   ClipboardList,
   Hash,
+  Monitor,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -68,9 +69,10 @@ const navItems: NavItem[] = [
     icon: Inbox,
     permission: Permission.VIEW_INBOX,
     children: [
+      { href: '/inbox/unified', label: 'General', icon: Monitor, permission: Permission.VIEW_INBOX },
       { href: '/inbox/whatsapp', label: 'WhatsApp', icon: Phone, permission: Permission.VIEW_INBOX },
       { href: '/inbox/instagram', label: 'Instagram', icon: Instagram, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/unified', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
+      { href: '/inbox/unificado', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
     ],
   },
   {
@@ -132,7 +134,7 @@ const toolsItems: NavItem[] = [];
 function normalizePathname(pathname: string | null): string | null {
   if (!pathname) return null;
   
-  // Map legacy routes to inventory canonical routes for active state matching
+  // Map legacy routes to canonical routes for active state matching
   const legacyMap: Record<string, string> = {
     '/stock': '/inventory/stock',
     '/stock/reservations': '/inventory/reservas',
@@ -140,12 +142,13 @@ function normalizePathname(pathname: string | null): string | null {
     '/items/price-lists': '/inventory/pricelist',
     '/inventory/reservations': '/inventory/reservas',
     '/inventory/price-lists': '/inventory/pricelist',
+    '/sales/purchases': '/purchases',
   };
   
   // Check if pathname matches a legacy route exactly or starts with it
-  for (const [legacy, inventory] of Object.entries(legacyMap)) {
+  for (const [legacy, canonical] of Object.entries(legacyMap)) {
     if (pathname === legacy || pathname.startsWith(legacy + '/')) {
-      return pathname.replace(legacy, inventory);
+      return pathname.replace(legacy, canonical);
     }
   }
   

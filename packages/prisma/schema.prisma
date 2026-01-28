@@ -77,6 +77,7 @@ model Organization {
   conversationTags         ConversationTag[]
   metaAttributionSnapshots MetaAttributionSnapshot[]
   MetaSpendDaily           MetaSpendDaily[]
+  items                    Item[]
   customers                Customer[]
   ledgerAccounts           LedgerAccount[]
   journalEntries           JournalEntry[]
@@ -319,6 +320,30 @@ model StockItem {
   @@index([organizationId, model])
   @@index([sku])
   @@index([imei])
+}
+
+// ===== ITEMS (Product Catalog) =====
+
+model Item {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  sku            String?
+  category       String?
+  brand          String?
+  description    String?  @db.Text
+  attributes     Json? // Flexible attributes (color, size, etc.)
+  isActive       Boolean  @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+  @@index([organizationId, deletedAt])
+  @@index([sku])
+  @@index([name])
 }
 
 enum ItemCondition {
