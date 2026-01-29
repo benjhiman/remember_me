@@ -279,7 +279,7 @@ export default function InventoryItemsPage() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                               <div className="flex items-center justify-end gap-2">
-                                {can('inventory.write') && (
+                                {(can('stock.write') || can('inventory.write') || ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '')) && (
                                   <>
                                     <button
                                       onClick={() => setEditingItem(item)}
