@@ -32,17 +32,16 @@ interface ItemFormDialogProps {
 
 const STORAGE_OPTIONS = [64, 128, 256, 512, 1024, 2048];
 const CONDITION_OPTIONS = [
-  { value: 'NEW', label: 'Nuevo' },
-  { value: 'USED', label: 'Usado' },
-  { value: 'REFURBISHED', label: 'Reacondicionado' },
-  { value: 'OEM', label: 'OEM' },
+  { value: 'NEW', label: 'new' },
+  { value: 'USED', label: 'usado' },
+  { value: 'OEM', label: 'oem' },
 ];
 
 export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps) {
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
   const [formData, setFormData] = useState<CreateItemDto | UpdateItemDto>({
-    brand: 'Apple',
+    brand: '',
     model: '',
     storageGb: 128,
     condition: 'NEW',
@@ -57,7 +56,7 @@ export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps
     if (item) {
       setFormData({
         name: item.name,
-        brand: item.brand || 'Apple',
+        brand: item.brand || '',
         model: item.model || '',
         storageGb: item.storageGb || 128,
         condition: item.condition || 'NEW',
@@ -69,7 +68,7 @@ export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps
       });
     } else {
       setFormData({
-        brand: 'Apple',
+        brand: '',
         model: '',
         storageGb: 128,
         condition: 'NEW',

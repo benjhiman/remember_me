@@ -360,6 +360,7 @@ enum ItemCondition {
   NEW
   USED
   REFURBISHED
+  OEM
 }
 
 enum StockStatus {

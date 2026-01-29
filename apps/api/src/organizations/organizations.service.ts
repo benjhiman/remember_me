@@ -56,7 +56,7 @@ export class OrganizationsService {
         },
       });
 
-      await tx.membership.create({
+      const membership = await tx.membership.create({
         data: {
           userId,
           organizationId: org.id,

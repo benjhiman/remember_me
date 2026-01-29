@@ -1,11 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
+import { ItemsSeederService } from './items/items-seeder.service';
 
 @Injectable()
-export class AppService {
+export class AppService implements OnModuleInit {
+  private readonly logger = new Logger(AppService.name);
   private readonly startTime = Date.now();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly itemsSeeder?: ItemsSeederService,
+  ) {}
 
   getHello(): string {
     return 'Hello World!';
@@ -33,5 +38,18 @@ export class AppService {
       commit: commit.substring(0, 7), // Short commit hash
       env: process.env.NODE_ENV || 'development',
     };
+  }
+
+  async onModuleInit() {
+    // Backfill default items for existing organizations (one-time, idempotent)
+    if (this.itemsSeeder) {
+      this.logger.log('Starting backfill of default items for existing organizations...');
+      try {
+        const result = await this.itemsSeeder.backfillExistingOrganizations();
+        this.logger.log(`Backfill completed: ${result.seeded} items seeded across ${result.total} organizations`);
+      } catch (error) {
+        this.logger.error('Failed to backfill default items:', error);
+      }
+    }
   }
 }

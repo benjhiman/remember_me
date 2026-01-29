@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/utils/lead-utils';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { Plus, Search, Edit, Trash2, RefreshCw, Hash } from 'lucide-react';
 import { ItemFormDialog } from '@/components/items/item-form-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,9 @@ export default function InventoryItemsPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [deletingItem, setDeletingItem] = useState<Item | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   const deleteItem = useDeleteItem();
 
@@ -52,6 +56,17 @@ export default function InventoryItemsPage() {
     }, 250);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Clear selection when data changes
+  useEffect(() => {
+    if (data) {
+      const currentIds = new Set(data.data.map((item) => item.id));
+      const newSelected = new Set(Array.from(selectedIds).filter((id) => currentIds.has(id)));
+      if (newSelected.size !== selectedIds.size) {
+        setSelectedIds(newSelected);
+      }
+    }
+  }, [data]);
 
   const { data, isLoading, error, refetch } = useItems({
     page,
@@ -118,6 +133,81 @@ export default function InventoryItemsPage() {
     setIsCreateOpen(true);
   };
 
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+
+    const canWrite =
+      can('stock.write') ||
+      can('inventory.write') ||
+      ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '');
+
+    if (!canWrite) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin permisos',
+        description: 'No tenés permiso para eliminar items. Pedile a un admin que te habilite.',
+      });
+      return;
+    }
+
+    setShowBulkDeleteConfirm(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsBulkDeleting(true);
+    const idsArray = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      idsArray.map((id) => deleteItem.mutateAsync(id))
+    );
+
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    setSelectedIds(new Set());
+    setShowBulkDeleteConfirm(false);
+    setIsBulkDeleting(false);
+
+    if (succeeded > 0) {
+      await queryClient.invalidateQueries({ queryKey: ['items'] });
+      toast({
+        title: 'Items eliminados',
+        description: `${succeeded} item${succeeded > 1 ? 's' : ''} eliminado${succeeded > 1 ? 's' : ''} correctamente.`,
+      });
+    }
+
+    if (failed > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Error al eliminar',
+        description: `No se pudieron eliminar ${failed} item${failed > 1 ? 's' : ''}.`,
+      });
+    }
+  };
+
+  const isAllSelected = data && data.data.length > 0 && data.data.every((item) => selectedIds.has(item.id));
+  const isSomeSelected = selectedIds.size > 0 && !isAllSelected;
+
+  const handleSelectAll = () => {
+    if (!data) return;
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(data.data.map((item) => item.id)));
+    }
+  };
+
+  const handleSelectItem = (itemId: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(itemId)) {
+      newSelected.delete(itemId);
+    } else {
+      newSelected.add(itemId);
+    }
+    setSelectedIds(newSelected);
+  };
+
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory/stock' },
     { label: 'Items', href: '/inventory/items' },
@@ -134,6 +224,17 @@ export default function InventoryItemsPage() {
         <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
         Actualizar
       </Button>
+      {selectedIds.size > 0 && (
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={handleBulkDelete}
+          disabled={isBulkDeleting}
+        >
+          <Trash2 className="h-4 w-4 mr-1.5" />
+          {isBulkDeleting ? 'Eliminando...' : `Eliminar seleccionados (${selectedIds.size})`}
+        </Button>
+      )}
       <Button size="sm" onClick={handleOpenCreate}>
         <Plus className="h-4 w-4 mr-1.5" />
         Nuevo Item
@@ -214,6 +315,13 @@ export default function InventoryItemsPage() {
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                          <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Seleccionar todos"
+                          />
+                        </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Modelo
                         </th>
@@ -242,19 +350,26 @@ export default function InventoryItemsPage() {
                         const getConditionLabel = (condition: string | null) => {
                           switch (condition) {
                             case 'NEW':
-                              return 'Nuevo';
+                              return 'new';
                             case 'USED':
-                              return 'Usado';
-                            case 'REFURBISHED':
-                              return 'Reacondicionado';
+                              return 'usado';
                             case 'OEM':
-                              return 'OEM';
+                              return 'oem';
+                            case 'REFURBISHED':
+                              return 'Reacondicionado'; // Legacy support
                             default:
                               return condition || '-';
                           }
                         };
                         return (
                           <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <Checkbox
+                                checked={selectedIds.has(item.id)}
+                                onCheckedChange={() => handleSelectItem(item.id)}
+                                aria-label={`Seleccionar ${item.model || item.name}`}
+                              />
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900">
                                 {item.model || item.name}
@@ -360,6 +475,27 @@ export default function InventoryItemsPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               {deleteItem.isPending ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar items seleccionados</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que querés eliminar {selectedIds.size} item{selectedIds.size > 1 ? 's' : ''}? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmBulkDelete}
+              disabled={isBulkDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isBulkDeleting ? 'Eliminando...' : 'Eliminar'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -129,13 +129,19 @@ export class ItemsService {
     }
 
     // Normalize strings
-    const brand = (dto.brand || 'Apple').trim();
+    const brand = dto.brand?.trim() || '';
+    if (!brand || brand.length < 2) {
+      throw new BadRequestException('Brand is required');
+    }
     const model = dto.model.trim();
     const color = dto.color.trim();
     const condition = dto.condition;
 
+    // Map condition to display label
+    const conditionLabel = condition === 'NEW' ? 'new' : condition === 'USED' ? 'usado' : condition === 'OEM' ? 'oem' : condition.toLowerCase();
+
     // Build name if not provided
-    const name = dto.name?.trim() || `${brand} ${model} ${dto.storageGb}GB ${color} (${condition})`;
+    const name = dto.name?.trim() || `${brand} ${model} ${dto.storageGb}GB ${color} (${conditionLabel})`;
 
     const item = await this.prisma.item.create({
       data: {
