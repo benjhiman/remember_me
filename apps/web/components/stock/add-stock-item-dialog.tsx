@@ -65,7 +65,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         item.name.toLowerCase().includes(searchLower) ||
         item.sku?.toLowerCase().includes(searchLower) ||
         item.brand?.toLowerCase().includes(searchLower) ||
-        item.category?.toLowerCase().includes(searchLower)
+        item.category?.toLowerCase().includes(searchLower) ||
+        item.model?.toLowerCase().includes(searchLower) ||
+        item.color?.toLowerCase().includes(searchLower)
     );
   }, [items, itemSearch]);
 
