@@ -194,6 +194,17 @@ export class ItemsSeederService {
   }
 
   /**
+   * Helper to compare sets for equality
+   */
+  private setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+    if (a.size !== b.size) return false;
+    for (const item of a) {
+      if (!b.has(item)) return false;
+    }
+    return true;
+  }
+
+  /**
    * Backfill default items for all existing organizations that don't have items
    */
   async backfillExistingOrganizations(): Promise<{ total: number; seeded: number }> {
