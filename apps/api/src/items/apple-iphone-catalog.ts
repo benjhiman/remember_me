@@ -164,14 +164,14 @@ const APPLE_IPHONE_MODELS: Array<{
   // iPhone 17
   {
     model: 'iPhone 17',
-    capacities: [128, 256, 512],
-    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'],
+    capacities: [256, 512],
+    colors: ['Lavender', 'Sage', 'Mist Blue', 'White', 'Black'],
   },
   // iPhone 17 Air
   {
     model: 'iPhone 17 Air',
-    capacities: [128, 256, 512],
-    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'],
+    capacities: [256, 512, 1024],
+    colors: ['Sky Blue', 'Light Gold', 'Cloud White', 'Space Black'],
   },
   // iPhone 17 Pro
   {

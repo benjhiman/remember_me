@@ -12,12 +12,12 @@ import {
 export class ItemsSeederService {
   private readonly logger = new Logger(ItemsSeederService.name);
   private readonly SEED_SOURCE = 'APPLE_IPHONE';
-  private readonly SEED_VERSION = 3;
+  private readonly SEED_VERSION = 4;
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Seed default Apple iPhone catalog for an organization (version 3)
+   * Seed default Apple iPhone catalog for an organization (version 4)
    * Idempotent: only seeds if organization has no items
    */
   async seedDefaultItemsForOrg(organizationId: string): Promise<number> {
@@ -38,14 +38,46 @@ export class ItemsSeederService {
   }
 
   /**
-   * Reseed Apple catalog for an organization (version 3)
-   * Soft-deletes old seed items (v2 and earlier) and creates new ones
+   * Reseed Apple catalog for an organization (version 4)
+   * Soft-deletes old seed items (v3 and earlier) and creates new ones
    */
   async reseedAppleCatalogForOrg(organizationId: string): Promise<number> {
     this.logger.log(`Reseeding Apple iPhone catalog v${this.SEED_VERSION} for organization ${organizationId}`);
 
-    // Check if already at version 3
-    const existingV3Count = await this.prisma.item.count({
+    // Sanity check: verify iPhone 17 and iPhone 17 Air colors are correct
+    const iphone17Model = APPLE_IPHONE_CATALOG.find((item) => item.model === 'iPhone 17' && item.condition === 'NEW');
+    const iphone17AirModel = APPLE_IPHONE_CATALOG.find((item) => item.model === 'iPhone 17 Air' && item.condition === 'NEW');
+    
+    if (iphone17Model) {
+      const iphone17Colors = new Set(
+        APPLE_IPHONE_CATALOG
+          .filter((item) => item.model === 'iPhone 17' && item.condition === 'NEW')
+          .map((item) => item.color)
+      );
+      const expected17Colors = new Set(['Lavender', 'Sage', 'Mist Blue', 'White', 'Black']);
+      if (!this.setsEqual(iphone17Colors, expected17Colors)) {
+        this.logger.error(
+          `SANITY CHECK FAILED: iPhone 17 colors mismatch. Expected: ${Array.from(expected17Colors).join(', ')}, Found: ${Array.from(iphone17Colors).join(', ')}`
+        );
+        throw new Error('iPhone 17 colors do not match official Apple specifications. Aborting seed.');
+      }
+    }
+
+    if (iphone17AirModel) {
+      const iphone17AirColors = new Set(
+        APPLE_IPHONE_CATALOG.filter((item) => item.model === 'iPhone 17 Air' && item.condition === 'NEW').map((item) => item.color)
+      );
+      const expected17AirColors = new Set(['Sky Blue', 'Light Gold', 'Cloud White', 'Space Black']);
+      if (!this.setsEqual(iphone17AirColors, expected17AirColors)) {
+        this.logger.error(
+          `SANITY CHECK FAILED: iPhone 17 Air colors mismatch. Expected: ${Array.from(expected17AirColors).join(', ')}, Found: ${Array.from(iphone17AirColors).join(', ')}`
+        );
+        throw new Error('iPhone 17 Air colors do not match official Apple specifications. Aborting seed.');
+      }
+    }
+
+    // Check if already at version 4
+    const existingV4Count = await this.prisma.item.count({
       where: {
         organizationId,
         seedSource: this.SEED_SOURCE as any,
@@ -55,19 +87,19 @@ export class ItemsSeederService {
     });
 
     const expectedCount = APPLE_IPHONE_CATALOG.length;
-    if (existingV3Count >= expectedCount * 0.9) {
+    if (existingV4Count >= expectedCount * 0.9) {
       // Already seeded (90% threshold to account for potential deletions)
-      this.logger.debug(`Organization ${organizationId} already has v${this.SEED_VERSION} items (${existingV3Count}), skipping reseed`);
+      this.logger.debug(`Organization ${organizationId} already has v${this.SEED_VERSION} items (${existingV4Count}), skipping reseed`);
       return 0;
     }
 
-    // Soft-delete old seed items (seedSource="APPLE_IPHONE" with seedVersion < 3, or legacy detection)
+    // Soft-delete old seed items (seedSource="APPLE_IPHONE" with seedVersion < 4, or legacy detection)
     const legacyItems = await this.prisma.item.findMany({
       where: {
         organizationId,
         deletedAt: null,
         OR: [
-          // Items with seedSource but version < 3
+          // Items with seedSource but version < 4
           {
             AND: [
               { seedSource: this.SEED_SOURCE as any },
@@ -187,7 +219,7 @@ export class ItemsSeederService {
   }
 
   /**
-   * Reseed Apple catalog for all organizations (version 3)
+   * Reseed Apple catalog for all organizations (version 4)
    * Idempotent: checks seedVersion before reseeding
    */
   async reseedAllOrganizations(): Promise<{ total: number; reseeded: number }> {

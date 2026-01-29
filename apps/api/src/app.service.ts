@@ -41,9 +41,9 @@ export class AppService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Reseed Apple catalog v3 for all organizations (one-time, idempotent)
+    // Reseed Apple catalog v4 for all organizations (one-time, idempotent)
     if (this.itemsSeeder) {
-      this.logger.log('Starting reseed of Apple iPhone catalog v3 for all organizations...');
+      this.logger.log('Starting reseed of Apple iPhone catalog v4 for all organizations...');
       try {
         const result = await this.itemsSeeder.reseedAllOrganizations();
         this.logger.log(`Reseed completed: ${result.reseeded} items reseeded across ${result.total} organizations`);
