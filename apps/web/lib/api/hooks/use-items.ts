@@ -8,6 +8,10 @@ export interface Item {
   sku: string | null;
   category: string | null;
   brand: string | null;
+  model: string | null;
+  storageGb: number | null;
+  condition: 'NEW' | 'USED' | 'REFURBISHED' | 'OEM' | null;
+  color: string | null;
   description: string | null;
   attributes: Record<string, any> | null;
   isActive: boolean;

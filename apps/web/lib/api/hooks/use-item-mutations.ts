@@ -4,10 +4,14 @@ import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/utils/error-handler';
 
 export interface CreateItemDto {
-  name: string;
+  name?: string; // Optional: auto-generated if not provided
+  brand: string; // Required, default "Apple" in service
+  model: string; // Required
+  storageGb: number; // Required
+  condition: 'NEW' | 'USED' | 'REFURBISHED' | 'OEM'; // Required
+  color: string; // Required
   sku?: string;
   category?: string;
-  brand?: string;
   description?: string;
   attributes?: Record<string, any>;
   isActive?: boolean;
@@ -15,9 +19,13 @@ export interface CreateItemDto {
 
 export interface UpdateItemDto {
   name?: string;
+  brand?: string;
+  model?: string;
+  storageGb?: number;
+  condition?: 'NEW' | 'USED' | 'REFURBISHED' | 'OEM';
+  color?: string;
   sku?: string;
   category?: string;
-  brand?: string;
   description?: string;
   attributes?: Record<string, any>;
   isActive?: boolean;

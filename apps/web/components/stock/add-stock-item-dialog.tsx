@@ -224,22 +224,28 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
                 {!itemsLoading && filteredItems.length > 0 && (
                   <div className="border rounded-md max-h-[300px] overflow-y-auto">
-                    {filteredItems.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelectedItemId(item.id)}
-                        className={cn(
-                          'w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b last:border-b-0',
-                          selectedItemId === item.id && 'bg-muted'
-                        )}
-                      >
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {[item.brand, item.category, item.sku].filter(Boolean).join(' • ')}
-                        </div>
-                      </button>
-                    ))}
+                    {filteredItems.map((item) => {
+                      // Build display label: brand + model + storage + color + condition
+                      const displayLabel =
+                        item.model && item.storageGb && item.color && item.condition
+                          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${item.condition === 'NEW' ? 'Nuevo' : item.condition === 'USED' ? 'Usado' : item.condition === 'REFURBISHED' ? 'Reacondicionado' : item.condition === 'OEM' ? 'OEM' : item.condition}`
+                          : item.name || 'Item sin nombre';
+                      const subtitle = [item.brand, item.category, item.sku].filter(Boolean).join(' • ') || undefined;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setSelectedItemId(item.id)}
+                          className={cn(
+                            'w-full text-left px-4 py-3 hover:bg-muted transition-colors border-b last:border-b-0',
+                            selectedItemId === item.id && 'bg-muted'
+                          )}
+                        >
+                          <div className="font-medium">{displayLabel}</div>
+                          {subtitle && <div className="text-sm text-muted-foreground">{subtitle}</div>}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -247,7 +253,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                   <div className="p-3 bg-muted rounded-md">
                     <div className="text-sm font-medium">Item seleccionado:</div>
                     <div className="text-sm text-muted-foreground">
-                      {selectedItem.name} {selectedItem.brand && `• ${selectedItem.brand}`}
+                      {selectedItem.model && selectedItem.storageGb && selectedItem.color && selectedItem.condition
+                        ? `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${selectedItem.condition === 'NEW' ? 'Nuevo' : selectedItem.condition === 'USED' ? 'Usado' : selectedItem.condition === 'REFURBISHED' ? 'Reacondicionado' : selectedItem.condition === 'OEM' ? 'OEM' : selectedItem.condition}`
+                        : selectedItem.name}
                     </div>
                   </div>
                 )}

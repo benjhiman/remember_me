@@ -77,6 +77,8 @@ export class ItemsService {
         { sku: { contains: dto.q, mode: 'insensitive' } },
         { brand: { contains: dto.q, mode: 'insensitive' } },
         { category: { contains: dto.q, mode: 'insensitive' } },
+        { model: { contains: dto.q, mode: 'insensitive' } },
+        { color: { contains: dto.q, mode: 'insensitive' } },
       ];
     }
 
@@ -126,14 +128,27 @@ export class ItemsService {
       throw new ForbiddenException('Only admins and managers can create items');
     }
 
+    // Normalize strings
+    const brand = (dto.brand || 'Apple').trim();
+    const model = dto.model.trim();
+    const color = dto.color.trim();
+    const condition = dto.condition;
+
+    // Build name if not provided
+    const name = dto.name?.trim() || `${brand} ${model} ${dto.storageGb}GB ${color} (${condition})`;
+
     const item = await this.prisma.item.create({
       data: {
         organizationId,
-        name: dto.name,
-        sku: dto.sku || null,
-        category: dto.category || null,
-        brand: dto.brand || null,
-        description: dto.description || null,
+        name,
+        sku: dto.sku?.trim() || null,
+        category: dto.category?.trim() || null,
+        brand,
+        model,
+        storageGb: dto.storageGb,
+        condition,
+        color,
+        description: dto.description?.trim() || null,
         attributes: dto.attributes || undefined,
         isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
@@ -179,17 +194,35 @@ export class ItemsService {
       throw new NotFoundException('Item not found');
     }
 
+    // Build update data with normalization
+    const updateData: any = {};
+    if (dto.name !== undefined) updateData.name = dto.name.trim();
+    if (dto.sku !== undefined) updateData.sku = dto.sku?.trim() || null;
+    if (dto.category !== undefined) updateData.category = dto.category?.trim() || null;
+    if (dto.brand !== undefined) updateData.brand = dto.brand.trim();
+    if (dto.model !== undefined) updateData.model = dto.model.trim();
+    if (dto.storageGb !== undefined) updateData.storageGb = dto.storageGb;
+    if (dto.condition !== undefined) updateData.condition = dto.condition;
+    if (dto.color !== undefined) updateData.color = dto.color.trim();
+    if (dto.description !== undefined) updateData.description = dto.description?.trim() || null;
+    if (dto.attributes !== undefined) updateData.attributes = dto.attributes || undefined;
+    if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+
+    // Auto-update name if model/brand/storage/color/condition changed
+    if (dto.model || dto.brand || dto.storageGb !== undefined || dto.color || dto.condition) {
+      const finalBrand = updateData.brand || existingItem.brand || 'Apple';
+      const finalModel = updateData.model || existingItem.model || '';
+      const finalStorageGb = updateData.storageGb ?? existingItem.storageGb ?? 0;
+      const finalColor = updateData.color || existingItem.color || '';
+      const finalCondition = updateData.condition || existingItem.condition || 'NEW';
+      if (finalModel && finalStorageGb && finalColor) {
+        updateData.name = `${finalBrand} ${finalModel} ${finalStorageGb}GB ${finalColor} (${finalCondition})`;
+      }
+    }
+
     const item = await this.prisma.item.update({
       where: { id: itemId },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        ...(dto.sku !== undefined && { sku: dto.sku || null }),
-        ...(dto.category !== undefined && { category: dto.category || null }),
-        ...(dto.brand !== undefined && { brand: dto.brand || null }),
-        ...(dto.description !== undefined && { description: dto.description || null }),
-        ...(dto.attributes !== undefined && { attributes: dto.attributes || undefined }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-      },
+      data: updateData,
     });
 
     const metadata = this.getRequestMetadata();

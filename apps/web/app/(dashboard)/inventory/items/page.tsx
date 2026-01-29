@@ -201,13 +201,16 @@ export default function InventoryItemsPage() {
                     <thead className="bg-gray-50 border-b border-gray-200">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Nombre
+                          Modelo
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          SKU
+                          Almacenamiento
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Categoría
+                          Condición
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Color
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Marca
@@ -221,47 +224,70 @@ export default function InventoryItemsPage() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {data.data.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{item.sku || '-'}</div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{item.category || '-'}</div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="text-sm text-gray-600">{item.brand || '-'}</div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                            {formatDate(item.updatedAt)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex items-center justify-end gap-2">
-                              {can('inventory.write') && (
-                                <>
-                                  <button
-                                    onClick={() => setEditingItem(item)}
-                                    className="text-blue-600 hover:text-blue-900"
-                                    title="Editar"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => setDeletingItem(item)}
-                                    className="text-red-600 hover:text-red-900"
-                                    title="Eliminar"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {data.data.map((item) => {
+                        const getConditionLabel = (condition: string | null) => {
+                          switch (condition) {
+                            case 'NEW':
+                              return 'Nuevo';
+                            case 'USED':
+                              return 'Usado';
+                            case 'REFURBISHED':
+                              return 'Reacondicionado';
+                            case 'OEM':
+                              return 'OEM';
+                            default:
+                              return condition || '-';
+                          }
+                        };
+                        return (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {item.model || item.name}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">
+                                {item.storageGb ? `${item.storageGb} GB` : '-'}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">{getConditionLabel(item.condition)}</div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">{item.color || '-'}</div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">{item.brand || '-'}</div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                              {formatDate(item.updatedAt)}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                              <div className="flex items-center justify-end gap-2">
+                                {can('inventory.write') && (
+                                  <>
+                                    <button
+                                      onClick={() => setEditingItem(item)}
+                                      className="text-blue-600 hover:text-blue-900"
+                                      title="Editar"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setDeletingItem(item)}
+                                      className="text-red-600 hover:text-red-900"
+                                      title="Eliminar"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

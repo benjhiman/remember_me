@@ -328,18 +328,22 @@ model StockItem {
 // ===== ITEMS (Product Catalog) =====
 
 model Item {
-  id             String   @id @default(cuid())
+  id             String        @id @default(cuid())
   organizationId String
   name           String
   sku            String?
   category       String?
   brand          String?
-  description    String?  @db.Text
+  model          String? // e.g., "iPhone 15 Pro"
+  storageGb      Int? // e.g., 64, 128, 256, 512, 1024
+  condition      ItemCondition?
+  color          String? // e.g., "Natural Titanium", "Blue"
+  description    String?       @db.Text
   attributes     Json? // Flexible attributes (color, size, etc.)
-  isActive       Boolean  @default(true)
+  isActive       Boolean       @default(true)
   deletedAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   stockItems   StockItem[]
@@ -348,6 +352,8 @@ model Item {
   @@index([organizationId, deletedAt])
   @@index([sku])
   @@index([name])
+  @@index([organizationId, model])
+  @@index([organizationId, brand])
 }
 
 enum ItemCondition {
