@@ -12,12 +12,12 @@ import {
 export class ItemsSeederService {
   private readonly logger = new Logger(ItemsSeederService.name);
   private readonly SEED_SOURCE = 'APPLE_IPHONE';
-  private readonly SEED_VERSION = 2;
+  private readonly SEED_VERSION = 3;
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Seed default Apple iPhone catalog for an organization (version 2)
+   * Seed default Apple iPhone catalog for an organization (version 3)
    * Idempotent: only seeds if organization has no items
    */
   async seedDefaultItemsForOrg(organizationId: string): Promise<number> {
@@ -38,34 +38,69 @@ export class ItemsSeederService {
   }
 
   /**
-   * Reseed Apple catalog for an organization (version 2)
-   * Soft-deletes old seed items and creates new ones
+   * Reseed Apple catalog for an organization (version 3)
+   * Soft-deletes old seed items (v2 and earlier) and creates new ones
    */
   async reseedAppleCatalogForOrg(organizationId: string): Promise<number> {
     this.logger.log(`Reseeding Apple iPhone catalog v${this.SEED_VERSION} for organization ${organizationId}`);
 
-    // Soft-delete old seed items (seedSource="APPLE_IPHONE" or legacy detection)
+    // Check if already at version 3
+    const existingV3Count = await this.prisma.item.count({
+      where: {
+        organizationId,
+        seedSource: this.SEED_SOURCE as any,
+        seedVersion: this.SEED_VERSION,
+        deletedAt: null,
+      },
+    });
+
+    const expectedCount = APPLE_IPHONE_CATALOG.length;
+    if (existingV3Count >= expectedCount * 0.9) {
+      // Already seeded (90% threshold to account for potential deletions)
+      this.logger.debug(`Organization ${organizationId} already has v${this.SEED_VERSION} items (${existingV3Count}), skipping reseed`);
+      return 0;
+    }
+
+    // Soft-delete old seed items (seedSource="APPLE_IPHONE" with seedVersion < 3, or legacy detection)
     const legacyItems = await this.prisma.item.findMany({
       where: {
         organizationId,
         deletedAt: null,
         OR: [
-          { seedSource: this.SEED_SOURCE },
+          // Items with seedSource but version < 3
+          {
+            AND: [
+              { seedSource: this.SEED_SOURCE as any },
+              {
+                OR: [
+                  { seedVersion: { lt: this.SEED_VERSION } },
+                  { seedVersion: null },
+                ],
+              },
+            ],
+          },
           // Legacy detection: brand="Apple" or "APPLE" and name starts with "Apple iPhone" or "APPLE iPhone"
           {
             AND: [
               { brand: { in: ['Apple', 'APPLE'] } },
               { name: { startsWith: 'Apple iPhone' } },
+              { seedSource: null }, // Only if not already marked as seed
             ],
           },
           {
             AND: [
               { brand: { in: ['Apple', 'APPLE'] } },
               { name: { startsWith: 'APPLE iPhone' } },
+              { seedSource: null }, // Only if not already marked as seed
             ],
           },
-          // Or SKU starts with "IPH"
-          { sku: { startsWith: 'IPH' } },
+          // Or SKU starts with "IPH" and seedSource is null (legacy seed)
+          {
+            AND: [
+              { sku: { startsWith: 'IPH' } },
+              { seedSource: null },
+            ],
+          },
         ],
       },
       select: { id: true },

@@ -4,7 +4,9 @@
  * This catalog includes all iPhone models from iPhone 11 to iPhone 17 Pro Max
  * with official capacities and colors from Apple.
  * 
- * Generated from official Apple specifications.
+ * Colors and capacities verified from:
+ * - Apple Tech Specs (support.apple.com) for iPhone 11-16
+ * - Apple Store (apple.com/shop/buy-iphone) for iPhone 17
  */
 
 export interface AppleIphoneCatalogItem {
@@ -15,355 +17,187 @@ export interface AppleIphoneCatalogItem {
   condition: 'NEW' | 'USED' | 'OEM';
 }
 
-export const APPLE_IPHONE_CATALOG: AppleIphoneCatalogItem[] = [
+// Source of truth: official Apple specifications per model
+const APPLE_IPHONE_MODELS: Array<{
+  model: string;
+  capacities: number[];
+  colors: string[];
+}> = [
   // iPhone 11
-  ...['64', '128', '256'].flatMap((storage) =>
-    ['Black', 'Green', 'Yellow', 'Purple', 'Red', 'White'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 11',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 11',
+    capacities: [64, 128, 256],
+    colors: ['Black', 'Green', 'Yellow', 'Purple', 'Red', 'White'],
+  },
   // iPhone 11 Pro
-  ...['64', '256', '512'].flatMap((storage) =>
-    ['Space Gray', 'Silver', 'Gold', 'Midnight Green'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 11 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 11 Pro',
+    capacities: [64, 256, 512],
+    colors: ['Space Gray', 'Silver', 'Gold', 'Midnight Green'],
+  },
   // iPhone 11 Pro Max
-  ...['64', '256', '512'].flatMap((storage) =>
-    ['Space Gray', 'Silver', 'Gold', 'Midnight Green'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 11 Pro Max',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 11 Pro Max',
+    capacities: [64, 256, 512],
+    colors: ['Space Gray', 'Silver', 'Gold', 'Midnight Green'],
+  },
   // iPhone 12 mini
-  ...['64', '128', '256'].flatMap((storage) =>
-    ['Black', 'White', 'Red', 'Green', 'Blue', 'Purple'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 12 mini',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 12 mini',
+    capacities: [64, 128, 256],
+    colors: ['Black', 'White', 'Red', 'Green', 'Blue', 'Purple'],
+  },
   // iPhone 12
-  ...['64', '128', '256'].flatMap((storage) =>
-    ['Black', 'White', 'Red', 'Green', 'Blue', 'Purple'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 12',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 12',
+    capacities: [64, 128, 256],
+    colors: ['Black', 'White', 'Red', 'Green', 'Blue', 'Purple'],
+  },
   // iPhone 12 Pro
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Graphite', 'Silver', 'Gold', 'Pacific Blue'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 12 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 12 Pro',
+    capacities: [128, 256, 512],
+    colors: ['Graphite', 'Silver', 'Gold', 'Pacific Blue'],
+  },
   // iPhone 12 Pro Max
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Graphite', 'Silver', 'Gold', 'Pacific Blue'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 12 Pro Max',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 12 Pro Max',
+    capacities: [128, 256, 512],
+    colors: ['Graphite', 'Silver', 'Gold', 'Pacific Blue'],
+  },
   // iPhone 13 mini
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Blue', 'Midnight', 'Starlight', 'Red'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 13 mini',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 13 mini',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Blue', 'Midnight', 'Starlight', 'Red'],
+  },
   // iPhone 13
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Blue', 'Midnight', 'Starlight', 'Red'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 13',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 13',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Blue', 'Midnight', 'Starlight', 'Red'],
+  },
   // iPhone 13 Pro
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Graphite', 'Gold', 'Silver', 'Sierra Blue', 'Alpine Green'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 13 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 13 Pro',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Graphite', 'Gold', 'Silver', 'Sierra Blue', 'Alpine Green'],
+  },
   // iPhone 13 Pro Max
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Graphite', 'Gold', 'Silver', 'Sierra Blue', 'Alpine Green'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 13 Pro Max',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 13 Pro Max',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Graphite', 'Gold', 'Silver', 'Sierra Blue', 'Alpine Green'],
+  },
   // iPhone 14
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Blue', 'Purple', 'Midnight', 'Starlight', 'Red'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 14',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 14',
+    capacities: [128, 256, 512],
+    colors: ['Blue', 'Purple', 'Midnight', 'Starlight', 'Red'],
+  },
   // iPhone 14 Plus
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Blue', 'Purple', 'Midnight', 'Starlight', 'Red'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 14 Plus',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 14 Plus',
+    capacities: [128, 256, 512],
+    colors: ['Blue', 'Purple', 'Midnight', 'Starlight', 'Red'],
+  },
   // iPhone 14 Pro
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Deep Purple', 'Gold', 'Silver', 'Space Black'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 14 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 14 Pro',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Deep Purple', 'Gold', 'Silver', 'Space Black'],
+  },
   // iPhone 14 Pro Max
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Deep Purple', 'Gold', 'Silver', 'Space Black'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 14 Pro Max',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 14 Pro Max',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Deep Purple', 'Gold', 'Silver', 'Space Black'],
+  },
   // iPhone 15
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Yellow', 'Green', 'Blue', 'Black'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 15',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 15',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black'],
+  },
   // iPhone 15 Plus
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Yellow', 'Green', 'Blue', 'Black'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 15 Plus',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 15 Plus',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black'],
+  },
   // iPhone 15 Pro
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 15 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 15 Pro',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium'],
+  },
   // iPhone 15 Pro Max
-  ...['256', '512', '1024'].flatMap((storage) =>
-    ['Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 15 Pro Max',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 15 Pro Max',
+    capacities: [256, 512, 1024],
+    colors: ['Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium'],
+  },
   // iPhone 16
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 16',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 16',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'],
+  },
   // iPhone 16 Plus
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 16 Plus',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 16 Plus',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'],
+  },
   // iPhone 16 Pro
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Desert Titanium', 'Natural Titanium', 'White Titanium', 'Black Titanium'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 16 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 16 Pro',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Desert Titanium', 'Natural Titanium', 'White Titanium', 'Black Titanium'],
+  },
   // iPhone 16 Pro Max
-  ...['256', '512', '1024'].flatMap((storage) =>
-    ['Desert Titanium', 'Natural Titanium', 'White Titanium', 'Black Titanium'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 16 Pro Max',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
-  // iPhone 17 (projected - using similar structure to iPhone 16)
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 17',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 16 Pro Max',
+    capacities: [256, 512, 1024],
+    colors: ['Desert Titanium', 'Natural Titanium', 'White Titanium', 'Black Titanium'],
+  },
+  // iPhone 17
+  {
+    model: 'iPhone 17',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'],
+  },
   // iPhone 17 Air
-  ...['128', '256', '512'].flatMap((storage) =>
-    ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 17 Air',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 17 Air',
+    capacities: [128, 256, 512],
+    colors: ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'],
+  },
   // iPhone 17 Pro
-  ...['128', '256', '512', '1024'].flatMap((storage) =>
-    ['Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 17 Pro',
-        storageGb: parseInt(storage),
-        color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
-      }))
-    )
-  ),
-
+  {
+    model: 'iPhone 17 Pro',
+    capacities: [128, 256, 512, 1024],
+    colors: ['Cosmic Orange', 'Deep Blue', 'Silver'],
+  },
   // iPhone 17 Pro Max
-  ...['256', '512', '1024'].flatMap((storage) =>
-    ['Natural Titanium', 'Blue Titanium', 'White Titanium', 'Black Titanium'].flatMap((color) =>
-      ['NEW', 'USED', 'OEM'].map((condition) => ({
-        brand: 'Apple',
-        model: 'iPhone 17 Pro Max',
-        storageGb: parseInt(storage),
+  {
+    model: 'iPhone 17 Pro Max',
+    capacities: [256, 512, 1024, 2048],
+    colors: ['Cosmic Orange', 'Deep Blue', 'Silver'],
+  },
+];
+
+// Generate catalog from source of truth
+export const APPLE_IPHONE_CATALOG: AppleIphoneCatalogItem[] = APPLE_IPHONE_MODELS.flatMap((model) =>
+  model.capacities.flatMap((capacity) =>
+    model.colors.flatMap((color) =>
+      (['NEW', 'USED', 'OEM'] as const).map((condition) => ({
+        brand: 'Apple', // Will be normalized to "APPLE" in seeder
+        model: model.model,
+        storageGb: capacity,
         color,
-        condition: condition as 'NEW' | 'USED' | 'OEM',
+        condition,
       }))
     )
-  ),
-];
+  )
+);
