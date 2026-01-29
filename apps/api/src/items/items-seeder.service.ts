@@ -187,7 +187,7 @@ export class ItemsSeederService {
   }
 
   /**
-   * Reseed Apple catalog for all organizations (version 2)
+   * Reseed Apple catalog for all organizations (version 3)
    * Idempotent: checks seedVersion before reseeding
    */
   async reseedAllOrganizations(): Promise<{ total: number; reseeded: number }> {
@@ -198,36 +198,30 @@ export class ItemsSeederService {
     });
 
     let totalReseeded = 0;
+    let totalOrgsProcessed = 0;
 
-    for (const org of organizations) {
-      try {
-        // Check if already at version 2
-        const existingV2Count = await this.prisma.item.count({
-          where: {
-            organizationId: org.id,
-            seedSource: this.SEED_SOURCE as any,
-            seedVersion: this.SEED_VERSION,
-            deletedAt: null,
-          },
-        });
-
-        // Expected count: all catalog items
-        const expectedCount = APPLE_IPHONE_CATALOG.length;
-
-        if (existingV2Count >= expectedCount * 0.9) {
-          // Already seeded (90% threshold to account for potential deletions)
-          this.logger.debug(`Organization ${org.id} already has v${this.SEED_VERSION} items (${existingV2Count}), skipping`);
-          continue;
-        }
-
-        const count = await this.reseedAppleCatalogForOrg(org.id);
-        totalReseeded += count;
-      } catch (error) {
-        this.logger.error(`Failed to reseed items for organization ${org.id}: ${error.message}`, error.stack);
-      }
+    // Process with limited concurrency to avoid overwhelming the database
+    const concurrency = 5;
+    for (let i = 0; i < organizations.length; i += concurrency) {
+      const batch = organizations.slice(i, i + concurrency);
+      await Promise.all(
+        batch.map(async (org) => {
+          try {
+            const count = await this.reseedAppleCatalogForOrg(org.id);
+            if (count > 0) {
+              totalReseeded += count;
+              this.logger.log(`Organization ${org.id}: reseeded ${count} items (v${this.SEED_VERSION})`);
+            }
+            totalOrgsProcessed++;
+          } catch (error) {
+            this.logger.error(`Failed to reseed items for organization ${org.id}: ${error.message}`, error.stack);
+            totalOrgsProcessed++;
+          }
+        })
+      );
     }
 
-    this.logger.log(`Reseed completed: ${totalReseeded} items reseeded across ${organizations.length} organizations`);
+    this.logger.log(`Reseed completed: ${totalReseeded} items reseeded across ${totalOrgsProcessed}/${organizations.length} organizations`);
     return { total: organizations.length, reseeded: totalReseeded };
   }
 }
