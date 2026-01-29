@@ -96,12 +96,12 @@ export function InboxTopbar({ currentChannel }: InboxTopbarProps) {
         </div>
 
         <div className="flex items-center gap-2 h-9">
-          <span className="text-sm text-muted-foreground leading-none flex items-center h-9">Canal:</span>
+          <span className="text-sm text-muted-foreground leading-none">Canal:</span>
           <Select value={currentChannelValue} onValueChange={handleChannelChange}>
-            <SelectTrigger className="h-9 w-auto">
+            <SelectTrigger className="w-[140px] h-9">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent position="item-aligned" className="w-auto min-w-[160px]">
+            <SelectContent>
               {channelDropdown.map((channel) => {
                 const Icon = channel.icon;
                 return (
