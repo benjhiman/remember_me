@@ -17,6 +17,7 @@ import { UpdateStockItemDto } from './dto/update-stock-item.dto';
 import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateStockEntryDto, StockEntryMode } from './dto/create-stock-entry.dto';
 import {
   Role,
   StockStatus,
@@ -197,7 +198,7 @@ export class StockService {
     // Check if IMEI is unique (if provided)
     if (dto.imei) {
       const existingItem = await this.prisma.stockItem.findUnique({
-        where: { imei: dto.imei },
+        where: { organizationId_imei: { organizationId, imei: dto.imei } },
       });
 
       if (existingItem) {
@@ -205,10 +206,17 @@ export class StockService {
       }
     }
 
+    // Note: createStockItem is a legacy method that doesn't require itemId
+    // For new stock entries, use createStockEntry which requires itemId
+    // This method creates a "dummy" itemId to satisfy Prisma schema
+    // TODO: Migrate all callers to use createStockEntry with proper itemId
+    const dummyItemId = 'legacy-no-item'; // Placeholder for legacy items without catalog entry
+
     return this.prisma.$transaction(async (tx) => {
       const item = await tx.stockItem.create({
         data: {
           organizationId,
+          itemId: dummyItemId, // Legacy: items created without catalog reference
           sku: dto.sku,
           model: dto.model,
           storage: dto.storage,
@@ -223,7 +231,7 @@ export class StockService {
           location: dto.location,
           notes: dto.notes,
           metadata: dto.metadata || {},
-        },
+        } as any, // Type assertion needed for legacy compatibility
       });
 
       // Create initial IN movement
@@ -301,7 +309,7 @@ export class StockService {
     // Check if IMEI is unique (if being updated)
     if (dto.imei && dto.imei !== item.imei) {
       const existingItem = await this.prisma.stockItem.findUnique({
-        where: { imei: dto.imei },
+        where: { organizationId_imei: { organizationId, imei: dto.imei } },
       });
 
       if (existingItem) {
@@ -967,6 +975,220 @@ export class StockService {
     }
 
     return reservation;
+  }
+
+  async createStockEntry(organizationId: string, userId: string, dto: CreateStockEntryDto) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can create stock entries');
+    }
+
+    // Validate item exists and belongs to organization
+    const item = await this.prisma.item.findFirst({
+      where: {
+        id: dto.itemId,
+        organizationId,
+        deletedAt: null,
+        isActive: true,
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Item not found or inactive');
+    }
+
+    // Get item details for stock item creation
+    const itemName = item.name;
+    const itemAttributes = (item.attributes as any) || {};
+    const model = itemAttributes.model || itemName;
+    const storage = itemAttributes.storage;
+    const color = itemAttributes.color;
+
+    // Validate mode-specific fields
+    if (dto.mode === StockEntryMode.IMEI) {
+      if (!dto.imeis || dto.imeis.length === 0) {
+        throw new BadRequestException('IMEIs array is required for IMEI mode');
+      }
+
+      // Normalize IMEIs: trim, remove spaces, filter empty
+      const normalizedImeis = dto.imeis
+        .map((imei) => imei.trim().replace(/\s+/g, ''))
+        .filter((imei) => imei.length > 0);
+
+      if (normalizedImeis.length === 0) {
+        throw new BadRequestException('At least one valid IMEI is required');
+      }
+
+      // Check for duplicates within the request
+      const uniqueImeis = new Set(normalizedImeis);
+      if (uniqueImeis.size !== normalizedImeis.length) {
+        throw new BadRequestException('Duplicate IMEIs found in the request');
+      }
+
+      // Check for existing IMEIs in database (using findMany with OR)
+      const existingItems = await this.prisma.stockItem.findMany({
+        where: {
+          organizationId,
+          OR: normalizedImeis.map((imei) => ({ imei })),
+          deletedAt: null,
+        },
+        select: { imei: true },
+      });
+
+      if (existingItems.length > 0) {
+        const existingImeis = existingItems.map((item) => item.imei).filter(Boolean);
+        throw new ConflictException({
+          message: 'Some IMEIs already exist',
+          duplicateImeis: existingImeis,
+        });
+      }
+
+      // Create stock items (one per IMEI)
+      return this.prisma.$transaction(async (tx) => {
+        const createdItems = [];
+        const costPrice = dto.cost ? new Decimal(dto.cost) : new Decimal(0);
+        const basePrice = dto.cost ? new Decimal(dto.cost) : new Decimal(0);
+
+        for (const imei of normalizedImeis) {
+          const stockItem = await tx.stockItem.create({
+            data: {
+              organizationId,
+              itemId: dto.itemId,
+              model,
+              storage,
+              color,
+              condition: dto.condition || 'NEW',
+              imei,
+              quantity: 1, // IMEI items always have quantity 1
+              costPrice,
+              basePrice,
+              status: dto.status || 'AVAILABLE',
+              location: dto.location,
+              notes: dto.notes,
+              metadata: dto.metadata,
+            } as any, // Type assertion needed due to Prisma type inference
+          });
+
+          // Create movement (IN type)
+          await this.createMovement(
+            tx,
+            organizationId,
+            stockItem.id,
+            StockMovementType.IN,
+            0,
+            1,
+            userId,
+            'Stock entry created',
+            undefined,
+            undefined,
+            dto.metadata,
+          );
+
+          createdItems.push(stockItem);
+        }
+
+        // Audit log
+        const metadata = this.getRequestMetadata();
+        await this.auditLogService.log({
+          organizationId,
+          actorUserId: userId,
+          requestId: metadata.requestId,
+          action: AuditAction.CREATE,
+          entityType: AuditEntityType.StockItem,
+          entityId: createdItems[0]?.id || '',
+          after: {
+            count: createdItems.length.toString(),
+            mode: 'IMEI',
+            itemId: dto.itemId,
+          },
+          metadata: {
+            ...metadata,
+            itemId: dto.itemId,
+            mode: 'IMEI',
+            imeiCount: normalizedImeis.length,
+          },
+        });
+
+        return {
+          created: createdItems.length,
+          items: createdItems,
+        };
+      });
+    } else if (dto.mode === StockEntryMode.QUANTITY) {
+      if (!dto.quantity || dto.quantity < 1) {
+        throw new BadRequestException('Quantity must be at least 1 for QUANTITY mode');
+      }
+
+      const costPrice = dto.cost ? new Decimal(dto.cost) : new Decimal(0);
+      const basePrice = dto.cost ? new Decimal(dto.cost) : new Decimal(0);
+
+      return this.prisma.$transaction(async (tx) => {
+        const stockItem = await tx.stockItem.create({
+          data: {
+            organizationId,
+            itemId: dto.itemId,
+            model,
+            storage,
+            color,
+            condition: dto.condition || 'NEW',
+            imei: null, // No IMEI for quantity mode
+            quantity: dto.quantity!,
+            costPrice,
+            basePrice,
+            status: dto.status || 'AVAILABLE',
+            location: dto.location,
+            notes: dto.notes,
+            metadata: dto.metadata,
+          } as any, // Type assertion needed due to Prisma type inference
+        });
+
+        // Create movement (IN type)
+        await this.createMovement(
+          tx,
+          organizationId,
+          stockItem.id,
+          StockMovementType.IN,
+          0,
+          dto.quantity!,
+          userId,
+          'Stock entry created',
+          undefined,
+          undefined,
+          dto.metadata,
+        );
+
+        // Audit log
+        const metadata = this.getRequestMetadata();
+        await this.auditLogService.log({
+          organizationId,
+          actorUserId: userId,
+          requestId: metadata.requestId,
+          action: AuditAction.CREATE,
+          entityType: AuditEntityType.StockItem,
+          entityId: stockItem.id,
+          after: {
+            id: stockItem.id,
+            quantity: stockItem.quantity.toString(),
+            mode: 'QUANTITY',
+            itemId: dto.itemId,
+          },
+          metadata: {
+            ...metadata,
+            itemId: dto.itemId,
+            mode: 'QUANTITY',
+            quantity: dto.quantity,
+          },
+        });
+
+        return {
+          created: 1,
+          items: [stockItem],
+        };
+      });
+    } else {
+      throw new BadRequestException(`Invalid mode: ${dto.mode}`);
+    }
   }
 
   health() {

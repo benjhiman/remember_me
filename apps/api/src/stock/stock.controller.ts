@@ -24,6 +24,7 @@ import { UpdateStockItemDto } from './dto/update-stock-item.dto';
 import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { CreateStockEntryDto } from './dto/create-stock-entry.dto';
 import { Idempotent } from '../common/idempotency/idempotent.decorator';
 import { Role } from '@remember-me/prisma';
 
@@ -134,6 +135,17 @@ export class StockController {
   }
 
   // Reservations
+  @Post('entries')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  async createStockEntry(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreateStockEntryDto,
+  ) {
+    return this.stockService.createStockEntry(organizationId, user.userId, dto);
+  }
+
   @Post('reservations')
   async createReservation(
     @CurrentOrganization() organizationId: string,

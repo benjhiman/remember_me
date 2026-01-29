@@ -17,6 +17,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { RefreshCw, Loader2, Package } from 'lucide-react';
 import { formatDate } from '@/lib/utils/lead-utils';
 import type { StockStatus, ItemCondition } from '@/types/stock';
+import { AddStockItemDialog } from '@/components/stock/add-stock-item-dialog';
 
 export default function InventoryStockPage() {
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function InventoryStockPage() {
   const [statusFilter, setStatusFilter] = useState<StockStatus | undefined>(undefined);
   const [conditionFilter, setConditionFilter] = useState<ItemCondition | undefined>(undefined);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   const {
     data,
@@ -175,7 +177,11 @@ export default function InventoryStockPage() {
         )}
         {isRefreshing ? 'Refreshing...' : 'Refresh'}
       </Button>
-      <Button size="sm" onClick={() => router.push('/inventory/reservas')}>
+      <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
+        <Package className="h-4 w-4 mr-1.5" />
+        Agregar item
+      </Button>
+      <Button size="sm" variant="outline" onClick={() => router.push('/inventory/reservas')}>
         Ver Reservas
       </Button>
     </div>
@@ -268,9 +274,12 @@ export default function InventoryStockPage() {
           headline="Start managing your inventory"
           description="Agregá items a tu inventario para comenzar a gestionar el stock."
           primaryActionLabel="AGREGAR ITEM"
+          onPrimaryAction={() => setIsAddDialogOpen(true)}
           showDropdown
         />
       )}
+
+      <AddStockItemDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
 
       {allItems.length > 0 && (
         <>

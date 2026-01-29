@@ -292,12 +292,13 @@ model Task {
 model StockItem {
   id             String        @id @default(cuid())
   organizationId String
+  itemId         String // FK to Item (product catalog)
   sku            String? // SKU interno
   model          String // "iPhone 15 Pro 256GB"
   storage        String? // "256GB"
   color          String? // "Natural Titanium"
   condition      ItemCondition @default(NEW)
-  imei           String?       @unique
+  imei           String?
   serialNumber   String?
   quantity       Int           @default(1) // Para lotes sin IMEI
   costPrice      Decimal       @db.Decimal(10, 2)
@@ -311,15 +312,17 @@ model StockItem {
   updatedAt      DateTime      @updatedAt
 
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  item               Item              @relation(fields: [itemId], references: [id], onDelete: Restrict)
   reservations      SaleItem[]
   movements         StockMovement[]
   stockReservations StockReservation[]
   PurchaseLine      PurchaseLine[]
 
+  @@unique([organizationId, imei]) // IMEI único por organización
   @@index([organizationId, status])
   @@index([organizationId, model])
+  @@index([organizationId, itemId])
   @@index([sku])
-  @@index([imei])
 }
 
 // ===== ITEMS (Product Catalog) =====
@@ -339,6 +342,7 @@ model Item {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stockItems   StockItem[]
 
   @@index([organizationId, isActive])
   @@index([organizationId, deletedAt])

@@ -524,9 +524,13 @@ export class PurchasesService {
 
         // If no stock item exists, create a placeholder
         if (!stockItem) {
+          // Note: This creates stock without itemId (legacy behavior)
+          // TODO: Migrate to use createStockEntry with proper itemId
+          const dummyItemId = 'legacy-purchase-no-item';
           stockItem = await tx.stockItem.create({
             data: {
               organizationId,
+              itemId: dummyItemId, // Legacy: purchases create stock without catalog reference
               sku: line.sku || `PURCHASE-${purchaseId}-${line.id}`,
               model: line.description,
               quantity: 0, // Will be updated by movement
@@ -534,7 +538,7 @@ export class PurchasesService {
               basePrice: line.unitPriceCents / 100,
               status: 'AVAILABLE',
               condition: 'NEW',
-            },
+            } as any, // Type assertion needed for legacy compatibility
           });
 
           // Update PurchaseLine with stockItemId
