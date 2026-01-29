@@ -101,7 +101,13 @@ export default function InventoryItemsPage() {
   };
 
   const handleOpenCreate = () => {
-    if (!can('inventory.write')) {
+    // Check permissions: use 'stock.write' (backend permission) or fallback to role check
+    const canWrite =
+      can('stock.write') ||
+      can('inventory.write') || // Legacy fallback
+      ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '');
+
+    if (!canWrite) {
       toast({
         variant: 'destructive',
         title: 'Sin permisos',
