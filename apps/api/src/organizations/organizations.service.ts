@@ -4,6 +4,9 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  Inject,
+  forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -14,10 +17,15 @@ import { InviteUserDto } from './dto/invite-user.dto';
 import { Role, InviteStatus } from '@remember-me/prisma';
 import * as crypto from 'crypto';
 import { ORG_SETTINGS_DEFAULTS } from '../settings/org-settings.defaults';
+import { ItemsSeederService } from '../items/items-seeder.service';
 
 @Injectable()
 export class OrganizationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() @Inject(forwardRef(() => ItemsSeederService))
+    private itemsSeeder?: ItemsSeederService,
+  ) {}
 
   async create(userId: string, dto: CreateOrganizationDto) {
     // Generate slug if not provided
@@ -66,6 +74,14 @@ export class OrganizationsService {
 
       return org;
     });
+
+    // Seed default items for new organization (async, non-blocking)
+    // This is done outside the transaction to avoid blocking org creation
+    if (this.itemsSeeder) {
+      this.itemsSeeder.seedDefaultItemsForOrg(organization.id).catch((err: any) => {
+        console.error(`Failed to seed default items for organization ${organization.id}:`, err);
+      });
+    }
 
     return organization;
   }

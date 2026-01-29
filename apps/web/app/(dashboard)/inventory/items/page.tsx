@@ -57,17 +57,6 @@ export default function InventoryItemsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Clear selection when data changes
-  useEffect(() => {
-    if (data) {
-      const currentIds = new Set(data.data.map((item) => item.id));
-      const newSelected = new Set(Array.from(selectedIds).filter((id) => currentIds.has(id)));
-      if (newSelected.size !== selectedIds.size) {
-        setSelectedIds(newSelected);
-      }
-    }
-  }, [data]);
-
   const { data, isLoading, error, refetch } = useItems({
     page,
     limit: 20,
@@ -84,6 +73,17 @@ export default function InventoryItemsPage() {
       perfMeasureToNow('items-page-data-loaded', 'items-page-mount');
     }
   }, [data, isLoading]);
+
+  // Clear selection when data changes
+  useEffect(() => {
+    if (data) {
+      const currentIds = new Set(data.data.map((item) => item.id));
+      const newSelected = new Set(Array.from(selectedIds).filter((id) => currentIds.has(id)));
+      if (newSelected.size !== selectedIds.size) {
+        setSelectedIds(newSelected);
+      }
+    }
+  }, [data, selectedIds]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
