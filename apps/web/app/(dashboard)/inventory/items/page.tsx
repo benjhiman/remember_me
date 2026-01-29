@@ -100,13 +100,25 @@ export default function InventoryItemsPage() {
     }
   };
 
+  const handleOpenCreate = () => {
+    if (!can('inventory.write')) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin permisos',
+        description: 'No tenés permiso para crear items. Pedile a un admin que te habilite.',
+      });
+      return;
+    }
+    setIsCreateOpen(true);
+  };
+
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory/stock' },
     { label: 'Items', href: '/inventory/items' },
   ];
 
   const actions = (
-    <>
+    <div className="flex items-center gap-2">
       <Button
         size="sm"
         variant="outline"
@@ -116,13 +128,11 @@ export default function InventoryItemsPage() {
         <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
         Actualizar
       </Button>
-      {can('inventory.write') && (
-        <Button size="sm" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nuevo Item
-        </Button>
-      )}
-    </>
+      <Button size="sm" onClick={handleOpenCreate}>
+        <Plus className="h-4 w-4 mr-1.5" />
+        Nuevo Item
+      </Button>
+    </div>
   );
 
   const toolbar = (
@@ -186,12 +196,10 @@ export default function InventoryItemsPage() {
                       ? 'Intentá ajustar los filtros para ver más resultados.'
                       : 'Creá tu primer item para empezar a gestionar tu catálogo.'}
                   </p>
-                  {can('inventory.write') && (
-                    <Button onClick={() => setIsCreateOpen(true)} size="sm">
-                      <Plus className="h-4 w-4 mr-1.5" />
-                      Crear primer item
-                    </Button>
-                  )}
+                  <Button onClick={handleOpenCreate} size="sm">
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Crear primer item
+                  </Button>
                 </div>
               </div>
             ) : (
