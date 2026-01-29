@@ -2,15 +2,22 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { APPLE_IPHONE_CATALOG } from './apple-iphone-catalog';
 import { ItemCondition } from '@remember-me/prisma';
+import {
+  generateSku,
+  generateSortKey,
+  conditionLabel,
+} from './item-utils';
 
 @Injectable()
 export class ItemsSeederService {
   private readonly logger = new Logger(ItemsSeederService.name);
+  private readonly SEED_SOURCE = 'APPLE_IPHONE';
+  private readonly SEED_VERSION = 2;
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Seed default Apple iPhone catalog for an organization
+   * Seed default Apple iPhone catalog for an organization (version 2)
    * Idempotent: only seeds if organization has no items
    */
   async seedDefaultItemsForOrg(organizationId: string): Promise<number> {
@@ -27,22 +34,77 @@ export class ItemsSeederService {
       return 0;
     }
 
-    this.logger.log(`Seeding default Apple iPhone catalog for organization ${organizationId}`);
+    return this.reseedAppleCatalogForOrg(organizationId);
+  }
 
-    // Map catalog items to Prisma create data
+  /**
+   * Reseed Apple catalog for an organization (version 2)
+   * Soft-deletes old seed items and creates new ones
+   */
+  async reseedAppleCatalogForOrg(organizationId: string): Promise<number> {
+    this.logger.log(`Reseeding Apple iPhone catalog v${this.SEED_VERSION} for organization ${organizationId}`);
+
+    // Soft-delete old seed items (seedSource="APPLE_IPHONE" or legacy detection)
+    const legacyItems = await this.prisma.item.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        OR: [
+          { seedSource: this.SEED_SOURCE },
+          // Legacy detection: brand="Apple" or "APPLE" and name starts with "Apple iPhone" or "APPLE iPhone"
+          {
+            AND: [
+              { brand: { in: ['Apple', 'APPLE'] } },
+              { name: { startsWith: 'Apple iPhone' } },
+            ],
+          },
+          {
+            AND: [
+              { brand: { in: ['Apple', 'APPLE'] } },
+              { name: { startsWith: 'APPLE iPhone' } },
+            ],
+          },
+          // Or SKU starts with "IPH"
+          { sku: { startsWith: 'IPH' } },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (legacyItems.length > 0) {
+      await this.prisma.item.updateMany({
+        where: {
+          id: { in: legacyItems.map((i) => i.id) },
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+      this.logger.debug(`Soft-deleted ${legacyItems.length} legacy seed items`);
+    }
+
+    // Map catalog items to Prisma create data with SKU and sortKey
     const itemsToCreate = APPLE_IPHONE_CATALOG.map((item) => {
-      const conditionLabel = item.condition === 'NEW' ? 'new' : item.condition === 'USED' ? 'usado' : 'oem';
-      const name = `${item.brand} ${item.model} ${item.storageGb}GB ${item.color} (${conditionLabel})`;
+      const condition = item.condition as ItemCondition;
+      const conditionDisplayLabel = conditionLabel(condition);
+      const brand = 'APPLE'; // Always uppercase
+      const name = `${brand} ${item.model} ${item.storageGb}GB ${item.color} (${conditionDisplayLabel})`;
+      const sku = generateSku(item.model, item.storageGb, condition, item.color);
+      const sortKey = generateSortKey(item.model, item.storageGb, condition, item.color);
 
       return {
         organizationId,
         name,
-        brand: item.brand,
+        sku,
+        brand,
         model: item.model,
         storageGb: item.storageGb,
-        condition: item.condition as ItemCondition,
+        condition,
         color: item.color,
         isActive: true,
+        seedSource: this.SEED_SOURCE,
+        seedVersion: this.SEED_VERSION,
+        sortKey,
       };
     });
 
@@ -60,7 +122,7 @@ export class ItemsSeederService {
       this.logger.debug(`Created batch ${Math.floor(i / batchSize) + 1}, ${created}/${itemsToCreate.length} items`);
     }
 
-    this.logger.log(`Successfully seeded ${created} default items for organization ${organizationId}`);
+    this.logger.log(`Successfully reseeded ${created} Apple iPhone items (v${this.SEED_VERSION}) for organization ${organizationId}`);
     return created;
   }
 
@@ -87,5 +149,50 @@ export class ItemsSeederService {
 
     this.logger.log(`Backfill completed: seeded ${totalSeeded} items across ${organizations.length} organizations`);
     return { total: organizations.length, seeded: totalSeeded };
+  }
+
+  /**
+   * Reseed Apple catalog for all organizations (version 2)
+   * Idempotent: checks seedVersion before reseeding
+   */
+  async reseedAllOrganizations(): Promise<{ total: number; reseeded: number }> {
+    this.logger.log(`Starting reseed of Apple iPhone catalog v${this.SEED_VERSION} for all organizations`);
+
+    const organizations = await this.prisma.organization.findMany({
+      select: { id: true },
+    });
+
+    let totalReseeded = 0;
+
+    for (const org of organizations) {
+      try {
+        // Check if already at version 2
+        const existingV2Count = await this.prisma.item.count({
+          where: {
+            organizationId: org.id,
+            seedSource: this.SEED_SOURCE as any,
+            seedVersion: this.SEED_VERSION,
+            deletedAt: null,
+          },
+        });
+
+        // Expected count: all catalog items
+        const expectedCount = APPLE_IPHONE_CATALOG.length;
+
+        if (existingV2Count >= expectedCount * 0.9) {
+          // Already seeded (90% threshold to account for potential deletions)
+          this.logger.debug(`Organization ${org.id} already has v${this.SEED_VERSION} items (${existingV2Count}), skipping`);
+          continue;
+        }
+
+        const count = await this.reseedAppleCatalogForOrg(org.id);
+        totalReseeded += count;
+      } catch (error) {
+        this.logger.error(`Failed to reseed items for organization ${org.id}: ${error.message}`, error.stack);
+      }
+    }
+
+    this.logger.log(`Reseed completed: ${totalReseeded} items reseeded across ${organizations.length} organizations`);
+    return { total: organizations.length, reseeded: totalReseeded };
   }
 }

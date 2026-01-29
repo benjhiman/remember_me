@@ -44,4 +44,12 @@ export class CreateItemDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean = true;
+
+  @IsString()
+  @IsOptional()
+  seedSource?: string;
+
+  @IsInt()
+  @IsOptional()
+  seedVersion?: number;
 }

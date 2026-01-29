@@ -10,10 +10,15 @@ import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit/audit-log.service';
-import { AuditAction, AuditEntityType, Role } from '@remember-me/prisma';
+import { AuditAction, AuditEntityType, Role, ItemCondition } from '@remember-me/prisma';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { ListItemsDto } from './dto/list-items.dto';
+import {
+  generateSku,
+  generateSortKey,
+  conditionLabel,
+} from './item-utils';
 
 @Injectable({ scope: Scope.REQUEST })
 export class ItemsService {
@@ -86,7 +91,10 @@ export class ItemsService {
     const [items, total] = await Promise.all([
       this.prisma.item.findMany({
         where,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [
+          { sortKey: 'asc' }, // Canonical ordering: model DESC, variant, storage DESC, condition, color
+          { updatedAt: 'desc' }, // Fallback if sortKey is null
+        ],
         skip,
         take: limit,
       }),
@@ -130,25 +138,38 @@ export class ItemsService {
     }
 
     // Normalize strings
-    const brand = dto.brand?.trim() || '';
+    let brand = dto.brand?.trim() || '';
     if (!brand || brand.length < 2) {
       throw new BadRequestException('Brand is required');
     }
+    // Normalize brand to uppercase (especially for Apple)
+    brand = brand.toUpperCase();
+    
     const model = dto.model.trim();
     const color = dto.color.trim();
     const condition = dto.condition;
 
     // Map condition to display label
-    const conditionLabel = condition === 'NEW' ? 'new' : condition === 'USED' ? 'usado' : condition === 'OEM' ? 'oem' : condition.toLowerCase();
+    const conditionDisplayLabel = conditionLabel(condition);
 
     // Build name if not provided
-    const name = dto.name?.trim() || `${brand} ${model} ${dto.storageGb}GB ${color} (${conditionLabel})`;
+    const name = dto.name?.trim() || `${brand} ${model} ${dto.storageGb}GB ${color} (${conditionDisplayLabel})`;
+
+    // Generate SKU if not provided
+    const sku = dto.sku?.trim() || (model && dto.storageGb && condition && color
+      ? generateSku(model, dto.storageGb, condition, color)
+      : null);
+
+    // Generate sort key
+    const sortKey = model && dto.storageGb && condition && color
+      ? generateSortKey(model, dto.storageGb, condition, color)
+      : null;
 
     const item = await this.prisma.item.create({
       data: {
         organizationId,
         name,
-        sku: dto.sku?.trim() || null,
+        sku,
         category: dto.category?.trim() || null,
         brand,
         model,
@@ -158,6 +179,9 @@ export class ItemsService {
         description: dto.description?.trim() || null,
         attributes: dto.attributes || undefined,
         isActive: dto.isActive !== undefined ? dto.isActive : true,
+        sortKey,
+        seedSource: dto.seedSource || null,
+        seedVersion: dto.seedVersion || null,
       },
     });
 
@@ -204,9 +228,14 @@ export class ItemsService {
     // Build update data with normalization
     const updateData: any = {};
     if (dto.name !== undefined) updateData.name = dto.name.trim();
-    if (dto.sku !== undefined) updateData.sku = dto.sku?.trim() || null;
+    if (dto.sku !== undefined) {
+      updateData.sku = dto.sku?.trim() || null;
+    }
     if (dto.category !== undefined) updateData.category = dto.category?.trim() || null;
-    if (dto.brand !== undefined) updateData.brand = dto.brand.trim();
+    if (dto.brand !== undefined) {
+      // Normalize brand to uppercase
+      updateData.brand = dto.brand.trim().toUpperCase();
+    }
     if (dto.model !== undefined) updateData.model = dto.model.trim();
     if (dto.storageGb !== undefined) updateData.storageGb = dto.storageGb;
     if (dto.condition !== undefined) updateData.condition = dto.condition;
@@ -215,15 +244,34 @@ export class ItemsService {
     if (dto.attributes !== undefined) updateData.attributes = dto.attributes || undefined;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
 
+    // Determine final values for computed fields
+    const finalBrand = updateData.brand || existingItem.brand || 'APPLE';
+    const finalModel = updateData.model || existingItem.model || '';
+    const finalStorageGb = updateData.storageGb ?? existingItem.storageGb ?? 0;
+    const finalColor = updateData.color || existingItem.color || '';
+    const finalCondition = (updateData.condition || existingItem.condition || 'NEW') as ItemCondition;
+
     // Auto-update name if model/brand/storage/color/condition changed
     if (dto.model || dto.brand || dto.storageGb !== undefined || dto.color || dto.condition) {
-      const finalBrand = updateData.brand || existingItem.brand || 'Apple';
-      const finalModel = updateData.model || existingItem.model || '';
-      const finalStorageGb = updateData.storageGb ?? existingItem.storageGb ?? 0;
-      const finalColor = updateData.color || existingItem.color || '';
-      const finalCondition = updateData.condition || existingItem.condition || 'NEW';
       if (finalModel && finalStorageGb && finalColor) {
-        updateData.name = `${finalBrand} ${finalModel} ${finalStorageGb}GB ${finalColor} (${finalCondition})`;
+        const conditionDisplayLabel = conditionLabel(finalCondition);
+        updateData.name = `${finalBrand} ${finalModel} ${finalStorageGb}GB ${finalColor} (${conditionDisplayLabel})`;
+      }
+    }
+
+    // Auto-regenerate SKU if model/storage/condition/color changed (unless user set custom SKU)
+    const shouldRegenerateSku = (dto.model || dto.storageGb !== undefined || dto.condition || dto.color) &&
+      !dto.sku && // User didn't set custom SKU
+      finalModel && finalStorageGb && finalColor;
+    
+    if (shouldRegenerateSku) {
+      updateData.sku = generateSku(finalModel, finalStorageGb, finalCondition, finalColor);
+    }
+
+    // Auto-regenerate sortKey if any ordering field changed
+    if (dto.model || dto.storageGb !== undefined || dto.condition || dto.color) {
+      if (finalModel && finalStorageGb && finalColor) {
+        updateData.sortKey = generateSortKey(finalModel, finalStorageGb, finalCondition, finalColor);
       }
     }
 

@@ -328,12 +328,12 @@ export const APPLE_IPHONE_CATALOG: AppleIphoneCatalogItem[] = [
     )
   ),
 
-  // iPhone 17 Plus
+  // iPhone 17 Air
   ...['128', '256', '512'].flatMap((storage) =>
     ['Pink', 'Yellow', 'Green', 'Blue', 'Black', 'White'].flatMap((color) =>
       ['NEW', 'USED', 'OEM'].map((condition) => ({
         brand: 'Apple',
-        model: 'iPhone 17 Plus',
+        model: 'iPhone 17 Air',
         storageGb: parseInt(storage),
         color,
         condition: condition as 'NEW' | 'USED' | 'OEM',

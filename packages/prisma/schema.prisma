@@ -341,6 +341,9 @@ model Item {
   description    String?       @db.Text
   attributes     Json? // Flexible attributes (color, size, etc.)
   isActive       Boolean       @default(true)
+  seedSource     String? // e.g., "APPLE_IPHONE"
+  seedVersion    Int? // e.g., 2
+  sortKey        String?       @db.VarChar(64) // For canonical ordering
   deletedAt      DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -354,6 +357,7 @@ model Item {
   @@index([name])
   @@index([organizationId, model])
   @@index([organizationId, brand])
+  @@index([organizationId, sortKey])
 }
 
 enum ItemCondition {

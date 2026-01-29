@@ -24,6 +24,7 @@ import { useItems } from '@/lib/api/hooks/use-items';
 import { useCreateStockEntry, StockEntryMode, type CreateStockEntryDto } from '@/lib/api/hooks/use-stock-entry-mutations';
 import { Loader2, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { conditionLabel } from '@/lib/items/condition-label';
 
 interface AddStockItemDialogProps {
   open: boolean;
@@ -230,7 +231,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                       // Build display label: brand + model + storage + color + condition
                       const displayLabel =
                         item.model && item.storageGb && item.color && item.condition
-                          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${item.condition === 'NEW' ? 'Nuevo' : item.condition === 'USED' ? 'Usado' : item.condition === 'REFURBISHED' ? 'Reacondicionado' : item.condition === 'OEM' ? 'OEM' : item.condition}`
+                          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
                           : item.name || 'Item sin nombre';
                       const subtitle = [item.brand, item.category, item.sku].filter(Boolean).join(' • ') || undefined;
                       return (
@@ -256,7 +257,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                     <div className="text-sm font-medium">Item seleccionado:</div>
                     <div className="text-sm text-muted-foreground">
                       {selectedItem.model && selectedItem.storageGb && selectedItem.color && selectedItem.condition
-                        ? `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${selectedItem.condition === 'NEW' ? 'Nuevo' : selectedItem.condition === 'USED' ? 'Usado' : selectedItem.condition === 'REFURBISHED' ? 'Reacondicionado' : selectedItem.condition === 'OEM' ? 'OEM' : selectedItem.condition}`
+                        ? `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${conditionLabel(selectedItem.condition)}`
                         : selectedItem.name}
                     </div>
                   </div>
@@ -367,9 +368,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="NEW">Nuevo</SelectItem>
+                        <SelectItem value="NEW">NEW</SelectItem>
                         <SelectItem value="USED">Usado</SelectItem>
-                        <SelectItem value="REFURBISHED">Reacondicionado</SelectItem>
+                        <SelectItem value="OEM">OEM</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

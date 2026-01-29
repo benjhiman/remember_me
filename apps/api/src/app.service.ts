@@ -41,14 +41,14 @@ export class AppService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    // Backfill default items for existing organizations (one-time, idempotent)
+    // Reseed Apple catalog v2 for all organizations (one-time, idempotent)
     if (this.itemsSeeder) {
-      this.logger.log('Starting backfill of default items for existing organizations...');
+      this.logger.log('Starting reseed of Apple iPhone catalog v2 for all organizations...');
       try {
-        const result = await this.itemsSeeder.backfillExistingOrganizations();
-        this.logger.log(`Backfill completed: ${result.seeded} items seeded across ${result.total} organizations`);
+        const result = await this.itemsSeeder.reseedAllOrganizations();
+        this.logger.log(`Reseed completed: ${result.reseeded} items reseeded across ${result.total} organizations`);
       } catch (error) {
-        this.logger.error('Failed to backfill default items:', error);
+        this.logger.error('Failed to reseed Apple catalog:', error);
       }
     }
   }

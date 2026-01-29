@@ -32,9 +32,9 @@ interface ItemFormDialogProps {
 
 const STORAGE_OPTIONS = [64, 128, 256, 512, 1024, 2048];
 const CONDITION_OPTIONS = [
-  { value: 'NEW', label: 'new' },
-  { value: 'USED', label: 'usado' },
-  { value: 'OEM', label: 'oem' },
+  { value: 'NEW', label: 'NEW' },
+  { value: 'USED', label: 'Usado' },
+  { value: 'OEM', label: 'OEM' },
 ];
 
 export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps) {
@@ -148,7 +148,7 @@ export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps
                   required={!item}
                   minLength={2}
                   disabled={isLoading}
-                  placeholder="Apple"
+                  placeholder="APPLE"
                 />
               </div>
               <div className="space-y-2">

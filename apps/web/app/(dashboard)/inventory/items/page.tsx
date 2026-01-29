@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { Plus, Search, Edit, Trash2, RefreshCw, Hash } from 'lucide-react';
+import { conditionLabel } from '@/lib/items/condition-label';
 import { ItemFormDialog } from '@/components/items/item-form-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -347,20 +348,6 @@ export default function InventoryItemsPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {data.data.map((item) => {
-                        const getConditionLabel = (condition: string | null) => {
-                          switch (condition) {
-                            case 'NEW':
-                              return 'new';
-                            case 'USED':
-                              return 'usado';
-                            case 'OEM':
-                              return 'oem';
-                            case 'REFURBISHED':
-                              return 'Reacondicionado'; // Legacy support
-                            default:
-                              return condition || '-';
-                          }
-                        };
                         return (
                           <tr key={item.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap">
@@ -381,7 +368,7 @@ export default function InventoryItemsPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              <div className="text-sm text-gray-600">{getConditionLabel(item.condition)}</div>
+                              <div className="text-sm text-gray-600">{conditionLabel(item.condition)}</div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="text-sm text-gray-600">{item.color || '-'}</div>
