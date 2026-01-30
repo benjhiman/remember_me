@@ -42,7 +42,94 @@ export class StockController {
     return this.stockService.health();
   }
 
-  // CRUD StockItem
+  // Stock summary and movements (MUST come before @Get(':id') to avoid route conflicts)
+  @Get('summary')
+  async getStockSummary(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Query() query: StockSummaryDto,
+  ) {
+    return this.stockService.getStockSummary(organizationId, user.userId, query);
+  }
+
+  @Get('movements')
+  async getStockMovements(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Query() query: StockMovementsDto,
+  ) {
+    return this.stockService.getStockMovements(organizationId, user.userId, query);
+  }
+
+  // Reservations (MUST come before @Get(':id') to avoid route conflicts)
+  @Get('reservations')
+  async listReservations(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Query() query: ListReservationsDto,
+  ) {
+    return this.stockService.listReservations(organizationId, user.userId, query);
+  }
+
+  @Post('reservations')
+  async createReservation(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreateReservationDto,
+  ) {
+    return this.stockService.reserveStock(organizationId, user.userId, dto);
+  }
+
+  @Get('reservations/:id')
+  async getReservation(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.stockService.getReservation(organizationId, user.userId, id);
+  }
+
+  @Post('reservations/:id/release')
+  async releaseReservation(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.stockService.releaseReservation(organizationId, user.userId, id);
+  }
+
+  @Post('reservations/:id/extend')
+  async extendReservation(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: ExtendReservationDto,
+  ) {
+    return this.stockService.extendReservation(organizationId, user.userId, id, dto.hours || 24);
+  }
+
+  @Post('reservations/:id/confirm')
+  async confirmReservation(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.stockService.confirmReservation(organizationId, user.userId, id);
+  }
+
+  // Stock entries
+  @Post('entries')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  async createStockEntry(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreateStockEntryDto,
+  ) {
+    return this.stockService.createStockEntry(organizationId, user.userId, dto);
+  }
+
+  // CRUD StockItem (dynamic routes must come after specific routes)
   @Get()
   async listStockItems(
     @CurrentOrganization() organizationId: string,
@@ -120,26 +207,7 @@ export class StockController {
     return this.stockService.adjustStock(organizationId, user.userId, id, dto);
   }
 
-  // Stock summary and movements
-  @Get('summary')
-  async getStockSummary(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Query() query: StockSummaryDto,
-  ) {
-    return this.stockService.getStockSummary(organizationId, user.userId, query);
-  }
-
-  @Get('movements')
-  async getStockMovements(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Query() query: StockMovementsDto,
-  ) {
-    return this.stockService.getStockMovements(organizationId, user.userId, query);
-  }
-
-  // Stock movements (legacy - by stock item ID)
+  // Stock movements (legacy - by stock item ID) - must come after @Get(':id')
   @Get(':id/movements')
   async listMovements(
     @CurrentOrganization() organizationId: string,
@@ -155,72 +223,5 @@ export class StockController {
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 50,
     );
-  }
-
-  // Reservations
-  @Post('entries')
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
-  async createStockEntry(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Body() dto: CreateStockEntryDto,
-  ) {
-    return this.stockService.createStockEntry(organizationId, user.userId, dto);
-  }
-
-  @Post('reservations')
-  async createReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Body() dto: CreateReservationDto,
-  ) {
-    return this.stockService.reserveStock(organizationId, user.userId, dto);
-  }
-
-  @Get('reservations')
-  async listReservations(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Query() query: ListReservationsDto,
-  ) {
-    return this.stockService.listReservations(organizationId, user.userId, query);
-  }
-
-  @Get('reservations/:id')
-  async getReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
-    return this.stockService.getReservation(organizationId, user.userId, id);
-  }
-
-  @Post('reservations/:id/release')
-  async releaseReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
-    return this.stockService.releaseReservation(organizationId, user.userId, id);
-  }
-
-  @Post('reservations/:id/extend')
-  async extendReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-    @Body() dto: ExtendReservationDto,
-  ) {
-    return this.stockService.extendReservation(organizationId, user.userId, id, dto.hours || 24);
-  }
-
-  @Post('reservations/:id/confirm')
-  async confirmReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
-    return this.stockService.confirmReservation(organizationId, user.userId, id);
   }
 }

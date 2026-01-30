@@ -1651,12 +1651,36 @@ export class StockService {
               itemId: true,
               model: true,
               sku: true,
+              item: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  brand: true,
+                  model: true,
+                  storageGb: true,
+                  color: true,
+                  condition: true,
+                },
+              },
             },
           },
           reservation: {
             select: {
               id: true,
               itemId: true,
+              item: {
+                select: {
+                  id: true,
+                  name: true,
+                  sku: true,
+                  brand: true,
+                  model: true,
+                  storageGb: true,
+                  color: true,
+                  condition: true,
+                },
+              },
             },
           },
           createdBy: {
@@ -1679,8 +1703,10 @@ export class StockService {
         id: m.id,
         type: m.type,
         qty: m.quantity,
-        itemId: m.stockItem?.itemId || null,
+        itemId: m.stockItem?.itemId || m.reservation?.itemId || null,
         stockItemId: m.stockItemId,
+        item: m.stockItem?.item || m.reservation?.item || null,
+        stockItem: m.stockItem || null,
         createdAt: m.createdAt,
         ref: m.reservationId || m.saleId || null,
         reason: m.reason,
