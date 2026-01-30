@@ -12,7 +12,10 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx seed.ts",
     "postinstall": "prisma generate",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "migrate:inspect": "tsx scripts/inspect-migration.ts",
+    "migrate:resolve:rolled-back:add_folder_prefix": "prisma migrate resolve --rolled-back 20250130000000_add_folder_prefix",
+    "migrate:resolve:applied:add_folder_prefix": "prisma migrate resolve --applied 20250130000000_add_folder_prefix"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"
