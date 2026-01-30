@@ -306,7 +306,7 @@ export default function InventoryItemsPage() {
                   </p>
                   <Button onClick={handleOpenCreate} size="sm">
                     <Plus className="h-4 w-4 mr-1.5" />
-                    Crear primer item
+                    {debouncedSearch ? 'Crear nuevo item' : 'Crear primer item'}
                   </Button>
                 </div>
               </div>
