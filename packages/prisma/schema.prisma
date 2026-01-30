@@ -78,6 +78,7 @@ model Organization {
   metaAttributionSnapshots MetaAttributionSnapshot[]
   MetaSpendDaily           MetaSpendDaily[]
   items                    Item[]
+  folderPrefixes           FolderPrefix[]
   customers                Customer[]
   ledgerAccounts           LedgerAccount[]
   journalEntries           JournalEntry[]
@@ -366,6 +367,21 @@ enum ItemCondition {
   USED
   REFURBISHED
   OEM
+}
+
+// ===== ITEMS FOLDERS (SKU Prefix Organization) =====
+
+model FolderPrefix {
+  id             String   @id @default(cuid())
+  organizationId String
+  prefix         String   // e.g., "IPH", "IPAD", "SAM"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, prefix])
+  @@index([organizationId])
 }
 
 enum StockStatus {

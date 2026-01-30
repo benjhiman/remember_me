@@ -338,4 +338,130 @@ export class ItemsService {
 
     return { message: 'Item deleted successfully' };
   }
+
+  // Extract SKU prefix helper
+  private extractSkuPrefix(sku: string | null | undefined): string | null {
+    if (!sku) return null;
+    const skuUpper = sku.toUpperCase().trim();
+    
+    // If has separator (_ or -), take part before separator
+    const separatorMatch = skuUpper.match(/^([A-Z0-9]+)[_\-]/);
+    if (separatorMatch) {
+      return separatorMatch[1].substring(0, 4); // Max 4 chars
+    }
+    
+    // If starts with known prefixes (IPH, IPAD, SAM), extract them
+    if (skuUpper.startsWith('IPH')) return 'IPH';
+    if (skuUpper.startsWith('IPAD')) return 'IPAD';
+    if (skuUpper.startsWith('SAM')) return 'SAM';
+    
+    // Otherwise, take first 3-4 letters
+    const lettersOnly = skuUpper.match(/^([A-Z]{3,4})/);
+    if (lettersOnly) {
+      return lettersOnly[1];
+    }
+    
+    // Fallback: first 3 chars
+    return skuUpper.substring(0, 3);
+  }
+
+  async listFolders(organizationId: string, userId: string) {
+    await this.verifyMembership(organizationId, userId);
+
+    // Get all items with SKU
+    const items = await this.prisma.item.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        isActive: true,
+        sku: { not: null },
+      },
+      select: { sku: true },
+    });
+
+    // Extract prefixes and count
+    const prefixCounts = new Map<string, number>();
+    items.forEach((item) => {
+      const prefix = this.extractSkuPrefix(item.sku);
+      if (prefix) {
+        prefixCounts.set(prefix, (prefixCounts.get(prefix) || 0) + 1);
+      }
+    });
+
+    // Get pinned folders
+    const pinnedFolders = await this.prisma.folderPrefix.findMany({
+      where: { organizationId },
+      select: { prefix: true },
+    });
+
+    const pinnedPrefixes = new Set(pinnedFolders.map((f: { prefix: string }) => f.prefix));
+
+    // Combine: all prefixes with counts + pinned folders (even if count=0)
+    const folders = Array.from(
+      new Set([...Array.from(prefixCounts.keys()), ...Array.from(pinnedPrefixes)]),
+    ).map((prefix: string) => ({
+      prefix,
+      count: prefixCounts.get(prefix) || 0,
+      pinned: pinnedPrefixes.has(prefix),
+    }));
+
+    // Sort by pinned first, then by count desc, then alphabetically
+    folders.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      if (a.count !== b.count) return b.count - a.count;
+      return a.prefix.localeCompare(b.prefix);
+    });
+
+    return { data: folders };
+  }
+
+  async createFolder(organizationId: string, userId: string, dto: { prefix: string }) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can create folders');
+    }
+
+    const prefixUpper = dto.prefix.toUpperCase().trim();
+
+    // Check if already exists
+    const existing = await this.prisma.folderPrefix.findUnique({
+      where: {
+        organizationId_prefix: {
+          organizationId,
+          prefix: prefixUpper,
+        },
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const folder = await this.prisma.folderPrefix.create({
+      data: {
+        organizationId,
+        prefix: prefixUpper,
+      },
+    });
+
+    return folder;
+  }
+
+  async deleteFolder(organizationId: string, userId: string, prefix: string) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can delete folders');
+    }
+
+    const prefixUpper = prefix.toUpperCase().trim();
+
+    await this.prisma.folderPrefix.deleteMany({
+      where: {
+        organizationId,
+        prefix: prefixUpper,
+      },
+    });
+  }
 }

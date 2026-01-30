@@ -39,7 +39,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   const [itemSearch, setItemSearch] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [imeisText, setImeisText] = useState('');
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<string>('');
+  const [quantityError, setQuantityError] = useState<string>('');
   const [condition, setCondition] = useState<'NEW' | 'USED' | 'REFURBISHED'>('NEW');
   const [status, setStatus] = useState<'AVAILABLE' | 'RESERVED' | 'SOLD' | 'DAMAGED' | 'RETURNED' | 'CANCELLED'>('AVAILABLE');
   const [cost, setCost] = useState<string>('');
@@ -105,7 +106,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       setItemSearch('');
       setSelectedItemId('');
       setImeisText('');
-      setQuantity(1);
+      setQuantity('');
+      setQuantityError('');
       setCondition('NEW');
       setStatus('AVAILABLE');
       setCost('');
@@ -154,7 +156,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         return;
       }
     } else if (mode === StockEntryMode.QUANTITY) {
-      if (quantity < 1) {
+      const quantityParsed = parseInt(quantity || '0', 10);
+      if (isNaN(quantityParsed) || quantityParsed < 1) {
+        setQuantityError('Debes ingresar una cantidad mayor o igual a 1');
         return;
       }
     }
@@ -169,7 +173,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       ...(cost ? { cost: parseFloat(cost) } : {}),
       ...(mode === StockEntryMode.IMEI
         ? { imeis: parsedImeis }
-        : { quantity: parseInt(quantity.toString(), 10) }), // Ensure quantity is a number
+        : { quantity: parseInt(quantity || '0', 10) }), // Ensure quantity is a number
     };
 
     // Debug logging (only in dev)
@@ -190,7 +194,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       setItemSearch('');
       setSelectedItemId('');
       setImeisText('');
-      setQuantity(1);
+      setQuantity('');
+      setQuantityError('');
       setCondition('NEW');
       setStatus('AVAILABLE');
       setCost('');
@@ -209,7 +214,13 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   const canSubmitStep3 =
     mode === StockEntryMode.IMEI
       ? parsedImeis.length > 0 && duplicateImeisInText.length === 0
-      : quantity >= 1;
+      : (() => {
+          if (mode === StockEntryMode.QUANTITY) {
+            const quantityParsed = parseInt(quantity || '0', 10);
+            return !isNaN(quantityParsed) && quantityParsed >= 1;
+          }
+          return true;
+        })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -385,38 +396,37 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      value={quantity.toString()}
+                      value={quantity}
                       onChange={(e) => {
                         // Only allow digits
                         const digitsOnly = e.target.value.replace(/\D/g, '');
-                        if (digitsOnly === '') {
-                          setQuantity(1);
-                        } else {
-                          const num = parseInt(digitsOnly, 10);
-                          if (!isNaN(num) && num >= 1) {
-                            setQuantity(num);
-                          }
+                        setQuantity(digitsOnly);
+                        // Clear error when user types
+                        if (quantityError) {
+                          setQuantityError('');
                         }
                       }}
                       onWheel={(e) => {
                         // Prevent scroll wheel from changing value
                         e.currentTarget.blur();
                       }}
-                      onBlur={(e) => {
-                        // Ensure minimum value of 1 on blur
-                        const value = parseInt(e.target.value, 10);
-                        if (isNaN(value) || value < 1) {
-                          setQuantity(1);
+                      onBlur={() => {
+                        // Validate on blur but don't auto-fill
+                        const quantityParsed = parseInt(quantity || '0', 10);
+                        if (isNaN(quantityParsed) || quantityParsed < 1) {
+                          setQuantityError('Debes ingresar una cantidad mayor o igual a 1');
+                        } else {
+                          setQuantityError('');
                         }
                       }}
                       placeholder="Ingresá la cantidad (ej: 20)"
                       disabled={isLoading}
-                      className="text-lg font-medium"
+                      className={cn('text-lg font-medium', quantityError && 'border-destructive')}
                       autoFocus
                     />
                     <p className="text-xs text-muted-foreground">Solo números. Mínimo: 1</p>
-                    {quantity < 1 && (
-                      <p className="text-xs text-destructive">La cantidad debe ser al menos 1</p>
+                    {quantityError && (
+                      <p className="text-xs text-destructive">{quantityError}</p>
                     )}
                   </div>
                 )}

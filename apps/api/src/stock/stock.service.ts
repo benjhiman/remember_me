@@ -1493,11 +1493,28 @@ export class StockService {
     const limit = dto.limit || 20;
 
     // Determine if we should include zero-stock items
-    // If q is provided, include zeros (user is searching, wants to see all matches)
-    // If includeZero is explicitly true, include zeros
-    // Otherwise, exclude items with totalQty=0 AND reservedQty=0
+    // Rules:
+    // - q empty => excludeZero = true (only show items with stock/reserved)
+    // - q with value:
+    //   - if SKU-like search (alphanumeric, 6+ chars, starts with letter) => includeZero = true
+    //   - if NOT SKU-like => excludeZero = true
     const hasSearchQuery = !!dto.q && dto.q.trim().length > 0;
-    const includeZero = dto.includeZero === true || hasSearchQuery;
+    let includeZero = false;
+    
+    if (hasSearchQuery) {
+      const qTrimUpper = dto.q.trim().toUpperCase();
+      // Detect SKU-like search: starts with letter, alphanumeric, 6+ chars
+      const isSkuLikeSearch = /^[A-Z][A-Z0-9]{5,}$/.test(qTrimUpper);
+      includeZero = isSkuLikeSearch;
+    } else {
+      // No search query: exclude zeros
+      includeZero = false;
+    }
+    
+    // Override if explicitly set
+    if (dto.includeZero === true) {
+      includeZero = true;
+    }
 
     // Build where clause for items
     const itemWhere: any = {
