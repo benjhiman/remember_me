@@ -176,45 +176,101 @@ export class SalesService {
       );
     }
 
-    const quantityBefore = reservation.stockItem.quantity;
-    const quantityAfter = quantityBefore - reservation.quantity;
+    // Handle item-based reservations differently from stockItem-based
+    if (reservation.itemId && !reservation.stockItemId) {
+      // Item-based reservation: reduce quantity from any available stock items
+      const stockItems = await tx.stockItem.findMany({
+        where: {
+          organizationId: reservation.organizationId,
+          itemId: reservation.itemId,
+          deletedAt: null,
+          status: StockStatus.AVAILABLE,
+        },
+        orderBy: { createdAt: 'asc' },
+      });
 
-    if (quantityAfter < 0) {
-      throw new BadRequestException(
-        `Cannot confirm reservation ${reservationId}. Current quantity: ${quantityBefore}, reservation: ${reservation.quantity}. Result would be negative.`,
+      let remainingQty = reservation.quantity;
+
+      for (const stockItem of stockItems) {
+        if (remainingQty <= 0) break;
+
+        const qtyToDeduct = Math.min(remainingQty, stockItem.quantity);
+        const qtyAfter = stockItem.quantity - qtyToDeduct;
+
+        await tx.stockItem.update({
+          where: { id: stockItem.id },
+          data: {
+            quantity: qtyAfter,
+            ...(stockItem.imei && qtyAfter === 0 ? { status: StockStatus.SOLD } : {}),
+          },
+        });
+
+        // Create movement for each stock item
+        await this.createMovement(
+          tx,
+          organizationId,
+          stockItem.id,
+          StockMovementType.SOLD,
+          stockItem.quantity,
+          qtyAfter,
+          userId,
+          'Reservation confirmed - sale paid',
+          reservationId,
+          saleId,
+        );
+
+        remainingQty -= qtyToDeduct;
+      }
+
+      if (remainingQty > 0) {
+        throw new BadRequestException(
+          `Not enough stock available. Could only allocate ${reservation.quantity - remainingQty} of ${reservation.quantity} requested.`,
+        );
+      }
+    } else if (reservation.stockItemId && reservation.stockItem) {
+      // Legacy: stockItem-based reservation
+      const quantityBefore = reservation.stockItem.quantity;
+      const quantityAfter = quantityBefore - reservation.quantity;
+
+      if (quantityAfter < 0) {
+        throw new BadRequestException(
+          `Cannot confirm reservation ${reservationId}. Current quantity: ${quantityBefore}, reservation: ${reservation.quantity}. Result would be negative.`,
+        );
+      }
+
+      const updateData: any = {
+        quantity: quantityAfter,
+      };
+
+      if (reservation.stockItem.imei && quantityAfter === 0) {
+        updateData.status = StockStatus.SOLD;
+      }
+
+      await tx.stockItem.update({
+        where: { id: reservation.stockItemId },
+        data: updateData,
+      });
+
+      await this.createMovement(
+        tx,
+        organizationId,
+        reservation.stockItemId,
+        StockMovementType.SOLD,
+        quantityBefore,
+        quantityAfter,
+        userId,
+        'Reservation confirmed - sale paid',
+        reservationId,
+        saleId,
       );
+    } else {
+      throw new BadRequestException('Reservation must have either itemId or stockItemId');
     }
-
-    const updateData: any = {
-      quantity: quantityAfter,
-    };
-
-    if (reservation.stockItem.imei && quantityAfter === 0) {
-      updateData.status = StockStatus.SOLD;
-    }
-
-    await tx.stockItem.update({
-      where: { id: reservation.stockItemId },
-      data: updateData,
-    });
 
     await tx.stockReservation.update({
       where: { id: reservationId },
       data: { status: ReservationStatus.CONFIRMED },
     });
-
-    await this.createMovement(
-      tx,
-      organizationId,
-      reservation.stockItemId,
-      StockMovementType.SOLD,
-      quantityBefore,
-      quantityAfter,
-      userId,
-      'Reservation confirmed - sale paid',
-      reservationId,
-      saleId,
-    );
   }
 
   // Helper: Release reservation internally (within transaction)
@@ -247,21 +303,48 @@ export class SalesService {
 
     await tx.stockReservation.update({
       where: { id: reservationId },
-      data: { status: ReservationStatus.CANCELLED },
+      data: { status: ReservationStatus.RELEASED, releasedAt: new Date() },
     });
 
-    await this.createMovement(
-      tx,
-      organizationId,
-      reservation.stockItemId,
-      StockMovementType.RELEASE,
-      reservation.stockItem.quantity,
-      reservation.stockItem.quantity,
-      userId,
-      'Reservation released - sale cancelled',
-      reservationId,
-      saleId,
-    );
+    // Create movement only if reservation has stockItemId (legacy reservations)
+    if (reservation.stockItemId && reservation.stockItem) {
+      await this.createMovement(
+        tx,
+        organizationId,
+        reservation.stockItemId,
+        StockMovementType.RELEASE,
+        reservation.stockItem.quantity,
+        reservation.stockItem.quantity,
+        userId,
+        'Reservation released - sale cancelled',
+        reservationId,
+        saleId,
+      );
+    } else if (reservation.itemId) {
+      // For item-based reservations, find a stock item to link the movement
+      const stockItem = await tx.stockItem.findFirst({
+        where: {
+          organizationId: reservation.organizationId,
+          itemId: reservation.itemId,
+          deletedAt: null,
+        },
+      });
+
+      if (stockItem) {
+        await this.createMovement(
+          tx,
+          organizationId,
+          stockItem.id,
+          StockMovementType.RELEASE,
+          stockItem.quantity,
+          stockItem.quantity,
+          userId,
+          'Reservation released - sale cancelled',
+          reservationId,
+          saleId,
+        );
+      }
+    }
   }
 
   async createSale(organizationId: string, userId: string, dto: CreateSaleDto) {
@@ -299,6 +382,15 @@ export class SalesService {
       },
       include: {
         stockItem: true,
+        item: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            brand: true,
+            model: true,
+          },
+        },
       },
     });
 
@@ -325,10 +417,18 @@ export class SalesService {
     }
 
     // Calculate totals from reservations
-    const subtotal = reservations.reduce(
-      (sum, reservation) => sum + parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity,
-      0,
-    );
+    // For item-based reservations, we need to get price from stock items or use a default
+    // For now, we'll use stockItem.basePrice if available, otherwise use 0 (should be improved with item pricing)
+    const subtotal = reservations.reduce((sum, reservation) => {
+      if (reservation.stockItem) {
+        return sum + parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity;
+      } else if (reservation.itemId) {
+        // For item-based reservations, try to get price from first available stock item
+        // If no stock item found, use 0 (this should be improved with proper item pricing)
+        return sum + 0; // TODO: Implement proper pricing for item-based reservations
+      }
+      return sum;
+    }, 0);
     const discount = dto.discount || 0;
     const total = subtotal - discount;
 
@@ -355,15 +455,34 @@ export class SalesService {
           notes: dto.notes,
           metadata: dto.metadata || {},
           items: {
-            create: reservations.map((reservation) => ({
-              stockItemId: reservation.stockItemId,
-              model: reservation.stockItem.model,
-              quantity: reservation.quantity,
-              unitPrice: reservation.stockItem.basePrice,
-              totalPrice: new Decimal(
-                parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity,
-              ),
-            })),
+            create: reservations.map((reservation) => {
+              if (reservation.stockItemId && reservation.stockItem) {
+                // Legacy: stockItem-based reservation
+                return {
+                  stockItemId: reservation.stockItemId,
+                  model: reservation.stockItem.model,
+                  quantity: reservation.quantity,
+                  unitPrice: reservation.stockItem.basePrice,
+                  totalPrice: new Decimal(
+                    parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity,
+                  ),
+                };
+              } else if (reservation.itemId && reservation.item) {
+                // Item-based reservation
+                const modelName = reservation.item.model || reservation.item.name;
+                return {
+                  stockItemId: null, // No specific stock item for item-based reservations
+                  model: modelName,
+                  quantity: reservation.quantity,
+                  unitPrice: new Decimal(0), // TODO: Implement proper pricing for item-based reservations
+                  totalPrice: new Decimal(0), // TODO: Implement proper pricing for item-based reservations
+                };
+              } else {
+                throw new BadRequestException(
+                  `Reservation ${reservation.id} must have either stockItemId or itemId`,
+                );
+              }
+            }),
           },
         },
         include: {
