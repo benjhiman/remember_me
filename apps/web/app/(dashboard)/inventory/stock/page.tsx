@@ -190,12 +190,35 @@ export default function InventoryStockPage() {
                   <div className="p-12 text-center">
                     <div className="max-w-sm mx-auto">
                       <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1">No hay items en stock</h3>
-                      <p className="text-xs text-gray-600 mb-4">Agregá items a tu inventario para comenzar.</p>
-                      <Button onClick={handleOpenCreate} size="sm">
-                        <Plus className="h-4 w-4 mr-1.5" />
-                        Agregar Stock
-                      </Button>
+                      {search.trim() ? (
+                        <>
+                          <h3 className="text-sm font-semibold text-gray-900 mb-1">Sin resultados para tu búsqueda</h3>
+                          <p className="text-xs text-gray-600 mb-4">
+                            No se encontraron items que coincidan con &quot;{search}&quot;.
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearch('');
+                              setPage(1);
+                            }}
+                          >
+                            Limpiar búsqueda
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <h3 className="text-sm font-semibold text-gray-900 mb-1">Sin stock aún</h3>
+                          <p className="text-xs text-gray-600 mb-4">
+                            Agregá items a tu inventario para comenzar a gestionar el stock.
+                          </p>
+                          <Button onClick={handleOpenCreate} size="sm">
+                            <Plus className="h-4 w-4 mr-1.5" />
+                            Agregar Stock
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : (

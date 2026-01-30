@@ -1491,7 +1491,13 @@ export class StockService {
 
     const page = dto.page || 1;
     const limit = dto.limit || 20;
-    const skip = (page - 1) * limit;
+
+    // Determine if we should include zero-stock items
+    // If q is provided, include zeros (user is searching, wants to see all matches)
+    // If includeZero is explicitly true, include zeros
+    // Otherwise, exclude items with totalQty=0 AND reservedQty=0
+    const hasSearchQuery = !!dto.q && dto.q.trim().length > 0;
+    const includeZero = dto.includeZero === true || hasSearchQuery;
 
     // Build where clause for items
     const itemWhere: any = {
@@ -1500,14 +1506,26 @@ export class StockService {
       isActive: true,
     };
 
-    if (dto.q) {
-      itemWhere.OR = [
-        { name: { contains: dto.q, mode: 'insensitive' } },
-        { sku: { contains: dto.q, mode: 'insensitive' } },
-        { brand: { contains: dto.q, mode: 'insensitive' } },
-        { model: { contains: dto.q, mode: 'insensitive' } },
-        { color: { contains: dto.q, mode: 'insensitive' } },
-      ];
+    if (hasSearchQuery) {
+      // For SKU prefix searches (alphanumeric starting with letters), prefer startsWith
+      const isSkuPrefix = /^[A-Za-z][A-Za-z0-9]*$/.test(dto.q.trim());
+      if (isSkuPrefix) {
+        itemWhere.OR = [
+          { sku: { startsWith: dto.q.trim(), mode: 'insensitive' } },
+          { name: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { brand: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { model: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { color: { contains: dto.q.trim(), mode: 'insensitive' } },
+        ];
+      } else {
+        itemWhere.OR = [
+          { name: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { sku: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { brand: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { model: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { color: { contains: dto.q.trim(), mode: 'insensitive' } },
+        ];
+      }
     }
 
     if (dto.condition) {
@@ -1518,20 +1536,15 @@ export class StockService {
       itemWhere.id = dto.itemId;
     }
 
-    // Get items with pagination
-    const [items, totalItems] = await Promise.all([
-      this.prisma.item.findMany({
-        where: itemWhere,
-        skip,
-        take: limit,
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.item.count({ where: itemWhere }),
-    ]);
+    // Get ALL items that match the search/filter criteria (no pagination yet)
+    const allItems = await this.prisma.item.findMany({
+      where: itemWhere,
+      orderBy: { name: 'asc' },
+    });
 
-    // For each item, calculate stock summary
-    const rows = await Promise.all(
-      items.map(async (item) => {
+    // Calculate stock summary for each item
+    const itemsWithStock = await Promise.all(
+      allItems.map(async (item) => {
         // Get all stock items for this item (including both serialized and quantity-based)
         const stockItems = await this.prisma.stockItem.findMany({
           where: {
@@ -1542,15 +1555,7 @@ export class StockService {
         });
 
         // Calculate total quantity: sum of all stockItems.quantity
-        // This includes both serialized items (quantity=1) and bulk items (quantity>1)
         const totalQty = stockItems.reduce((sum, si) => sum + si.quantity, 0);
-
-        // Log for debugging (only in dev)
-        if (process.env.NODE_ENV !== 'production' && stockItems.length > 0) {
-          this.logger.debug(
-            `Stock summary for itemId=${item.id}: ${stockItems.length} stockItems, totalQty=${totalQty}`,
-          );
-        }
 
         // Get active reservations for this item (not expired, not released, not cancelled)
         const activeReservations = await this.prisma.stockReservation.findMany({
@@ -1599,13 +1604,24 @@ export class StockService {
       }),
     );
 
+    // Filter out zero-stock items if not including zeros
+    let filteredRows = itemsWithStock;
+    if (!includeZero) {
+      filteredRows = itemsWithStock.filter((row) => row.totalQty > 0 || row.reservedQty > 0);
+    }
+
+    // Now apply pagination
+    const total = filteredRows.length;
+    const skip = (page - 1) * limit;
+    const paginatedRows = filteredRows.slice(skip, skip + limit);
+
     return {
-      data: rows,
+      data: paginatedRows,
       meta: {
-        total: totalItems,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(totalItems / limit),
+        totalPages: Math.ceil(total / limit),
       },
     };
   }
