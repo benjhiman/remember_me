@@ -21,11 +21,151 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useItems } from '@/lib/api/hooks/use-items';
+import { useItemSearchFlattened } from '@/lib/api/hooks/use-item-search';
 import { useCreateStockEntry, StockEntryMode, type CreateStockEntryDto } from '@/lib/api/hooks/use-stock-entry-mutations';
 import { useBulkAddStock, type BulkStockAddItem } from '@/lib/api/hooks/use-bulk-add-stock';
-import { Loader2, Search, X, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Search, X, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { conditionLabel } from '@/lib/items/condition-label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+
+// Component for each bulk row's item picker
+function BulkRowItemPicker({
+  row,
+  onSelect,
+  onUpdate,
+  isLoading,
+}: {
+  row: BulkRow;
+  onSelect: (itemId: string, item: any) => void;
+  onUpdate: (updates: Partial<BulkRow>) => void;
+  isLoading: boolean;
+}) {
+  const [rowSearchQuery, setRowSearchQuery] = useState('');
+
+  const {
+    items: rowItems,
+    isLoading: rowItemsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useItemSearchFlattened({
+    q: rowSearchQuery,
+    limit: 20,
+    enabled: row.isOpen || false,
+  });
+
+  const selectedItem = rowItems.find((i) => i.id === row.itemId);
+
+  return (
+    <div className="col-span-6">
+      <Popover
+        open={row.isOpen}
+        onOpenChange={(open) => {
+          onUpdate({ isOpen: open });
+          if (!open) {
+            setRowSearchQuery('');
+          }
+        }}
+      >
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            className={cn(
+              'w-full justify-between text-sm font-normal',
+              !row.itemId && 'text-muted-foreground'
+            )}
+            disabled={isLoading}
+          >
+            <span className="truncate">
+              {row.itemSearch || 'Buscar modelo...'}
+            </span>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[400px] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Buscar modelo, SKU, marca..."
+              value={rowSearchQuery}
+              onValueChange={(value) => {
+                setRowSearchQuery(value);
+              }}
+            />
+            <CommandList className="max-h-[300px] overflow-y-auto">
+              {rowItemsLoading && rowItems.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                  Cargando items...
+                </div>
+              ) : rowItems.length === 0 ? (
+                <CommandEmpty>
+                  {rowSearchQuery ? 'No se encontraron items' : 'No hay items disponibles'}
+                </CommandEmpty>
+              ) : (
+                <CommandGroup>
+                  {rowItems.map((item) => {
+                    const displayLabel =
+                      item.model && item.storageGb && item.color && item.condition
+                        ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+                        : item.name || 'Item sin nombre';
+                    return (
+                      <CommandItem
+                        key={item.id}
+                        value={item.id}
+                        onSelect={() => {
+                          onSelect(item.id, item);
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{displayLabel}</span>
+                          {item.sku && (
+                            <span className="text-xs text-muted-foreground">
+                              SKU: {item.sku}
+                            </span>
+                          )}
+                        </div>
+                      </CommandItem>
+                    );
+                  })}
+                  {hasNextPage && (
+                    <div className="px-2 py-1.5 text-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => fetchNextPage()}
+                        disabled={isFetchingNextPage}
+                        className="w-full"
+                      >
+                        {isFetchingNextPage ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Cargando más...
+                          </>
+                        ) : (
+                          'Cargar más items'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {selectedItem && (
+        <div className="text-xs text-muted-foreground mt-1">
+          {selectedItem.sku && `SKU: ${selectedItem.sku}`}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface AddStockItemDialogProps {
   open: boolean;
@@ -41,6 +181,7 @@ interface BulkRow {
   itemSearch: string;
   quantity: string;
   quantityError?: string;
+  isOpen?: boolean; // For dropdown state per row
 }
 
 export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogProps) {
@@ -58,8 +199,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   const [notes, setNotes] = useState('');
   const [bulkNote, setBulkNote] = useState('');
   const [bulkRows, setBulkRows] = useState<BulkRow[]>(() => [
-    { id: '1', itemId: '', itemSearch: '', quantity: '' },
-    { id: '2', itemId: '', itemSearch: '', quantity: '' },
+    { id: '1', itemId: '', itemSearch: '', quantity: '', isOpen: false },
+    { id: '2', itemId: '', itemSearch: '', quantity: '', isOpen: false },
   ]);
 
   const createStockEntry = useCreateStockEntry();
@@ -131,8 +272,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       setNotes('');
       setBulkNote('');
       setBulkRows([
-        { id: '1', itemId: '', itemSearch: '', quantity: '' },
-        { id: '2', itemId: '', itemSearch: '', quantity: '' },
+        { id: '1', itemId: '', itemSearch: '', quantity: '', isOpen: false },
+        { id: '2', itemId: '', itemSearch: '', quantity: '', isOpen: false },
       ]);
     }
   }, [open]);
@@ -176,7 +317,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   const addBulkRow = () => {
     setBulkRows((prev) => [
       ...prev,
-      { id: Date.now().toString(), itemId: '', itemSearch: '', quantity: '' },
+      { id: Date.now().toString(), itemId: '', itemSearch: '', quantity: '', isOpen: false },
     ]);
   };
 
@@ -188,40 +329,19 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     setBulkRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...updates } : row)));
   };
 
-  // Fetch items for bulk mode (all rows share the same search)
-  const { data: bulkItemsData, isLoading: bulkItemsLoading } = useItems({
-    q: itemSearch || undefined,
-    limit: 50,
-    enabled: open && mode === 'BULK' && step === 3,
-  });
+  // Note: Each row will have its own search query, so we don't fetch here
+  // Instead, each row's autocomplete will fetch independently
 
-  const bulkItems = bulkItemsData?.data || [];
-
-  const filteredBulkItems = useMemo(() => {
-    if (!itemSearch.trim()) return bulkItems;
-    const searchLower = itemSearch.toLowerCase();
-    return bulkItems.filter(
-      (item) =>
-        item.name.toLowerCase().includes(searchLower) ||
-        item.sku?.toLowerCase().includes(searchLower) ||
-        item.brand?.toLowerCase().includes(searchLower) ||
-        item.model?.toLowerCase().includes(searchLower) ||
-        item.color?.toLowerCase().includes(searchLower),
-    );
-  }, [bulkItems, itemSearch]);
-
-  const handleBulkItemSelect = (rowId: string, itemId: string) => {
-    const item = bulkItems.find((i) => i.id === itemId);
-    if (item) {
-      const displayLabel =
-        item.model && item.storageGb && item.color && item.condition
-          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
-          : item.name || 'Item sin nombre';
-      updateBulkRow(rowId, {
-        itemId,
-        itemSearch: displayLabel,
-      });
-    }
+  const handleBulkItemSelect = (rowId: string, itemId: string, item: any) => {
+    const displayLabel =
+      item.model && item.storageGb && item.color && item.condition
+        ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+        : item.name || 'Item sin nombre';
+    updateBulkRow(rowId, {
+      itemId,
+      itemSearch: displayLabel,
+      isOpen: false, // Close dropdown after selection
+    });
   };
 
   const validBulkRows = bulkRows.filter((row) => row.itemId && row.quantity);
@@ -512,66 +632,14 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                         </div>
                         <div className="max-h-[400px] overflow-y-auto">
                           {bulkRows.map((row, index) => {
-                            // Filter items for this row's search (function, not hook)
-                            const getRowFilteredItems = () => {
-                              if (!row.itemSearch.trim()) return bulkItems;
-                              const searchLower = row.itemSearch.toLowerCase();
-                              return bulkItems.filter(
-                                (item) =>
-                                  item.name.toLowerCase().includes(searchLower) ||
-                                  item.sku?.toLowerCase().includes(searchLower) ||
-                                  item.brand?.toLowerCase().includes(searchLower) ||
-                                  item.model?.toLowerCase().includes(searchLower) ||
-                                  item.color?.toLowerCase().includes(searchLower),
-                              );
-                            };
-                            const rowFilteredItems = getRowFilteredItems();
-
-                            const selectedItem = bulkItems.find((i) => i.id === row.itemId);
-                            
                             return (
                               <div key={row.id} className="border-b border-gray-200 px-4 py-3 grid grid-cols-12 gap-2 items-center">
-                                <div className="col-span-6">
-                                  <div className="relative">
-                                    <Input
-                                      placeholder="Buscar modelo..."
-                                      value={row.itemSearch}
-                                      onChange={(e) => {
-                                        updateBulkRow(row.id, { itemSearch: e.target.value });
-                                      }}
-                                      className="text-sm"
-                                      disabled={isLoading}
-                                    />
-                                    {row.itemSearch && rowFilteredItems.length > 0 && (
-                                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
-                                        {rowFilteredItems.slice(0, 10).map((item) => {
-                                          const displayLabel =
-                                            item.model && item.storageGb && item.color && item.condition
-                                              ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
-                                              : item.name || 'Item sin nombre';
-                                          return (
-                                            <button
-                                              key={item.id}
-                                              type="button"
-                                              onMouseDown={(e) => {
-                                                e.preventDefault(); // Prevent blur
-                                                handleBulkItemSelect(row.id, item.id);
-                                              }}
-                                              className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                                            >
-                                              {displayLabel}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {selectedItem && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                      {selectedItem.sku && `SKU: ${selectedItem.sku}`}
-                                    </div>
-                                  )}
-                                </div>
+                                <BulkRowItemPicker
+                                  row={row}
+                                  onSelect={(itemId, item) => handleBulkItemSelect(row.id, itemId, item)}
+                                  onUpdate={(updates) => updateBulkRow(row.id, updates)}
+                                  isLoading={isLoading}
+                                />
                                 <div className="col-span-4">
                                   <Input
                                     type="text"
