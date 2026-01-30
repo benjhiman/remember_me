@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useItems } from '@/lib/api/hooks/use-items';
+import { useItemFolders, useUnpinFolder } from '@/lib/api/hooks/use-item-folders';
 import { usePermissions } from '@/lib/auth/use-permissions';
 import { useDeleteItem } from '@/lib/api/hooks/use-item-mutations';
 import { Button } from '@/components/ui/button';
@@ -13,10 +14,13 @@ import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
-import { Plus, Search, Edit, Trash2, RefreshCw, Hash } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, RefreshCw, Hash, Folder, ArrowLeft } from 'lucide-react';
 import { conditionLabel } from '@/lib/items/condition-label';
 import { ItemFormDialog } from '@/components/items/item-form-dialog';
+import { ItemsFoldersGrid } from '@/components/items/items-folders-grid';
+import { CreateFolderDialog } from '@/components/items/create-folder-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +36,7 @@ import type { Item } from '@/lib/api/hooks/use-items';
 
 export default function InventoryItemsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { can } = usePermissions();
@@ -40,6 +45,7 @@ export default function InventoryItemsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [deletingItem, setDeletingItem] = useState<Item | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -47,7 +53,14 @@ export default function InventoryItemsPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
+  // Get prefix from URL params
+  const prefix = searchParams.get('prefix')?.toUpperCase() ?? null;
+
   const deleteItem = useDeleteItem();
+  const unpinFolder = useUnpinFolder();
+
+  // Fetch folders (only when not in prefix mode)
+  const { data: foldersData, isLoading: isLoadingFolders } = useItemFolders(!prefix && !!user);
 
   // Debounce search
   useEffect(() => {
@@ -58,11 +71,20 @@ export default function InventoryItemsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  // Build query for items: if prefix exists, use it as search (backend will handle startsWith)
+  const itemsQuery = useMemo(() => {
+    if (prefix) {
+      // When in prefix mode, search by prefix (backend should handle startsWith for SKU)
+      return prefix;
+    }
+    return debouncedSearch || undefined;
+  }, [prefix, debouncedSearch]);
+
   const { data, isLoading, error, refetch } = useItems({
     page,
     limit: 20,
-    q: debouncedSearch || undefined,
-    enabled: !!user,
+    q: itemsQuery,
+    enabled: !!user && !!prefix, // Only fetch items when in prefix mode
   });
 
   useEffect(() => {
@@ -89,11 +111,15 @@ export default function InventoryItemsPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['items'] });
-      await refetch();
+      if (prefix) {
+        await queryClient.invalidateQueries({ queryKey: ['items'] });
+        await refetch();
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ['item-folders'] });
+      }
       toast({
         title: 'Actualizado',
-        description: 'Los items se actualizaron correctamente',
+        description: 'Los datos se actualizaron correctamente',
       });
     } catch (error) {
       toast({
@@ -106,11 +132,65 @@ export default function InventoryItemsPage() {
     }
   };
 
+  const handleOpenFolder = (folderPrefix: string) => {
+    router.push(`/inventory/items?prefix=${encodeURIComponent(folderPrefix)}`);
+  };
+
+  const handleBackToFolders = () => {
+    router.push('/inventory/items');
+    setSearch('');
+    setDebouncedSearch('');
+    setPage(1);
+  };
+
+  const handleOpenCreateFolder = () => {
+    const canWrite =
+      can('stock.write') ||
+      can('inventory.write') ||
+      ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '');
+
+    if (!canWrite) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin permisos',
+        description: 'No tenés permiso para crear carpetas. Pedile a un admin que te habilite.',
+      });
+      return;
+    }
+    setIsCreateFolderOpen(true);
+  };
+
+  const handleUnpinFolder = (folderPrefix: string) => {
+    const canWrite =
+      can('stock.write') ||
+      can('inventory.write') ||
+      ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '');
+
+    if (!canWrite) {
+      toast({
+        variant: 'destructive',
+        title: 'Sin permisos',
+        description: 'No tenés permiso para desanclar carpetas. Pedile a un admin que te habilite.',
+      });
+      return;
+    }
+    unpinFolder.mutate(folderPrefix);
+  };
+
+  // Filter folders by search (when in folders mode)
+  const filteredFolders = useMemo(() => {
+    if (!foldersData?.data) return [];
+    if (!search.trim()) return foldersData.data;
+    const searchLower = search.toLowerCase();
+    return foldersData.data.filter((folder) => folder.prefix.toLowerCase().includes(searchLower));
+  }, [foldersData, search]);
+
   const handleDelete = async () => {
     if (!deletingItem) return;
     try {
       await deleteItem.mutateAsync(deletingItem.id);
       setDeletingItem(null);
+      await queryClient.invalidateQueries({ queryKey: ['item-folders'] });
     } catch (error) {
       // Error handled by mutation
     }
@@ -172,6 +252,7 @@ export default function InventoryItemsPage() {
 
     if (succeeded > 0) {
       await queryClient.invalidateQueries({ queryKey: ['items'] });
+      await queryClient.invalidateQueries({ queryKey: ['item-folders'] });
       toast({
         title: 'Items eliminados',
         description: `${succeeded} item${succeeded > 1 ? 's' : ''} eliminado${succeeded > 1 ? 's' : ''} correctamente.`,
@@ -212,10 +293,17 @@ export default function InventoryItemsPage() {
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory/stock' },
     { label: 'Items', href: '/inventory/items' },
+    ...(prefix ? [{ label: `Carpeta: ${prefix}`, href: `/inventory/items?prefix=${prefix}` }] : []),
   ];
 
   const actions = (
     <div className="flex items-center gap-2">
+      {prefix && (
+        <Button size="sm" variant="outline" onClick={handleBackToFolders}>
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Volver a carpetas
+        </Button>
+      )}
       <Button
         size="sm"
         variant="outline"
@@ -225,7 +313,13 @@ export default function InventoryItemsPage() {
         <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
         Actualizar
       </Button>
-      {selectedIds.size > 0 && (
+      {!prefix && (
+        <Button size="sm" variant="outline" onClick={handleOpenCreateFolder}>
+          <Folder className="h-4 w-4 mr-1.5" />
+          Nueva carpeta
+        </Button>
+      )}
+      {selectedIds.size > 0 && prefix && (
         <Button
           size="sm"
           variant="destructive"
@@ -249,16 +343,96 @@ export default function InventoryItemsPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Buscar por nombre, SKU, categoría o marca..."
+            placeholder={
+              prefix
+                ? 'Buscar por nombre, SKU, categoría o marca...'
+                : 'Buscar carpetas por prefijo...'
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
       </div>
+      {prefix && (
+        <Badge variant="secondary" className="text-sm">
+          Carpeta: {prefix}
+        </Badge>
+      )}
     </div>
   );
 
+  // Render folders view (when no prefix)
+  if (!prefix) {
+    return (
+      <>
+        <PageShell
+          title="Items"
+          description="Gestiona tu catálogo de productos"
+          breadcrumbs={breadcrumbs}
+          actions={actions}
+          toolbar={toolbar}
+        >
+          {isLoadingFolders && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {[...Array(10)].map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          )}
+
+          {!isLoadingFolders && filteredFolders.length === 0 && (
+            <div className="p-12 text-center">
+              <div className="max-w-sm mx-auto">
+                <Folder className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">No hay carpetas</h3>
+                <p className="text-xs text-gray-600 mb-4">
+                  {search.trim()
+                    ? 'No se encontraron carpetas con ese prefijo.'
+                    : 'No hay items con SKU para mostrar carpetas. Creá items para que aparezcan automáticamente.'}
+                </p>
+                {!search.trim() && (
+                  <Button onClick={handleOpenCreate} size="sm">
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Crear nuevo item
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!isLoadingFolders && filteredFolders.length > 0 && (
+            <ItemsFoldersGrid
+              folders={filteredFolders}
+              onOpen={handleOpenFolder}
+              onUnpin={handleUnpinFolder}
+              canUnpin={
+                can('stock.write') ||
+                can('inventory.write') ||
+                ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '')
+              }
+            />
+          )}
+        </PageShell>
+        <CreateFolderDialog open={isCreateFolderOpen} onOpenChange={setIsCreateFolderOpen} />
+        <ItemFormDialog
+          open={isCreateOpen}
+          onOpenChange={(open) => {
+            setIsCreateOpen(open);
+            if (!open) {
+              queryClient.invalidateQueries({ queryKey: ['item-folders'] });
+            }
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['item-folders'] });
+            queryClient.invalidateQueries({ queryKey: ['items'] });
+          }}
+        />
+      </>
+    );
+  }
+
+  // Render table view (when prefix exists)
   return (
     <>
       <PageShell

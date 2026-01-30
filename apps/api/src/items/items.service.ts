@@ -78,14 +78,31 @@ export class ItemsService {
     };
 
     if (dto.q) {
-      where.OR = [
-        { name: { contains: dto.q, mode: 'insensitive' } },
-        { sku: { contains: dto.q, mode: 'insensitive' } },
-        { brand: { contains: dto.q, mode: 'insensitive' } },
-        { category: { contains: dto.q, mode: 'insensitive' } },
-        { model: { contains: dto.q, mode: 'insensitive' } },
-        { color: { contains: dto.q, mode: 'insensitive' } },
-      ];
+      const qTrimUpper = dto.q.trim().toUpperCase();
+      // Detect if query looks like a SKU prefix (alphanumeric, 2-10 chars, starts with letter)
+      const isSkuPrefix = /^[A-Z][A-Z0-9]{1,9}$/.test(qTrimUpper);
+      
+      if (isSkuPrefix) {
+        // For SKU prefix searches, use startsWith for SKU (more precise)
+        where.OR = [
+          { sku: { startsWith: qTrimUpper, mode: 'insensitive' } },
+          { name: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { brand: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { category: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { model: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { color: { contains: dto.q.trim(), mode: 'insensitive' } },
+        ];
+      } else {
+        // For regular text searches, use contains for all fields
+        where.OR = [
+          { name: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { sku: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { brand: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { category: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { model: { contains: dto.q.trim(), mode: 'insensitive' } },
+          { color: { contains: dto.q.trim(), mode: 'insensitive' } },
+        ];
+      }
     }
 
     const [items, total] = await Promise.all([

@@ -28,6 +28,7 @@ interface ItemFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: Item | null;
+  onSuccess?: () => void;
 }
 
 const STORAGE_OPTIONS = [64, 128, 256, 512, 1024, 2048];
@@ -37,7 +38,7 @@ const CONDITION_OPTIONS = [
   { value: 'OEM', label: 'OEM' },
 ];
 
-export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps) {
+export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemFormDialogProps) {
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
   const [formData, setFormData] = useState<CreateItemDto | UpdateItemDto>({
@@ -104,6 +105,9 @@ export function ItemFormDialog({ open, onOpenChange, item }: ItemFormDialogProps
         await createItem.mutateAsync(formData as CreateItemDto);
       }
       onOpenChange(false);
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       // Error handled by mutation
     }
