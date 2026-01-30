@@ -43,9 +43,11 @@ export function useCreateStockEntry() {
       return api.post<CreateStockEntryResponse>('/stock/entries', dto);
     },
     onSuccess: (data) => {
-      // Invalidate stock queries
+      // Invalidate all stock-related queries to ensure UI updates immediately
       queryClient.invalidateQueries({ queryKey: ['stock-items'] });
       queryClient.invalidateQueries({ queryKey: ['stock-items-infinite'] });
+      queryClient.invalidateQueries({ queryKey: ['stock-summary'] }); // Critical: refresh summary
+      queryClient.invalidateQueries({ queryKey: ['stock-movements-global'] }); // Refresh movements
       queryClient.invalidateQueries({ queryKey: ['stock-reservations'] });
       queryClient.invalidateQueries({ queryKey: ['items'] }); // In case items show stock counts
 

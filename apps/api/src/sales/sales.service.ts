@@ -417,18 +417,37 @@ export class SalesService {
     }
 
     // Calculate totals from reservations
-    // For item-based reservations, we need to get price from stock items or use a default
-    // For now, we'll use stockItem.basePrice if available, otherwise use 0 (should be improved with item pricing)
-    const subtotal = reservations.reduce((sum, reservation) => {
-      if (reservation.stockItem) {
-        return sum + parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity;
-      } else if (reservation.itemId) {
-        // For item-based reservations, try to get price from first available stock item
-        // If no stock item found, use 0 (this should be improved with proper item pricing)
-        return sum + 0; // TODO: Implement proper pricing for item-based reservations
-      }
-      return sum;
-    }, 0);
+    // For item-based reservations, get price from first available stock item
+    const reservationPrices = await Promise.all(
+      reservations.map(async (reservation) => {
+        if (reservation.stockItem) {
+          // Legacy: stockItem-based reservation
+          return parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity;
+        } else if (reservation.itemId) {
+          // Item-based reservation: get price from first available stock item
+          const stockItem = await this.prisma.stockItem.findFirst({
+            where: {
+              organizationId: reservation.organizationId,
+              itemId: reservation.itemId,
+              deletedAt: null,
+            },
+            orderBy: { createdAt: 'desc' }, // Get most recent stock item
+          });
+
+          if (stockItem) {
+            return parseFloat(stockItem.basePrice.toString()) * reservation.quantity;
+          } else {
+            // No stock item found - log warning but allow sale to proceed with 0 price
+            this.logger.warn(
+              `No stock item found for itemId ${reservation.itemId} in reservation ${reservation.id}. Using price 0.`,
+            );
+            return 0;
+          }
+        }
+        return 0;
+      }),
+    );
+    const subtotal = reservationPrices.reduce((sum, price) => sum + price, 0);
     const discount = dto.discount || 0;
     const total = subtotal - discount;
 
@@ -455,34 +474,48 @@ export class SalesService {
           notes: dto.notes,
           metadata: dto.metadata || {},
           items: {
-            create: reservations.map((reservation) => {
-              if (reservation.stockItemId && reservation.stockItem) {
-                // Legacy: stockItem-based reservation
-                return {
-                  stockItemId: reservation.stockItemId,
-                  model: reservation.stockItem.model,
-                  quantity: reservation.quantity,
-                  unitPrice: reservation.stockItem.basePrice,
-                  totalPrice: new Decimal(
-                    parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity,
-                  ),
-                };
-              } else if (reservation.itemId && reservation.item) {
-                // Item-based reservation
-                const modelName = reservation.item.model || reservation.item.name;
-                return {
-                  stockItemId: null, // No specific stock item for item-based reservations
-                  model: modelName,
-                  quantity: reservation.quantity,
-                  unitPrice: new Decimal(0), // TODO: Implement proper pricing for item-based reservations
-                  totalPrice: new Decimal(0), // TODO: Implement proper pricing for item-based reservations
-                };
-              } else {
-                throw new BadRequestException(
-                  `Reservation ${reservation.id} must have either stockItemId or itemId`,
-                );
-              }
-            }),
+            create: await Promise.all(
+              reservations.map(async (reservation) => {
+                if (reservation.stockItemId && reservation.stockItem) {
+                  // Legacy: stockItem-based reservation
+                  return {
+                    stockItemId: reservation.stockItemId,
+                    model: reservation.stockItem.model,
+                    quantity: reservation.quantity,
+                    unitPrice: reservation.stockItem.basePrice,
+                    totalPrice: new Decimal(
+                      parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity,
+                    ),
+                  };
+                } else if (reservation.itemId && reservation.item) {
+                  // Item-based reservation: get price from first available stock item
+                  const stockItem = await tx.stockItem.findFirst({
+                    where: {
+                      organizationId: reservation.organizationId,
+                      itemId: reservation.itemId,
+                      deletedAt: null,
+                    },
+                    orderBy: { createdAt: 'desc' },
+                  });
+
+                  const modelName = reservation.item.model || reservation.item.name;
+                  const unitPrice = stockItem ? stockItem.basePrice : new Decimal(0);
+                  const totalPrice = new Decimal(parseFloat(unitPrice.toString()) * reservation.quantity);
+
+                  return {
+                    stockItemId: stockItem?.id || null,
+                    model: modelName,
+                    quantity: reservation.quantity,
+                    unitPrice,
+                    totalPrice,
+                  };
+                } else {
+                  throw new BadRequestException(
+                    `Reservation ${reservation.id} must have either stockItemId or itemId`,
+                  );
+                }
+              }),
+            ),
           },
         },
         include: {

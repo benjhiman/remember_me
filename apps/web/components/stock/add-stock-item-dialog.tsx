@@ -35,9 +35,9 @@ type Step = 1 | 2 | 3;
 
 export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogProps) {
   const [step, setStep] = useState<Step>(1);
+  const [mode, setMode] = useState<StockEntryMode | ''>('');
   const [itemSearch, setItemSearch] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string>('');
-  const [mode, setMode] = useState<StockEntryMode | ''>('');
   const [imeisText, setImeisText] = useState('');
   const [quantity, setQuantity] = useState<number>(1);
   const [condition, setCondition] = useState<'NEW' | 'USED' | 'REFURBISHED'>('NEW');
@@ -48,11 +48,11 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
   const createStockEntry = useCreateStockEntry();
 
-  // Fetch items for selection
+  // Fetch items for selection (enabled in step 2)
   const { data: itemsData, isLoading: itemsLoading } = useItems({
     q: itemSearch || undefined,
     limit: 50,
-    enabled: open && step === 1,
+    enabled: open && step >= 2,
   });
 
   const items = itemsData?.data || [];
@@ -101,9 +101,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   useEffect(() => {
     if (!open) {
       setStep(1);
+      setMode('');
       setItemSearch('');
       setSelectedItemId('');
-      setMode('');
       setImeisText('');
       setQuantity(1);
       setCondition('NEW');
@@ -114,17 +114,25 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     }
   }, [open]);
 
-  const handleNext = () => {
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
     if (step === 1) {
-      if (!selectedItemId) return;
+      // Step 1: Mode selection -> Step 2: Item selection
+      if (!mode) return;
       setStep(2);
     } else if (step === 2) {
-      if (!mode) return;
+      // Step 2: Item selection -> Step 3: Data entry
+      if (!selectedItemId) return;
       setStep(3);
     }
   };
 
-  const handleBack = () => {
+  const handleBack = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    
     if (step === 2) {
       setStep(1);
     } else if (step === 3) {
@@ -166,6 +174,18 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
     try {
       await createStockEntry.mutateAsync(dto);
+      // Reset form and close dialog
+      setStep(1);
+      setMode('');
+      setItemSearch('');
+      setSelectedItemId('');
+      setImeisText('');
+      setQuantity(1);
+      setCondition('NEW');
+      setStatus('AVAILABLE');
+      setCost('');
+      setLocation('');
+      setNotes('');
       onOpenChange(false);
     } catch (error) {
       // Error handled by mutation
@@ -174,8 +194,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
   const isLoading = createStockEntry.isPending;
 
-  const canProceedStep1 = !!selectedItemId;
-  const canProceedStep2 = !!mode;
+  const canProceedStep1 = !!mode; // Step 1: need mode selected
+  const canProceedStep2 = !!selectedItemId; // Step 2: need item selected
   const canSubmitStep3 =
     mode === StockEntryMode.IMEI
       ? parsedImeis.length > 0 && duplicateImeisInText.length === 0
@@ -187,16 +207,57 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         <DialogHeader>
           <DialogTitle>Agregar stock</DialogTitle>
           <DialogDescription>
-            {step === 1 && 'Seleccioná el item del catálogo'}
-            {step === 2 && 'Elegí el modo de agregado'}
+            {step === 1 && 'Elegí el modo de agregado'}
+            {step === 2 && 'Seleccioná el item del catálogo'}
             {step === 3 && 'Completá los datos del stock'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-6 py-4">
-            {/* Step 1: Item Selection */}
+            {/* Step 1: Mode Selection */}
             {step === 1 && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Modo de agregado</Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setMode(StockEntryMode.IMEI)}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-colors',
+                        mode === StockEntryMode.IMEI
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                    >
+                      <div className="font-medium mb-1">IMEI (Serializado)</div>
+                      <div className="text-sm text-muted-foreground">
+                        Para items con IMEI único (ej: iPhone)
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode(StockEntryMode.QUANTITY)}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-colors',
+                        mode === StockEntryMode.QUANTITY
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                    >
+                      <div className="font-medium mb-1">Cantidad</div>
+                      <div className="text-sm text-muted-foreground">
+                        Para lotes sin IMEI (ej: accesorios)
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Item Selection */}
+            {step === 2 && (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="item-search">Buscar item</Label>
@@ -265,46 +326,6 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
               </div>
             )}
 
-            {/* Step 2: Mode Selection */}
-            {step === 2 && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Modo de agregado</Label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setMode(StockEntryMode.IMEI)}
-                      className={cn(
-                        'p-4 border-2 rounded-lg text-left transition-colors',
-                        mode === StockEntryMode.IMEI
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      )}
-                    >
-                      <div className="font-medium mb-1">IMEI (Serializado)</div>
-                      <div className="text-sm text-muted-foreground">
-                        Para items con IMEI único (ej: iPhone)
-                      </div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode(StockEntryMode.QUANTITY)}
-                      className={cn(
-                        'p-4 border-2 rounded-lg text-left transition-colors',
-                        mode === StockEntryMode.QUANTITY
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      )}
-                    >
-                      <div className="font-medium mb-1">Cantidad</div>
-                      <div className="text-sm text-muted-foreground">
-                        Para lotes sin IMEI (ej: accesorios)
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Step 3: Fields */}
             {step === 3 && (
@@ -449,7 +470,11 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                   Cancelar
                 </Button>
                 {step < 3 ? (
-                  <Button type="button" onClick={handleNext} disabled={!canProceedStep1 && !canProceedStep2 || isLoading}>
+                  <Button 
+                    type="button" 
+                    onClick={handleNext} 
+                    disabled={(step === 1 && !canProceedStep1) || (step === 2 && !canProceedStep2) || isLoading}
+                  >
                     Siguiente
                   </Button>
                 ) : (
