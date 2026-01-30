@@ -19,6 +19,7 @@ import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateStockEntryDto, StockEntryMode } from './dto/create-stock-entry.dto';
+import { BulkStockAddDto } from './dto/bulk-stock-add.dto';
 import {
   Role,
   StockStatus,
@@ -1484,6 +1485,199 @@ export class StockService {
     } else {
       throw new BadRequestException(`Invalid mode: ${dto.mode}`);
     }
+  }
+
+  async bulkAddStock(organizationId: string, userId: string, dto: BulkStockAddDto) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can bulk add stock');
+    }
+
+    if (!dto.items || dto.items.length === 0) {
+      throw new BadRequestException('Items array cannot be empty');
+    }
+
+    // Consolidate duplicates: sum quantities for same itemId
+    const consolidated = new Map<string, number>();
+    for (const item of dto.items) {
+      const current = consolidated.get(item.itemId) || 0;
+      consolidated.set(item.itemId, current + item.quantity);
+    }
+
+    // Validate all items exist and belong to organization
+    const itemIds = Array.from(consolidated.keys());
+    const items = await this.prisma.item.findMany({
+      where: {
+        id: { in: itemIds },
+        organizationId,
+        deletedAt: null,
+        isActive: true,
+      },
+    });
+
+    if (items.length !== itemIds.length) {
+      const foundIds = new Set(items.map((i) => i.id));
+      const missingIds = itemIds.filter((id) => !foundIds.has(id));
+      throw new NotFoundException(`Items not found: ${missingIds.join(', ')}`);
+    }
+
+    // Create a map for quick lookup
+    const itemsMap = new Map(items.map((i) => [i.id, i]));
+
+    // Execute all operations in a single transaction
+    return this.prisma.$transaction(async (tx) => {
+      const applied: Array<{ itemId: string; quantityApplied: number }> = [];
+      const errors: Array<{ itemId: string; error: string }> = [];
+
+      for (const [itemId, totalQuantity] of consolidated.entries()) {
+        try {
+          const item = itemsMap.get(itemId);
+          if (!item) {
+            errors.push({ itemId, error: 'Item not found' });
+            continue;
+          }
+
+          // Find or create stock item for this item
+          let stockItem = await tx.stockItem.findFirst({
+            where: {
+              organizationId,
+              itemId,
+              deletedAt: null,
+              // For quantity-based stock, we can have multiple StockItems or consolidate
+              // Strategy: find first non-serialized (imei is null) or create new
+              imei: null,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (stockItem) {
+            // Update existing stock item
+            const quantityBefore = stockItem.quantity;
+            const quantityAfter = quantityBefore + totalQuantity;
+
+            stockItem = await tx.stockItem.update({
+              where: { id: stockItem.id },
+              data: { quantity: quantityAfter },
+            });
+
+            // Create movement
+            await this.createMovement(
+              tx,
+              organizationId,
+              stockItem.id,
+              StockMovementType.IN,
+              quantityBefore,
+              quantityAfter,
+              userId,
+              dto.note || 'Bulk stock add',
+              undefined,
+              undefined,
+              {
+                bulkAdd: true,
+                source: dto.source || 'manual',
+                itemId,
+              },
+            );
+          } else {
+            // Create new stock item
+            const model = item.model || item.name;
+            const storage = item.storageGb || null;
+            const color = item.color || null;
+
+            stockItem = await tx.stockItem.create({
+              data: {
+                organizationId,
+                itemId,
+                model,
+                storage,
+                color,
+                condition: item.condition || 'NEW',
+                imei: null,
+                quantity: totalQuantity,
+                costPrice: new Decimal(0),
+                basePrice: new Decimal(0),
+                status: StockStatus.AVAILABLE,
+                notes: dto.note,
+                metadata: {
+                  bulkAdd: true,
+                  source: dto.source || 'manual',
+                },
+              } as any,
+            });
+
+            // Create movement
+            await this.createMovement(
+              tx,
+              organizationId,
+              stockItem.id,
+              StockMovementType.IN,
+              0,
+              totalQuantity,
+              userId,
+              dto.note || 'Bulk stock add',
+              undefined,
+              undefined,
+              {
+                bulkAdd: true,
+                source: dto.source || 'manual',
+                itemId,
+              },
+            );
+          }
+
+          applied.push({ itemId, quantityApplied: totalQuantity });
+
+          // Audit log
+          const metadata = this.getRequestMetadata();
+          await this.auditLogService.log({
+            organizationId,
+            actorUserId: userId,
+            requestId: metadata.requestId,
+            action: AuditAction.CREATE,
+            entityType: AuditEntityType.StockItem,
+            entityId: stockItem.id,
+            after: {
+              id: stockItem.id,
+              quantity: stockItem.quantity.toString(),
+              itemId,
+              bulkAdd: true,
+            },
+            metadata: {
+              ...metadata,
+              itemId,
+              quantity: totalQuantity,
+              bulkAdd: true,
+              source: dto.source || 'manual',
+            },
+          });
+        } catch (error) {
+          this.logger.error(`Error processing item ${itemId} in bulk add: ${error}`);
+          errors.push({
+            itemId,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      // If any errors occurred, rollback the entire transaction
+      if (errors.length > 0) {
+        throw new BadRequestException(
+          `Failed to process some items: ${errors.map((e) => `${e.itemId}: ${e.error}`).join(', ')}`,
+        );
+      }
+
+      this.logger.log(
+        `Bulk stock add completed: ${applied.length} items, ${applied.reduce((sum, a) => sum + a.quantityApplied, 0)} total units`,
+      );
+
+      return {
+        success: true,
+        applied,
+        totalItems: applied.length,
+        totalQuantity: applied.reduce((sum, a) => sum + a.quantityApplied, 0),
+      };
+    });
   }
 
   async getStockSummary(organizationId: string, userId: string, dto: any) {

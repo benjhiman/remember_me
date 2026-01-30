@@ -25,6 +25,7 @@ import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateStockEntryDto } from './dto/create-stock-entry.dto';
+import { BulkStockAddDto } from './dto/bulk-stock-add.dto';
 import { StockSummaryDto } from './dto/stock-summary.dto';
 import { StockMovementsDto } from './dto/stock-movements.dto';
 import { ListReservationsDto } from './dto/list-reservations.dto';
@@ -127,6 +128,18 @@ export class StockController {
     @Body() dto: CreateStockEntryDto,
   ) {
     return this.stockService.createStockEntry(organizationId, user.userId, dto);
+  }
+
+  // Bulk stock add
+  @Post('bulk-add')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  async bulkAddStock(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Body() dto: BulkStockAddDto,
+  ) {
+    return this.stockService.bulkAddStock(organizationId, user.userId, dto);
   }
 
   // CRUD StockItem (dynamic routes must come after specific routes)

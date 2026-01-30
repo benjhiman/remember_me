@@ -22,7 +22,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { useItems } from '@/lib/api/hooks/use-items';
 import { useCreateStockEntry, StockEntryMode, type CreateStockEntryDto } from '@/lib/api/hooks/use-stock-entry-mutations';
-import { Loader2, Search, X } from 'lucide-react';
+import { useBulkAddStock, type BulkStockAddItem } from '@/lib/api/hooks/use-bulk-add-stock';
+import { Loader2, Search, X, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { conditionLabel } from '@/lib/items/condition-label';
 
@@ -32,10 +33,19 @@ interface AddStockItemDialogProps {
 }
 
 type Step = 1 | 2 | 3;
+type EntryMode = StockEntryMode | 'BULK';
+
+interface BulkRow {
+  id: string;
+  itemId: string;
+  itemSearch: string;
+  quantity: string;
+  quantityError?: string;
+}
 
 export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogProps) {
   const [step, setStep] = useState<Step>(1);
-  const [mode, setMode] = useState<StockEntryMode | ''>('');
+  const [mode, setMode] = useState<EntryMode | ''>('');
   const [itemSearch, setItemSearch] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<string>('');
   const [imeisText, setImeisText] = useState('');
@@ -46,8 +56,14 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   const [cost, setCost] = useState<string>('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>(() => [
+    { id: '1', itemId: '', itemSearch: '', quantity: '' },
+    { id: '2', itemId: '', itemSearch: '', quantity: '' },
+  ]);
 
   const createStockEntry = useCreateStockEntry();
+  const bulkAddStock = useBulkAddStock();
 
   // Fetch items for selection (enabled in step 2)
   const { data: itemsData, isLoading: itemsLoading } = useItems({
@@ -113,6 +129,11 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       setCost('');
       setLocation('');
       setNotes('');
+      setBulkNote('');
+      setBulkRows([
+        { id: '1', itemId: '', itemSearch: '', quantity: '' },
+        { id: '2', itemId: '', itemSearch: '', quantity: '' },
+      ]);
     }
   }, [open]);
 
@@ -121,9 +142,14 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     e?.stopPropagation();
     
     if (step === 1) {
-      // Step 1: Mode selection -> Step 2: Item selection
+      // Step 1: Mode selection -> Step 2: Item selection (or bulk mode)
       if (!mode) return;
-      setStep(2);
+      if (mode === 'BULK') {
+        // Skip to step 3 for bulk mode (no item selection needed)
+        setStep(3);
+      } else {
+        setStep(2);
+      }
     } else if (step === 2) {
       // Step 2: Item selection -> Step 3: Data entry
       if (!selectedItemId) return;
@@ -138,14 +164,121 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     if (step === 2) {
       setStep(1);
     } else if (step === 3) {
-      setStep(2);
+      if (mode === 'BULK') {
+        setStep(1); // Bulk mode skips step 2
+      } else {
+        setStep(2);
+      }
     }
   };
+
+  // Bulk mode helpers
+  const addBulkRow = () => {
+    setBulkRows((prev) => [
+      ...prev,
+      { id: Date.now().toString(), itemId: '', itemSearch: '', quantity: '' },
+    ]);
+  };
+
+  const removeBulkRow = (id: string) => {
+    setBulkRows((prev) => prev.filter((row) => row.id !== id));
+  };
+
+  const updateBulkRow = (id: string, updates: Partial<BulkRow>) => {
+    setBulkRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...updates } : row)));
+  };
+
+  // Fetch items for bulk mode (all rows share the same search)
+  const { data: bulkItemsData, isLoading: bulkItemsLoading } = useItems({
+    q: itemSearch || undefined,
+    limit: 50,
+    enabled: open && mode === 'BULK' && step === 3,
+  });
+
+  const bulkItems = bulkItemsData?.data || [];
+
+  const filteredBulkItems = useMemo(() => {
+    if (!itemSearch.trim()) return bulkItems;
+    const searchLower = itemSearch.toLowerCase();
+    return bulkItems.filter(
+      (item) =>
+        item.name.toLowerCase().includes(searchLower) ||
+        item.sku?.toLowerCase().includes(searchLower) ||
+        item.brand?.toLowerCase().includes(searchLower) ||
+        item.model?.toLowerCase().includes(searchLower) ||
+        item.color?.toLowerCase().includes(searchLower),
+    );
+  }, [bulkItems, itemSearch]);
+
+  const handleBulkItemSelect = (rowId: string, itemId: string) => {
+    const item = bulkItems.find((i) => i.id === itemId);
+    if (item) {
+      const displayLabel =
+        item.model && item.storageGb && item.color && item.condition
+          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+          : item.name || 'Item sin nombre';
+      updateBulkRow(rowId, {
+        itemId,
+        itemSearch: displayLabel,
+      });
+    }
+  };
+
+  const validBulkRows = bulkRows.filter((row) => row.itemId && row.quantity);
+  const canSubmitBulk = validBulkRows.length > 0 && validBulkRows.every((row) => {
+    const qty = parseInt(row.quantity || '0', 10);
+    return !isNaN(qty) && qty >= 1;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedItemId || !mode) return;
+    if (!mode) return;
+
+    // Handle bulk mode
+    if (mode === 'BULK') {
+      // Validate bulk rows
+      const validRows = bulkRows.filter((row) => row.itemId && row.quantity);
+      if (validRows.length === 0) {
+        return;
+      }
+
+      // Consolidate duplicates and validate
+      const consolidated = new Map<string, number>();
+      for (const row of validRows) {
+        const qty = parseInt(row.quantity || '0', 10);
+        if (isNaN(qty) || qty < 1) {
+          // Mark row with error
+          setBulkRows((prev) =>
+            prev.map((r) => (r.id === row.id ? { ...r, quantityError: 'Cantidad debe ser >= 1' } : r)),
+          );
+          return;
+        }
+        const current = consolidated.get(row.itemId) || 0;
+        consolidated.set(row.itemId, current + qty);
+      }
+
+      // Convert to API format
+      const items: BulkStockAddItem[] = Array.from(consolidated.entries()).map(([itemId, quantity]) => ({
+        itemId,
+        quantity,
+      }));
+
+      try {
+        await bulkAddStock.mutateAsync({
+          items,
+          note: bulkNote || undefined,
+          source: 'manual',
+        });
+        onOpenChange(false);
+      } catch (error) {
+        // Error handled by mutation
+      }
+      return;
+    }
+
+    // Handle single entry modes
+    if (!selectedItemId) return;
 
     // Validate mode-specific fields
     if (mode === StockEntryMode.IMEI) {
@@ -207,7 +340,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     }
   };
 
-  const isLoading = createStockEntry.isPending;
+  const isLoading = createStockEntry.isPending || bulkAddStock.isPending;
 
   const canProceedStep1 = !!mode; // Step 1: need mode selected
   const canProceedStep2 = !!selectedItemId; // Step 2: need item selected
@@ -230,7 +363,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
           <DialogDescription>
             {step === 1 && 'Elegí el modo de agregado'}
             {step === 2 && 'Seleccioná el item del catálogo'}
-            {step === 3 && 'Completá los datos del stock'}
+            {step === 3 && mode === 'BULK' && 'Agregá múltiples items a la vez'}
+            {step === 3 && mode !== 'BULK' && 'Completá los datos del stock'}
           </DialogDescription>
         </DialogHeader>
 
@@ -241,7 +375,22 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Modo de agregado</Label>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setMode('BULK')}
+                      className={cn(
+                        'p-4 border-2 rounded-lg text-left transition-colors',
+                        mode === 'BULK'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                    >
+                      <div className="font-medium mb-1">Bulk (Múltiple)</div>
+                      <div className="text-sm text-muted-foreground">
+                        Agregar varios items a la vez
+                      </div>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setMode(StockEntryMode.IMEI)}
@@ -351,6 +500,158 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
             {/* Step 3: Fields */}
             {step === 3 && (
               <div className="space-y-4">
+                {mode === 'BULK' && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Items a agregar</Label>
+                      <div className="border rounded-md overflow-hidden">
+                        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 uppercase">
+                          <div className="col-span-6">Modelo</div>
+                          <div className="col-span-4">Cantidad</div>
+                          <div className="col-span-2 text-right">Acción</div>
+                        </div>
+                        <div className="max-h-[400px] overflow-y-auto">
+                          {bulkRows.map((row, index) => {
+                            // Filter items for this row's search (function, not hook)
+                            const getRowFilteredItems = () => {
+                              if (!row.itemSearch.trim()) return bulkItems;
+                              const searchLower = row.itemSearch.toLowerCase();
+                              return bulkItems.filter(
+                                (item) =>
+                                  item.name.toLowerCase().includes(searchLower) ||
+                                  item.sku?.toLowerCase().includes(searchLower) ||
+                                  item.brand?.toLowerCase().includes(searchLower) ||
+                                  item.model?.toLowerCase().includes(searchLower) ||
+                                  item.color?.toLowerCase().includes(searchLower),
+                              );
+                            };
+                            const rowFilteredItems = getRowFilteredItems();
+
+                            const selectedItem = bulkItems.find((i) => i.id === row.itemId);
+                            
+                            return (
+                              <div key={row.id} className="border-b border-gray-200 px-4 py-3 grid grid-cols-12 gap-2 items-center">
+                                <div className="col-span-6">
+                                  <div className="relative">
+                                    <Input
+                                      placeholder="Buscar modelo..."
+                                      value={row.itemSearch}
+                                      onChange={(e) => {
+                                        updateBulkRow(row.id, { itemSearch: e.target.value });
+                                      }}
+                                      className="text-sm"
+                                      disabled={isLoading}
+                                    />
+                                    {row.itemSearch && rowFilteredItems.length > 0 && (
+                                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        {rowFilteredItems.slice(0, 10).map((item) => {
+                                          const displayLabel =
+                                            item.model && item.storageGb && item.color && item.condition
+                                              ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+                                              : item.name || 'Item sin nombre';
+                                          return (
+                                            <button
+                                              key={item.id}
+                                              type="button"
+                                              onMouseDown={(e) => {
+                                                e.preventDefault(); // Prevent blur
+                                                handleBulkItemSelect(row.id, item.id);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
+                                            >
+                                              {displayLabel}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {selectedItem && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      {selectedItem.sku && `SKU: ${selectedItem.sku}`}
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="col-span-4">
+                                  <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    placeholder="0"
+                                    value={row.quantity}
+                                    onChange={(e) => {
+                                      const digitsOnly = e.target.value.replace(/\D/g, '');
+                                      updateBulkRow(row.id, {
+                                        quantity: digitsOnly,
+                                        quantityError: undefined,
+                                      });
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && row.itemId && row.quantity) {
+                                        e.preventDefault();
+                                        addBulkRow();
+                                      }
+                                    }}
+                                    className={cn('text-sm', row.quantityError && 'border-destructive')}
+                                    disabled={isLoading}
+                                  />
+                                  {row.quantityError && (
+                                    <p className="text-xs text-destructive mt-1">{row.quantityError}</p>
+                                  )}
+                                </div>
+                                <div className="col-span-2 text-right">
+                                  {bulkRows.length > 1 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeBulkRow(row.id)}
+                                      disabled={isLoading}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addBulkRow}
+                        disabled={isLoading}
+                        className="w-full"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Agregar fila
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bulk-note">Nota (opcional)</Label>
+                      <Textarea
+                        id="bulk-note"
+                        value={bulkNote}
+                        onChange={(e) => setBulkNote(e.target.value)}
+                        placeholder="Ej: Compra proveedor X"
+                        rows={2}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    {validBulkRows.length > 0 && (
+                      <div className="p-3 bg-muted rounded-md text-sm">
+                        <div className="font-medium">Resumen:</div>
+                        <div className="text-muted-foreground">
+                          {validBulkRows.length} item{validBulkRows.length !== 1 ? 's' : ''} •{' '}
+                          {validBulkRows.reduce((sum, row) => sum + parseInt(row.quantity || '0', 10), 0)} unidades
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {mode === StockEntryMode.IMEI && (
                   <div className="space-y-2">
                     <Label htmlFor="imeis">
@@ -528,7 +829,12 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                     Siguiente
                   </Button>
                 ) : (
-                  <Button type="submit" disabled={!canSubmitStep3 || isLoading}>
+                  <Button
+                    type="submit"
+                    disabled={
+                      (mode === 'BULK' ? !canSubmitBulk : !canSubmitStep3) || isLoading
+                    }
+                  >
                     {isLoading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
