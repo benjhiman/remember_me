@@ -6,6 +6,7 @@ import { LeadsModule } from './leads/leads.module';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { LoggerService } from './common/logger/logger.service';
+import { StockModule } from './stock/stock.module';
 
 /**
  * Worker Module - Only loads modules needed for job processing
@@ -21,6 +22,7 @@ import { LoggerService } from './common/logger/logger.service';
     MetricsModule, // Needed by RateLimitModule
     RateLimitModule, // Needed by IntegrationsModule
     IntegrationsModule, // Includes JobRunnerService and all processors
+    StockModule, // Includes ReservationsExpirerService
   ],
   providers: [LoggerService],
 })

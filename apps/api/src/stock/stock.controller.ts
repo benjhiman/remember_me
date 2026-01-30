@@ -25,6 +25,10 @@ import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateStockEntryDto } from './dto/create-stock-entry.dto';
+import { StockSummaryDto } from './dto/stock-summary.dto';
+import { StockMovementsDto } from './dto/stock-movements.dto';
+import { ListReservationsDto } from './dto/list-reservations.dto';
+import { ExtendReservationDto } from './dto/extend-reservation.dto';
 import { Idempotent } from '../common/idempotency/idempotent.decorator';
 import { Role } from '@remember-me/prisma';
 
@@ -116,7 +120,26 @@ export class StockController {
     return this.stockService.adjustStock(organizationId, user.userId, id, dto);
   }
 
-  // Stock movements
+  // Stock summary and movements
+  @Get('summary')
+  async getStockSummary(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Query() query: StockSummaryDto,
+  ) {
+    return this.stockService.getStockSummary(organizationId, user.userId, query);
+  }
+
+  @Get('movements')
+  async getStockMovements(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Query() query: StockMovementsDto,
+  ) {
+    return this.stockService.getStockMovements(organizationId, user.userId, query);
+  }
+
+  // Stock movements (legacy - by stock item ID)
   @Get(':id/movements')
   async listMovements(
     @CurrentOrganization() organizationId: string,
@@ -159,19 +182,9 @@ export class StockController {
   async listReservations(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Query('itemId') itemId?: string,
-    @Query('status') status?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: ListReservationsDto,
   ) {
-    return this.stockService.listReservations(
-      organizationId,
-      user.userId,
-      itemId,
-      status as any,
-      page ? parseInt(page, 10) : 1,
-      limit ? parseInt(limit, 10) : 50,
-    );
+    return this.stockService.listReservations(organizationId, user.userId, query);
   }
 
   @Get('reservations/:id')
@@ -190,6 +203,16 @@ export class StockController {
     @Param('id') id: string,
   ) {
     return this.stockService.releaseReservation(organizationId, user.userId, id);
+  }
+
+  @Post('reservations/:id/extend')
+  async extendReservation(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: ExtendReservationDto,
+  ) {
+    return this.stockService.extendReservation(organizationId, user.userId, id, dto.hours || 24);
   }
 
   @Post('reservations/:id/confirm')

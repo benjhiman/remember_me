@@ -350,6 +350,7 @@ model Item {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   stockItems   StockItem[]
+  reservations StockReservation[]
 
   @@index([organizationId, isActive])
   @@index([organizationId, deletedAt])
@@ -390,6 +391,7 @@ enum ReservationStatus {
   CONFIRMED
   EXPIRED
   CANCELLED
+  RELEASED
 }
 
 model PricingRule {
@@ -758,23 +760,28 @@ model StockMovement {
 model StockReservation {
   id             String            @id @default(cuid())
   organizationId String
-  stockItemId    String
+  itemId         String? // FK to Item (product catalog) - for quantity-based reservations
+  stockItemId    String? // FK to StockItem - for legacy/specific item reservations
   quantity       Int               @default(1)
   status         ReservationStatus @default(ACTIVE)
   expiresAt      DateTime?
+  releasedAt     DateTime? // When reservation was released
   saleId         String?
   createdById    String
+  customerName   String? // Customer name for the reservation
   notes          String?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  stockItem    StockItem       @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  item         Item?           @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  stockItem    StockItem?      @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
   sale         Sale?           @relation(fields: [saleId], references: [id], onDelete: SetNull)
   createdBy    User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
   movements    StockMovement[]
 
   @@index([organizationId])
+  @@index([itemId])
   @@index([stockItemId])
   @@index([status])
   @@index([saleId])

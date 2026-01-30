@@ -3,7 +3,12 @@ import { Type } from 'class-transformer';
 
 export class CreateReservationDto {
   @IsString()
-  stockItemId!: string;
+  @IsOptional()
+  itemId?: string; // FK to Item (product catalog) - for quantity-based reservations
+
+  @IsString()
+  @IsOptional()
+  stockItemId?: string; // FK to StockItem - for legacy/specific item reservations
 
   @Type(() => Number)
   @IsInt()
@@ -17,6 +22,10 @@ export class CreateReservationDto {
   @IsString()
   @IsOptional()
   saleId?: string; // Link opcional con Sale
+
+  @IsString()
+  @IsOptional()
+  customerName?: string; // Customer name for the reservation
 
   @IsString()
   @IsOptional()
