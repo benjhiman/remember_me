@@ -6,6 +6,7 @@ import {
   ConflictException,
   Inject,
   Scope,
+  Logger,
 } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
@@ -29,6 +30,8 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable({ scope: Scope.REQUEST })
 export class StockService {
+  private readonly logger = new Logger(StockService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditLogService: AuditLogService,
@@ -1401,6 +1404,11 @@ export class StockService {
         throw new BadRequestException('Quantity must be at least 1 for QUANTITY mode');
       }
 
+      // Log for debugging
+      this.logger.log(
+        `Creating stock entry QUANTITY mode: orgId=${organizationId}, itemId=${dto.itemId}, quantity=${dto.quantity}`,
+      );
+
       const costPrice = dto.cost ? new Decimal(dto.cost) : new Decimal(0);
       const basePrice = dto.cost ? new Decimal(dto.cost) : new Decimal(0);
 
@@ -1414,7 +1422,7 @@ export class StockService {
             color,
             condition: dto.condition || 'NEW',
             imei: null, // No IMEI for quantity mode
-            quantity: dto.quantity!,
+            quantity: dto.quantity!, // Use the exact quantity provided
             costPrice,
             basePrice,
             status: dto.status || 'AVAILABLE',
@@ -1424,20 +1432,26 @@ export class StockService {
           } as any, // Type assertion needed due to Prisma type inference
         });
 
-        // Create movement (IN type)
+        this.logger.log(
+          `Created stock item: id=${stockItem.id}, itemId=${stockItem.itemId}, quantity=${stockItem.quantity}`,
+        );
+
+        // Create movement (IN type) with the exact quantity
         await this.createMovement(
           tx,
           organizationId,
           stockItem.id,
           StockMovementType.IN,
           0,
-          dto.quantity!,
+          dto.quantity!, // Use the exact quantity, not stockItem.quantity (should be same but explicit)
           userId,
           'Stock entry created',
           undefined,
           undefined,
           dto.metadata,
         );
+
+        this.logger.log(`Created stock movement IN: stockItemId=${stockItem.id}, quantity=${dto.quantity}`);
 
         // Audit log
         const metadata = this.getRequestMetadata();
@@ -1518,7 +1532,7 @@ export class StockService {
     // For each item, calculate stock summary
     const rows = await Promise.all(
       items.map(async (item) => {
-        // Get all stock items for this item
+        // Get all stock items for this item (including both serialized and quantity-based)
         const stockItems = await this.prisma.stockItem.findMany({
           where: {
             organizationId,
@@ -1527,8 +1541,16 @@ export class StockService {
           },
         });
 
-        // Calculate total quantity
+        // Calculate total quantity: sum of all stockItems.quantity
+        // This includes both serialized items (quantity=1) and bulk items (quantity>1)
         const totalQty = stockItems.reduce((sum, si) => sum + si.quantity, 0);
+
+        // Log for debugging (only in dev)
+        if (process.env.NODE_ENV !== 'production' && stockItems.length > 0) {
+          this.logger.debug(
+            `Stock summary for itemId=${item.id}: ${stockItems.length} stockItems, totalQty=${totalQty}`,
+          );
+        }
 
         // Get active reservations for this item (not expired, not released, not cancelled)
         const activeReservations = await this.prisma.stockReservation.findMany({

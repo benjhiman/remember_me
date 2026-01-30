@@ -169,8 +169,18 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       ...(cost ? { cost: parseFloat(cost) } : {}),
       ...(mode === StockEntryMode.IMEI
         ? { imeis: parsedImeis }
-        : { quantity }),
+        : { quantity: parseInt(quantity.toString(), 10) }), // Ensure quantity is a number
     };
+
+    // Debug logging (only in dev)
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[AddStockItemDialog] Submitting DTO:', {
+        mode: dto.mode,
+        itemId: dto.itemId,
+        quantity: dto.quantity,
+        imeisCount: dto.imeis?.length,
+      });
+    }
 
     try {
       await createStockEntry.mutateAsync(dto);
@@ -369,15 +379,45 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
                 {mode === StockEntryMode.QUANTITY && (
                   <div className="space-y-2">
-                    <Label htmlFor="quantity">Cantidad</Label>
+                    <Label htmlFor="quantity">Cantidad *</Label>
                     <Input
                       id="quantity"
-                      type="number"
-                      min="1"
-                      value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 1)}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={quantity.toString()}
+                      onChange={(e) => {
+                        // Only allow digits
+                        const digitsOnly = e.target.value.replace(/\D/g, '');
+                        if (digitsOnly === '') {
+                          setQuantity(1);
+                        } else {
+                          const num = parseInt(digitsOnly, 10);
+                          if (!isNaN(num) && num >= 1) {
+                            setQuantity(num);
+                          }
+                        }
+                      }}
+                      onWheel={(e) => {
+                        // Prevent scroll wheel from changing value
+                        e.currentTarget.blur();
+                      }}
+                      onBlur={(e) => {
+                        // Ensure minimum value of 1 on blur
+                        const value = parseInt(e.target.value, 10);
+                        if (isNaN(value) || value < 1) {
+                          setQuantity(1);
+                        }
+                      }}
+                      placeholder="Ingresá la cantidad (ej: 20)"
                       disabled={isLoading}
+                      className="text-lg font-medium"
+                      autoFocus
                     />
+                    <p className="text-xs text-muted-foreground">Solo números. Mínimo: 1</p>
+                    {quantity < 1 && (
+                      <p className="text-xs text-destructive">La cantidad debe ser al menos 1</p>
+                    )}
                   </div>
                 )}
 

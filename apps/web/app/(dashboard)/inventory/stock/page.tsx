@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -30,17 +30,31 @@ export default function InventoryStockPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
 
+  const summaryParams = useMemo(
+    () => ({
+      q: search || undefined,
+      condition: conditionFilter || undefined,
+      page,
+      limit: 20,
+    }),
+    [search, conditionFilter, page],
+  );
+
   const { data: summaryData, isLoading: isLoadingSummary, refetch: refetchSummary } = useStockSummary({
-    q: search || undefined,
-    condition: conditionFilter || undefined,
-    page,
-    limit: 20,
+    ...summaryParams,
     enabled: activeTab === 'summary' && !!user,
   });
 
+  const movementsParams = useMemo(
+    () => ({
+      page,
+      limit: 50,
+    }),
+    [page],
+  );
+
   const { data: movementsData, isLoading: isLoadingMovements, refetch: refetchMovements } = useStockMovementsGlobal({
-    page,
-    limit: 50,
+    ...movementsParams,
     enabled: activeTab === 'movements' && !!user,
   });
 
@@ -109,7 +123,10 @@ export default function InventoryStockPage() {
         <select
           className="h-9 rounded-md border border-input bg-background px-3 py-1.5 text-sm"
           value={conditionFilter}
-          onChange={(e) => setConditionFilter(e.target.value)}
+          onChange={(e) => {
+            setConditionFilter(e.target.value);
+            setPage(1); // Reset to first page when filter changes
+          }}
         >
           <option value="">Todas las condiciones</option>
           <option value="NEW">Nuevo</option>
