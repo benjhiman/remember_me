@@ -33,6 +33,7 @@ import { parseBulkPaste } from '@/lib/stock/bulk-paste-parser';
 import { batchMatchQueries } from '@/lib/stock/bulk-item-matcher';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/components/ui/use-toast';
 
 // Component for each bulk row's item picker
 function BulkRowItemPicker({
@@ -220,9 +221,17 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     omitted: number;
   } | null>(null);
   const [pasteOmitNoMatch, setPasteOmitNoMatch] = useState(false);
+  const [confirmSaveValidOpen, setConfirmSaveValidOpen] = useState(false);
+  const [dontAskAgain, setDontAskAgain] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('bulk-save-dont-ask-again') === 'true';
+    }
+    return false;
+  });
 
   const createStockEntry = useCreateStockEntry();
   const bulkAddStock = useBulkAddStock();
+  const { toast } = useToast();
 
   // Fetch items for selection (enabled in step 2)
   const { data: itemsData, isLoading: itemsLoading } = useItems({
@@ -377,8 +386,11 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         return;
       }
 
-      // Extract unique queries for matching
-      const queries = parseResult.ok.map((line) => line.query);
+      // Extract queries with cleaned versions for matching
+      const queries = parseResult.ok.map((line) => ({
+        query: line.query,
+        queryClean: line.queryClean,
+      }));
       
       // Batch match queries
       const matchResults = await batchMatchQueries(
@@ -399,7 +411,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       const pendingLines: Array<{ query: string; quantity: number }> = [];
 
       for (const line of parseResult.ok) {
-        const match = matchResults.get(line.query);
+        // Try to get match by original query first, then by cleaned query
+        const match = matchResults.get(line.query) || matchResults.get(line.queryClean);
         
         if (match?.item) {
           // Found match - consolidate
@@ -515,21 +528,109 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     });
   };
 
+  // Calculate row categories
   const validBulkRows = bulkRows.filter((row) => {
     const qty = parseInt(row.quantity || '0', 10);
     return row.itemId && row.quantity && !isNaN(qty) && qty >= 1;
   });
-  const canSubmitBulk = validBulkRows.length > 0 && bulkRows.every((row) => {
-    // All rows must either be valid or empty (no pending rows with errors)
-    if (!row.itemId && row.quantity) {
-      return false; // Pending row (has quantity but no itemId)
-    }
-    if (row.itemId) {
-      const qty = parseInt(row.quantity || '0', 10);
-      return !isNaN(qty) && qty >= 1;
-    }
-    return true; // Empty row is OK
+  const pendingBulkRows = bulkRows.filter((row) => {
+    const qty = parseInt(row.quantity || '0', 10);
+    return !row.itemId && row.quantity && !isNaN(qty) && qty >= 1 && row.itemSearch;
   });
+  const invalidBulkRows = bulkRows.filter((row) => {
+    if (!row.quantity) return false; // Empty row
+    const qty = parseInt(row.quantity || '0', 10);
+    return isNaN(qty) || qty < 1;
+  });
+
+  // Allow submit if there are valid rows and no invalid rows
+  const canSubmitBulk = validBulkRows.length > 0 && invalidBulkRows.length === 0;
+
+  const saveValidBulkRows = async () => {
+    // Filter valid rows only (recalculate in case state changed)
+    const currentValidRows = bulkRows.filter((row) => {
+      const qty = parseInt(row.quantity || '0', 10);
+      return row.itemId && row.quantity && !isNaN(qty) && qty >= 1;
+    });
+    const currentPendingRows = bulkRows.filter((row) => {
+      const qty = parseInt(row.quantity || '0', 10);
+      return !row.itemId && row.quantity && !isNaN(qty) && qty >= 1 && row.itemSearch;
+    });
+
+    // Consolidate duplicates
+    const consolidated = new Map<string, number>();
+    for (const row of currentValidRows) {
+      const qty = parseInt(row.quantity || '0', 10);
+      const current = consolidated.get(row.itemId) || 0;
+      consolidated.set(row.itemId, current + qty);
+    }
+
+    // Convert to API format
+    const items: BulkStockAddItem[] = Array.from(consolidated.entries()).map(([itemId, quantity]) => ({
+      itemId,
+      quantity,
+    }));
+
+    // Calculate total quantity for summary
+    const totalQty = Array.from(consolidated.values()).reduce((sum, qty) => sum + qty, 0);
+
+    // Debug log (dev only) - verify itemIds are real IDs
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[BulkAddStock] Submitting to POST /api/stock/bulk-add:', {
+        items,
+        note: bulkNote,
+        source: 'manual',
+      });
+      console.debug('[BulkAddStock] Item IDs being sent:', items.map((i) => i.itemId));
+    }
+
+    try {
+      await bulkAddStock.mutateAsync({
+        items,
+        note: bulkNote || undefined,
+        source: 'manual',
+      });
+
+      // After success: keep only pending rows + 1 empty row
+      const newRows = [
+        ...currentPendingRows.map((row) => ({
+          ...row,
+          quantityError: undefined, // Clear any previous errors
+          itemError: undefined,
+        })),
+        { id: Date.now().toString(), itemId: '', itemSearch: '', quantity: '', isOpen: false },
+      ];
+      setBulkRows(newRows);
+
+      // Show success with pending info
+      if (currentPendingRows.length > 0) {
+        toast({
+          title: 'Stock agregado',
+          description: `Se guardaron ${currentValidRows.length} items (${totalQty} unidades). Quedan ${currentPendingRows.length} pendientes para revisar.`,
+        });
+      } else {
+        // All rows were valid, close modal
+        onOpenChange(false);
+      }
+    } catch (error: any) {
+      // Error handled by mutation, but we can use the propagated info to mark rows
+      if (error?.missingItemIds && error.missingItemIds.length > 0) {
+        setBulkRows((prev) =>
+          prev.map((row) => {
+            if (error.missingItemIds.includes(row.itemId)) {
+              return {
+                ...row,
+                itemError: 'Modelo inválido (no existe en tu org). Re-seleccioná.',
+                itemId: '', // Clear itemId to force re-selection
+                itemSearch: '', // Clear search text
+              };
+            }
+            return row;
+          }),
+        );
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -538,106 +639,44 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
     // Handle bulk mode
     if (mode === 'BULK') {
-      // Validate bulk rows - mark errors first
-      let hasErrors = false;
-      const errors = new Map<string, string>();
-
-      for (const row of bulkRows) {
-        if (!row.itemId) {
-          errors.set(row.id, 'Seleccioná un modelo');
-          hasErrors = true;
-        }
-        const qty = parseInt(row.quantity || '0', 10);
-        if (!row.quantity || isNaN(qty) || qty < 1) {
-          errors.set(row.id, 'Cantidad debe ser >= 1');
-          hasErrors = true;
-        }
-      }
-
-      // Update rows with errors
-      if (hasErrors) {
+      // Check for invalid rows (quantity errors)
+      if (invalidBulkRows.length > 0) {
+        // Mark invalid rows with errors
         setBulkRows((prev) =>
           prev.map((r) => {
-            const error = errors.get(r.id);
-            return error ? { ...r, quantityError: error } : r;
+            const qty = parseInt(r.quantity || '0', 10);
+            if (r.quantity && (isNaN(qty) || qty < 1)) {
+              return { ...r, quantityError: 'Cantidad debe ser >= 1' };
+            }
+            return r;
           }),
         );
+        toast({
+          variant: 'destructive',
+          title: 'Error de validación',
+          description: 'Corregí las cantidades inválidas antes de guardar.',
+        });
         return;
       }
 
-      // Filter valid rows only
-      const validRows = bulkRows.filter((row) => {
-        const qty = parseInt(row.quantity || '0', 10);
-        return row.itemId && !isNaN(qty) && qty >= 1;
-      });
-
-      if (validRows.length === 0) {
-        // This shouldn't happen after validation, but just in case
+      // Check if there are valid rows
+      if (validBulkRows.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Agregá al menos 1 item válido antes de guardar.',
+        });
         return;
       }
 
-      // Consolidate duplicates
-      const consolidated = new Map<string, number>();
-      for (const row of validRows) {
-        const qty = parseInt(row.quantity || '0', 10);
-        const current = consolidated.get(row.itemId) || 0;
-        consolidated.set(row.itemId, current + qty);
+      // If there are pending rows, show confirmation (unless user chose "don't ask again")
+      if (pendingBulkRows.length > 0 && !dontAskAgain) {
+        setConfirmSaveValidOpen(true);
+        return;
       }
 
-      // Convert to API format
-      const items: BulkStockAddItem[] = Array.from(consolidated.entries()).map(([itemId, quantity]) => ({
-        itemId,
-        quantity,
-      }));
-
-      // Debug log (dev only) - verify itemIds are real IDs
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('[BulkAddStock] Submitting to POST /api/stock/bulk-add:', {
-          items,
-          note: bulkNote || undefined,
-          source: 'manual',
-        });
-        console.debug('[BulkAddStock] Item IDs being sent:', items.map((i) => i.itemId));
-        console.debug('[BulkAddStock] Rows state:', bulkRows.map((r) => ({
-          rowId: r.id,
-          itemId: r.itemId,
-          itemSku: r.itemSku,
-          itemName: r.itemName,
-          quantity: r.quantity,
-        })));
-      }
-
-      try {
-        await bulkAddStock.mutateAsync({
-          items,
-          note: bulkNote || undefined,
-          source: 'manual',
-        });
-        onOpenChange(false);
-      } catch (error: any) {
-        // Error handled by mutation hook, but also mark rows with missing IDs
-        const missingItemIds = error?.missingItemIds || [];
-        if (missingItemIds.length > 0) {
-          // Mark rows with missing item IDs
-          setBulkRows((prev) =>
-            prev.map((r) => {
-              if (missingItemIds.includes(r.itemId)) {
-                return {
-                  ...r,
-                  quantityError: 'Modelo inválido (no existe en tu org). Re-seleccioná.',
-                  itemId: '', // Clear invalid ID
-                  itemSearch: '', // Clear selection
-                };
-              }
-              return r;
-            }),
-          );
-        }
-        // Error toast already shown by mutation hook
-        if (process.env.NODE_ENV !== 'production') {
-          console.error('[BulkAddStock] Error:', error);
-        }
-      }
+      // Proceed with saving only valid rows
+      await saveValidBulkRows();
       return;
     }
 
@@ -1280,6 +1319,57 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Confirm Save Valid Only Dialog */}
+      <Dialog open={confirmSaveValidOpen} onOpenChange={setConfirmSaveValidOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Guardar solo items válidos</DialogTitle>
+            <DialogDescription>
+              Se guardarán {validBulkRows.length} items ({Array.from(validBulkRows).reduce((sum, r) => sum + parseInt(r.quantity || '0', 10), 0)} unidades totales).
+              <br />
+              Quedan {pendingBulkRows.length} pendientes para revisar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="dont-ask-again"
+                checked={dontAskAgain}
+                onCheckedChange={(checked) => {
+                  setDontAskAgain(checked === true);
+                  if (checked) {
+                    localStorage.setItem('bulk-save-dont-ask-again', 'true');
+                  } else {
+                    localStorage.removeItem('bulk-save-dont-ask-again');
+                  }
+                }}
+              />
+              <Label htmlFor="dont-ask-again" className="text-sm font-normal cursor-pointer">
+                No volver a preguntar
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmSaveValidOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                setConfirmSaveValidOpen(false);
+                await saveValidBulkRows();
+              }}
+            >
+              Guardar válidos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

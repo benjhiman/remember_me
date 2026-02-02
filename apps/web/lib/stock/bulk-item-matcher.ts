@@ -154,12 +154,21 @@ export async function findBestMatch(
  * Batch match multiple queries with deduplication
  */
 export async function batchMatchQueries(
-  queries: string[],
+  queries: Array<{ query: string; queryClean: string }>,
   onProgress?: (current: number, total: number) => void,
   options: MatchOptions = {},
 ): Promise<Map<string, MatchResult>> {
   const results = new Map<string, MatchResult>();
-  const uniqueQueries = Array.from(new Set(queries));
+  
+  // Deduplicate by queryClean (for API calls) but keep original query for results
+  const uniqueByClean = new Map<string, { query: string; queryClean: string }>();
+  for (const q of queries) {
+    if (!uniqueByClean.has(q.queryClean)) {
+      uniqueByClean.set(q.queryClean, q);
+    }
+  }
+
+  const uniqueQueries = Array.from(uniqueByClean.values());
 
   // Process in batches of 10
   const batchSize = 10;
@@ -167,9 +176,14 @@ export async function batchMatchQueries(
     const batch = uniqueQueries.slice(i, i + batchSize);
     
     await Promise.all(
-      batch.map(async (query) => {
-        const result = await findBestMatch(query, undefined, options);
+      batch.map(async ({ query, queryClean }) => {
+        const result = await findBestMatch(query, queryClean, options);
+        // Store result by original query (for lookup)
         results.set(query, result);
+        // Also store by cleaned query for reuse
+        if (queryClean !== query) {
+          results.set(queryClean, result);
+        }
       }),
     );
 
