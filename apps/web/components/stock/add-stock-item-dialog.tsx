@@ -31,9 +31,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { parseBulkPaste } from '@/lib/stock/bulk-paste-parser';
 import { batchMatchQueries } from '@/lib/stock/bulk-item-matcher';
+import { parseFile, type ImportRow } from '@/lib/stock/bulk-file-import';
+import { cleanQuery } from '@/lib/stock/bulk-paste-parser';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
+import { Upload, FileText } from 'lucide-react';
 
 // Component for each bulk row's item picker
 function BulkRowItemPicker({
@@ -221,6 +224,17 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     omitted: number;
   } | null>(null);
   const [pasteOmitNoMatch, setPasteOmitNoMatch] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportRow[]>([]);
+  const [importProcessing, setImportProcessing] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [importSummary, setImportSummary] = useState<{
+    ok: number;
+    pending: number;
+    omitted: number;
+  } | null>(null);
+  const [importOmitNoMatch, setImportOmitNoMatch] = useState(false);
   const [confirmSaveValidOpen, setConfirmSaveValidOpen] = useState(false);
   const [dontAskAgain, setDontAskAgain] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -307,6 +321,12 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       setPasteSummary(null);
       setPasteProcessing(false);
       setPasteProgress({ current: 0, total: 0 });
+      setImportOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      setImportSummary(null);
+      setImportProcessing(false);
+      setImportProgress({ current: 0, total: 0 });
     }
   }, [open]);
 
@@ -362,6 +382,144 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
   const handleAddBulkRow = () => {
     addBulkRow();
+  };
+
+  const handleFileSelect = async (file: File) => {
+    setImportFile(file);
+    try {
+      const rows = await parseFile(file);
+      setImportPreview(rows.slice(0, 10)); // Preview first 10 rows
+    } catch (error) {
+      console.error('[BulkImport] Error parsing file:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error al leer archivo',
+        description: error instanceof Error ? error.message : 'No se pudo leer el archivo',
+      });
+      setImportFile(null);
+      setImportPreview([]);
+    }
+  };
+
+  const handleImportProcess = async () => {
+    if (!importFile) return;
+
+    setImportProcessing(true);
+    setImportProgress({ current: 0, total: 0 });
+
+    try {
+      // Parse file
+      const rows = await parseFile(importFile);
+
+      if (rows.length === 0) {
+        setImportSummary({
+          ok: 0,
+          pending: 0,
+          omitted: 0,
+        });
+        setImportProcessing(false);
+        return;
+      }
+
+      // Convert to format for matching (with queryClean)
+      const queries = rows.map((row) => ({
+        query: row.query,
+        queryClean: cleanQuery(row.query),
+      }));
+
+      // Batch match queries
+      const matchResults = await batchMatchQueries(
+        queries,
+        (current, total) => {
+          setImportProgress({ current, total });
+        },
+        { threshold: 30, ambiguousThreshold: 10 },
+      );
+
+      // Process results and add rows
+      let okCount = 0;
+      let pendingCount = 0;
+      let omittedCount = 0;
+
+      // Consolidate by itemId first (for duplicates)
+      const consolidated = new Map<string, { itemId: string; quantity: number; itemName?: string; itemSku?: string }>();
+      const pendingLines: Array<{ query: string; quantity: number }> = [];
+
+      for (const row of rows) {
+        // Try to get match by original query first, then by cleaned query
+        const match = matchResults.get(row.query) || matchResults.get(cleanQuery(row.query));
+
+        if (match?.item) {
+          // Found match - consolidate
+          const existing = consolidated.get(match.item.id) || {
+            itemId: match.item.id,
+            quantity: 0,
+            itemName: match.item.name,
+            itemSku: match.item.sku || undefined,
+          };
+          existing.quantity += row.quantity;
+          consolidated.set(match.item.id, existing);
+          okCount++;
+        } else {
+          // No match
+          if (importOmitNoMatch) {
+            omittedCount++;
+          } else {
+            pendingLines.push({ query: row.query, quantity: row.quantity });
+            pendingCount++;
+          }
+        }
+      }
+
+      // Add consolidated rows with matches
+      Array.from(consolidated.values()).forEach((data) => {
+        const displayLabel =
+          data.itemName || data.itemSku || `Item ${data.itemId.substring(0, 8)}`;
+        addBulkRow({
+          itemId: data.itemId,
+          itemSearch: displayLabel,
+          quantity: data.quantity.toString(),
+          itemSku: data.itemSku,
+          itemName: data.itemName,
+        });
+      });
+
+      // Add pending rows (no match)
+      for (const line of pendingLines) {
+        addBulkRow({
+          itemId: '',
+          itemSearch: line.query,
+          quantity: line.quantity.toString(),
+          quantityError: 'Revisar modelo',
+        });
+      }
+
+      setImportSummary({
+        ok: okCount,
+        pending: pendingCount,
+        omitted: omittedCount,
+      });
+
+      // Close import modal after processing
+      setImportOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+    } catch (error) {
+      console.error('[BulkImport] Error processing:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error al procesar archivo',
+        description: error instanceof Error ? error.message : 'No se pudo procesar el archivo',
+      });
+      setImportSummary({
+        ok: 0,
+        pending: 0,
+        omitted: 0,
+      });
+    } finally {
+      setImportProcessing(false);
+      setImportProgress({ current: 0, total: 0 });
+    }
   };
 
   const handlePasteProcess = async () => {
@@ -908,25 +1066,46 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label>Items a agregar</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setPasteOpen(!pasteOpen)}
-                          disabled={isLoading || pasteProcessing}
-                        >
-                          {pasteOpen ? (
-                            <>
-                              <X className="h-4 w-4 mr-1.5" />
-                              Cerrar
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="h-4 w-4 mr-1.5" />
-                              Pegar lista
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPasteOpen(!pasteOpen)}
+                            disabled={isLoading || pasteProcessing || importProcessing}
+                          >
+                            {pasteOpen ? (
+                              <>
+                                <X className="h-4 w-4 mr-1.5" />
+                                Cerrar
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1.5" />
+                                Pegar lista
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setImportOpen(!importOpen)}
+                            disabled={isLoading || pasteProcessing || importProcessing}
+                          >
+                            {importOpen ? (
+                              <>
+                                <X className="h-4 w-4 mr-1.5" />
+                                Cerrar
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-1.5" />
+                                Importar archivo
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Paste Modal/Accordion */}
@@ -1013,6 +1192,175 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                                 setPasteSummary(null);
                               }}
                               disabled={pasteProcessing}
+                            >
+                              Limpiar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Import File Modal/Accordion */}
+                      {importOpen && (
+                        <div className="border rounded-md p-4 bg-gray-50 space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="import-file">Seleccioná un archivo CSV o Excel (.xlsx)</Label>
+                            <div
+                              className={cn(
+                                'border-2 border-dashed rounded-md p-6 text-center transition-colors',
+                                importFile
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-gray-300 hover:border-primary/50 cursor-pointer'
+                              )}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const file = e.dataTransfer.files[0];
+                                if (file && (file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+                                  handleFileSelect(file);
+                                }
+                              }}
+                              onClick={() => {
+                                if (!importFile) {
+                                  document.getElementById('import-file-input')?.click();
+                                }
+                              }}
+                            >
+                              <input
+                                id="import-file-input"
+                                type="file"
+                                accept=".csv,.xlsx,.xls"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    handleFileSelect(file);
+                                  }
+                                }}
+                              />
+                              {importFile ? (
+                                <div className="space-y-2">
+                                  <FileText className="h-8 w-8 mx-auto text-primary" />
+                                  <div className="font-medium">{importFile.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {importPreview.length} fila{importPreview.length !== 1 ? 's' : ''} detectada{importPreview.length !== 1 ? 's' : ''}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setImportFile(null);
+                                      setImportPreview([]);
+                                    }}
+                                  >
+                                    Cambiar archivo
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                                  <div className="text-sm text-muted-foreground">
+                                    Arrastrá un archivo aquí o clickeá para seleccionar
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    CSV o Excel (.xlsx)
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {importPreview.length > 0 && (
+                            <div className="space-y-2">
+                              <Label>Vista previa (primeras {Math.min(10, importPreview.length)} filas)</Label>
+                              <div className="border rounded-md max-h-[200px] overflow-y-auto">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-gray-100 sticky top-0">
+                                    <tr>
+                                      <th className="px-3 py-2 text-left font-medium">Modelo</th>
+                                      <th className="px-3 py-2 text-left font-medium">Cantidad</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {importPreview.map((row, idx) => (
+                                      <tr key={idx} className="border-b">
+                                        <td className="px-3 py-2">{row.query}</td>
+                                        <td className="px-3 py-2">{row.quantity}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="import-omit-no-match"
+                              checked={importOmitNoMatch}
+                              onCheckedChange={(checked) => setImportOmitNoMatch(checked === true)}
+                              disabled={importProcessing}
+                            />
+                            <Label htmlFor="import-omit-no-match" className="text-sm font-normal cursor-pointer">
+                              Omitir filas sin match
+                            </Label>
+                          </div>
+
+                          {importProcessing && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Procesando {importProgress.current}/{importProgress.total}...
+                            </div>
+                          )}
+
+                          {importSummary && (
+                            <Alert>
+                              <AlertDescription className="text-sm">
+                                <div className="space-y-1">
+                                  {importSummary.ok > 0 && (
+                                    <div className="text-green-600">✓ {importSummary.ok} líneas procesadas</div>
+                                  )}
+                                  {importSummary.pending > 0 && (
+                                    <div className="text-yellow-600">⚠ {importSummary.pending} líneas para revisar</div>
+                                  )}
+                                  {importSummary.omitted > 0 && (
+                                    <div className="text-gray-600">⊘ {importSummary.omitted} líneas omitidas</div>
+                                  )}
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              onClick={handleImportProcess}
+                              disabled={!importFile || importProcessing}
+                              className="flex-1"
+                            >
+                              {importProcessing ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Procesando...
+                                </>
+                              ) : (
+                                'Procesar'
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setImportFile(null);
+                                setImportPreview([]);
+                                setImportSummary(null);
+                              }}
+                              disabled={importProcessing}
                             >
                               Limpiar
                             </Button>

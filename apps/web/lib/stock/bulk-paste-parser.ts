@@ -27,7 +27,7 @@ export interface ParseResult {
 /**
  * Clean query by removing noise tokens and normalizing
  */
-function cleanQuery(query: string): string {
+export function cleanQuery(query: string): string {
   // Remove parentheses and their content
   let cleaned = query.replace(/\([^)]*\)/g, ' ');
   
