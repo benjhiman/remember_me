@@ -29,6 +29,10 @@ import { cn } from '@/lib/utils/cn';
 import { conditionLabel } from '@/lib/items/condition-label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { parseBulkPaste } from '@/lib/stock/bulk-paste-parser';
+import { batchMatchQueries } from '@/lib/stock/bulk-item-matcher';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Component for each bulk row's item picker
 function BulkRowItemPicker({
@@ -206,6 +210,16 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     { id: '1', itemId: '', itemSearch: '', quantity: '', isOpen: false },
     { id: '2', itemId: '', itemSearch: '', quantity: '', isOpen: false },
   ]);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pasteProcessing, setPasteProcessing] = useState(false);
+  const [pasteProgress, setPasteProgress] = useState({ current: 0, total: 0 });
+  const [pasteSummary, setPasteSummary] = useState<{
+    ok: number;
+    pending: number;
+    omitted: number;
+  } | null>(null);
+  const [pasteOmitNoMatch, setPasteOmitNoMatch] = useState(false);
 
   const createStockEntry = useCreateStockEntry();
   const bulkAddStock = useBulkAddStock();
@@ -279,6 +293,11 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         { id: '1', itemId: '', itemSearch: '', quantity: '', isOpen: false },
         { id: '2', itemId: '', itemSearch: '', quantity: '', isOpen: false },
       ]);
+      setPasteOpen(false);
+      setPasteText('');
+      setPasteSummary(null);
+      setPasteProcessing(false);
+      setPasteProgress({ current: 0, total: 0 });
     }
   }, [open]);
 
@@ -318,11 +337,135 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   };
 
   // Bulk mode helpers
-  const addBulkRow = () => {
+  const addBulkRow = (row?: Partial<BulkRow>) => {
     setBulkRows((prev) => [
       ...prev,
-      { id: Date.now().toString(), itemId: '', itemSearch: '', quantity: '', isOpen: false },
+      {
+        id: Date.now().toString(),
+        itemId: '',
+        itemSearch: '',
+        quantity: '',
+        isOpen: false,
+        ...row,
+      },
     ]);
+  };
+
+  const handleAddBulkRow = () => {
+    addBulkRow();
+  };
+
+  const handlePasteProcess = async () => {
+    if (!pasteText.trim()) {
+      return;
+    }
+
+    setPasteProcessing(true);
+    setPasteProgress({ current: 0, total: 0 });
+
+    try {
+      // Parse lines
+      const parseResult = parseBulkPaste(pasteText);
+
+      if (parseResult.ok.length === 0) {
+        setPasteSummary({
+          ok: 0,
+          pending: 0,
+          omitted: parseResult.error.length,
+        });
+        setPasteProcessing(false);
+        return;
+      }
+
+      // Extract unique queries for matching
+      const queries = parseResult.ok.map((line) => line.query);
+      
+      // Batch match queries
+      const matchResults = await batchMatchQueries(
+        queries,
+        (current, total) => {
+          setPasteProgress({ current, total });
+        },
+        { threshold: 30, ambiguousThreshold: 10 },
+      );
+
+      // Process results and add rows
+      let okCount = 0;
+      let pendingCount = 0;
+      let omittedCount = 0;
+
+      // Consolidate by itemId first (for duplicates)
+      const consolidated = new Map<string, { itemId: string; quantity: number; itemName?: string; itemSku?: string }>();
+      const pendingLines: Array<{ query: string; quantity: number }> = [];
+
+      for (const line of parseResult.ok) {
+        const match = matchResults.get(line.query);
+        
+        if (match?.item) {
+          // Found match - consolidate
+          const existing = consolidated.get(match.item.id) || {
+            itemId: match.item.id,
+            quantity: 0,
+            itemName: match.item.name,
+            itemSku: match.item.sku || undefined,
+          };
+          existing.quantity += line.quantity;
+          consolidated.set(match.item.id, existing);
+          okCount++;
+        } else {
+          // No match
+          if (pasteOmitNoMatch) {
+            omittedCount++;
+          } else {
+            pendingLines.push({ query: line.query, quantity: line.quantity });
+            pendingCount++;
+          }
+        }
+      }
+
+      // Add consolidated rows with matches
+      Array.from(consolidated.values()).forEach((data) => {
+        const displayLabel =
+          data.itemName || data.itemSku || `Item ${data.itemId.substring(0, 8)}`;
+        addBulkRow({
+          itemId: data.itemId,
+          itemSearch: displayLabel,
+          quantity: data.quantity.toString(),
+          itemSku: data.itemSku,
+          itemName: data.itemName,
+        });
+      });
+
+      // Add pending rows (no match)
+      for (const line of pendingLines) {
+        addBulkRow({
+          itemId: '',
+          itemSearch: line.query,
+          quantity: line.quantity.toString(),
+          quantityError: 'Revisar modelo',
+        });
+      }
+
+      setPasteSummary({
+        ok: okCount,
+        pending: pendingCount,
+        omitted: omittedCount + parseResult.error.length,
+      });
+
+      // Close paste modal after processing
+      setPasteOpen(false);
+      setPasteText('');
+    } catch (error) {
+      console.error('[BulkPaste] Error processing:', error);
+      setPasteSummary({
+        ok: 0,
+        pending: 0,
+        omitted: 0,
+      });
+    } finally {
+      setPasteProcessing(false);
+      setPasteProgress({ current: 0, total: 0 });
+    }
   };
 
   const removeBulkRow = (id: string) => {
@@ -367,14 +510,25 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
       itemSearch: displayLabel,
       itemSku: item.sku || undefined, // Store for debugging
       itemName: item.name || undefined, // Store for debugging
+      quantityError: undefined, // Clear any previous errors
       isOpen: false, // Close dropdown after selection
     });
   };
 
-  const validBulkRows = bulkRows.filter((row) => row.itemId && row.quantity);
-  const canSubmitBulk = validBulkRows.length > 0 && validBulkRows.every((row) => {
+  const validBulkRows = bulkRows.filter((row) => {
     const qty = parseInt(row.quantity || '0', 10);
-    return !isNaN(qty) && qty >= 1;
+    return row.itemId && row.quantity && !isNaN(qty) && qty >= 1;
+  });
+  const canSubmitBulk = validBulkRows.length > 0 && bulkRows.every((row) => {
+    // All rows must either be valid or empty (no pending rows with errors)
+    if (!row.itemId && row.quantity) {
+      return false; // Pending row (has quantity but no itemId)
+    }
+    if (row.itemId) {
+      const qty = parseInt(row.quantity || '0', 10);
+      return !isNaN(qty) && qty >= 1;
+    }
+    return true; // Empty row is OK
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -713,7 +867,120 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                 {mode === 'BULK' && (
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Items a agregar</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Items a agregar</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPasteOpen(!pasteOpen)}
+                          disabled={isLoading || pasteProcessing}
+                        >
+                          {pasteOpen ? (
+                            <>
+                              <X className="h-4 w-4 mr-1.5" />
+                              Cerrar
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-1.5" />
+                              Pegar lista
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Paste Modal/Accordion */}
+                      {pasteOpen && (
+                        <div className="border rounded-md p-4 bg-gray-50 space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="paste-text">Pegá tu lista (una línea por item)</Label>
+                            <Textarea
+                              id="paste-text"
+                              placeholder={`IPH13128NEWWHITE 20
+IPH15P256USEDBLACK 11
+SELLADO 16 128 TEAL (ACTIVADO) 5`}
+                              value={pasteText}
+                              onChange={(e) => setPasteText(e.target.value)}
+                              rows={8}
+                              className="font-mono text-sm"
+                              disabled={pasteProcessing}
+                            />
+                            <div className="text-xs text-muted-foreground">
+                              Formato: [descripción/modelo/SKU] [cantidad]
+                              <br />
+                              Ejemplo: IPH13128NEWWHITE 20
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="omit-no-match"
+                              checked={pasteOmitNoMatch}
+                              onCheckedChange={(checked) => setPasteOmitNoMatch(checked === true)}
+                              disabled={pasteProcessing}
+                            />
+                            <Label htmlFor="omit-no-match" className="text-sm font-normal cursor-pointer">
+                              Omitir líneas sin match
+                            </Label>
+                          </div>
+
+                          {pasteProcessing && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Procesando {pasteProgress.current}/{pasteProgress.total}...
+                            </div>
+                          )}
+
+                          {pasteSummary && (
+                            <Alert>
+                              <AlertDescription className="text-sm">
+                                <div className="space-y-1">
+                                  {pasteSummary.ok > 0 && (
+                                    <div className="text-green-600">✓ {pasteSummary.ok} líneas procesadas</div>
+                                  )}
+                                  {pasteSummary.pending > 0 && (
+                                    <div className="text-yellow-600">⚠ {pasteSummary.pending} líneas para revisar</div>
+                                  )}
+                                  {pasteSummary.omitted > 0 && (
+                                    <div className="text-gray-600">⊘ {pasteSummary.omitted} líneas omitidas</div>
+                                  )}
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              onClick={handlePasteProcess}
+                              disabled={!pasteText.trim() || pasteProcessing}
+                              className="flex-1"
+                            >
+                              {pasteProcessing ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Procesando...
+                                </>
+                              ) : (
+                                'Procesar'
+                              )}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setPasteText('');
+                                setPasteSummary(null);
+                              }}
+                              disabled={pasteProcessing}
+                            >
+                              Limpiar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="border rounded-md overflow-hidden">
                         <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 uppercase">
                           <div className="col-span-6">Modelo</div>
@@ -748,7 +1015,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                                     onKeyDown={(e) => {
                                       if (e.key === 'Enter' && row.itemId && row.quantity) {
                                         e.preventDefault();
-                                        addBulkRow();
+                                        handleAddBulkRow();
                                       }
                                     }}
                                     className={cn('h-10 text-sm', row.quantityError && 'border-destructive')}
@@ -784,7 +1051,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={addBulkRow}
+                        onClick={handleAddBulkRow}
                         disabled={isLoading}
                         className="w-full"
                       >
