@@ -40,13 +40,46 @@ export function useBulkAddStock() {
       });
     },
     onError: (error: any) => {
+      const statusCode = error?.response?.status || 'Unknown';
       const errorMessage =
-        error?.response?.data?.message || 'Error al agregar stock. Por favor, intentá nuevamente.';
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.message ||
+        'Error al agregar stock. Por favor, intentá nuevamente.';
+
+      // Build detailed error message
+      let title = 'Error al agregar stock';
+      let description = errorMessage;
+
+      if (statusCode === 403) {
+        title = 'Sin permisos';
+        description = 'No tenés permisos para agregar stock. Contactá a un administrador.';
+      } else if (statusCode === 400) {
+        title = `Error de validación (${statusCode})`;
+        description = errorMessage;
+      } else if (statusCode === 404) {
+        title = `Item no encontrado (${statusCode})`;
+        description = errorMessage;
+      } else if (statusCode !== 'Unknown') {
+        title = `Error (${statusCode})`;
+        description = errorMessage;
+      }
+
       toast({
         variant: 'destructive',
-        title: 'Error al agregar stock',
-        description: errorMessage,
+        title,
+        description,
       });
+
+      // Debug log (dev only)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[useBulkAddStock] Error details:', {
+          status: statusCode,
+          message: errorMessage,
+          response: error?.response?.data,
+          error,
+        });
+      }
     },
   });
 }

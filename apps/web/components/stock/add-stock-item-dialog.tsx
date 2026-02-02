@@ -59,107 +59,109 @@ function BulkRowItemPicker({
   const selectedItem = rowItems.find((i) => i.id === row.itemId);
 
   return (
-    <div className="col-span-6">
-      <Popover
-        open={row.isOpen}
-        onOpenChange={(open) => {
-          onUpdate({ isOpen: open });
-          if (!open) {
-            setRowSearchQuery('');
-          }
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            className={cn(
-              'w-full justify-between text-sm font-normal',
-              !row.itemId && 'text-muted-foreground'
-            )}
-            disabled={isLoading}
-          >
-            <span className="truncate">
-              {row.itemSearch || 'Buscar modelo...'}
-            </span>
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[400px] p-0" align="start">
-          <Command shouldFilter={false}>
-            <CommandInput
-              placeholder="Buscar modelo, SKU, marca..."
-              value={rowSearchQuery}
-              onValueChange={(value) => {
-                setRowSearchQuery(value);
-              }}
-            />
-            <CommandList className="max-h-[300px] overflow-y-auto">
-              {rowItemsLoading && rowItems.length === 0 ? (
-                <div className="py-6 text-center text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                  Cargando items...
-                </div>
-              ) : rowItems.length === 0 ? (
-                <CommandEmpty>
-                  {rowSearchQuery ? 'No se encontraron items' : 'No hay items disponibles'}
-                </CommandEmpty>
-              ) : (
-                <CommandGroup>
-                  {rowItems.map((item) => {
-                    const displayLabel =
-                      item.model && item.storageGb && item.color && item.condition
-                        ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
-                        : item.name || 'Item sin nombre';
-                    return (
-                      <CommandItem
-                        key={item.id}
-                        value={item.id}
-                        onSelect={() => {
-                          onSelect(item.id, item);
-                        }}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{displayLabel}</span>
-                          {item.sku && (
-                            <span className="text-xs text-muted-foreground">
-                              SKU: {item.sku}
-                            </span>
-                          )}
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
-                  {hasNextPage && (
-                    <div className="px-2 py-1.5 text-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => fetchNextPage()}
-                        disabled={isFetchingNextPage}
-                        className="w-full"
-                      >
-                        {isFetchingNextPage ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Cargando más...
-                          </>
-                        ) : (
-                          'Cargar más items'
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </CommandGroup>
+    <div className="col-span-6 min-h-[64px] flex flex-col justify-start">
+      <div className="flex-1">
+        <Popover
+          open={row.isOpen}
+          onOpenChange={(open) => {
+            onUpdate({ isOpen: open });
+            if (!open) {
+              setRowSearchQuery('');
+            }
+          }}
+        >
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              className={cn(
+                'w-full h-10 justify-between text-sm font-normal',
+                !row.itemId && 'text-muted-foreground'
               )}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+              disabled={isLoading}
+            >
+              <span className="truncate text-left">
+                {row.itemSearch || 'Buscar modelo...'}
+              </span>
+              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[520px] max-w-[calc(100vw-3rem)] p-0" align="start">
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Buscar modelo, SKU, marca..."
+                value={rowSearchQuery}
+                onValueChange={(value) => {
+                  setRowSearchQuery(value);
+                }}
+              />
+              <CommandList className="max-h-[300px] overflow-y-auto">
+                {rowItemsLoading && rowItems.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                    Cargando items...
+                  </div>
+                ) : rowItems.length === 0 ? (
+                  <CommandEmpty>
+                    {rowSearchQuery ? 'No se encontraron items' : 'No hay items disponibles'}
+                  </CommandEmpty>
+                ) : (
+                  <CommandGroup>
+                    {rowItems.map((item) => {
+                      const displayLabel =
+                        item.model && item.storageGb && item.color && item.condition
+                          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+                          : item.name || 'Item sin nombre';
+                      return (
+                        <CommandItem
+                          key={item.id}
+                          value={item.id}
+                          onSelect={() => {
+                            onSelect(item.id, item);
+                          }}
+                          className="cursor-pointer min-h-[40px] flex items-center"
+                        >
+                          <div className="flex flex-col w-full">
+                            <span className="font-medium truncate">{displayLabel}</span>
+                            {item.sku && (
+                              <span className="text-xs text-muted-foreground truncate">
+                                SKU: {item.sku}
+                              </span>
+                            )}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                    {hasNextPage && (
+                      <div className="px-2 py-1.5 text-center">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => fetchNextPage()}
+                          disabled={isFetchingNextPage}
+                          className="w-full"
+                        >
+                          {isFetchingNextPage ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Cargando más...
+                            </>
+                          ) : (
+                            'Cargar más items'
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CommandGroup>
+                )}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      </div>
       {selectedItem && (
-        <div className="text-xs text-muted-foreground mt-1">
+        <div className="text-xs text-muted-foreground mt-1 truncate">
           {selectedItem.sku && `SKU: ${selectedItem.sku}`}
         </div>
       )}
@@ -357,23 +359,48 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
     // Handle bulk mode
     if (mode === 'BULK') {
-      // Validate bulk rows
-      const validRows = bulkRows.filter((row) => row.itemId && row.quantity);
-      if (validRows.length === 0) {
+      // Validate bulk rows - mark errors first
+      let hasErrors = false;
+      const errors = new Map<string, string>();
+
+      for (const row of bulkRows) {
+        if (!row.itemId) {
+          errors.set(row.id, 'Seleccioná un modelo');
+          hasErrors = true;
+        }
+        const qty = parseInt(row.quantity || '0', 10);
+        if (!row.quantity || isNaN(qty) || qty < 1) {
+          errors.set(row.id, 'Cantidad debe ser >= 1');
+          hasErrors = true;
+        }
+      }
+
+      // Update rows with errors
+      if (hasErrors) {
+        setBulkRows((prev) =>
+          prev.map((r) => {
+            const error = errors.get(r.id);
+            return error ? { ...r, quantityError: error } : r;
+          }),
+        );
         return;
       }
 
-      // Consolidate duplicates and validate
+      // Filter valid rows only
+      const validRows = bulkRows.filter((row) => {
+        const qty = parseInt(row.quantity || '0', 10);
+        return row.itemId && !isNaN(qty) && qty >= 1;
+      });
+
+      if (validRows.length === 0) {
+        // This shouldn't happen after validation, but just in case
+        return;
+      }
+
+      // Consolidate duplicates
       const consolidated = new Map<string, number>();
       for (const row of validRows) {
         const qty = parseInt(row.quantity || '0', 10);
-        if (isNaN(qty) || qty < 1) {
-          // Mark row with error
-          setBulkRows((prev) =>
-            prev.map((r) => (r.id === row.id ? { ...r, quantityError: 'Cantidad debe ser >= 1' } : r)),
-          );
-          return;
-        }
         const current = consolidated.get(row.itemId) || 0;
         consolidated.set(row.itemId, current + qty);
       }
@@ -384,6 +411,15 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         quantity,
       }));
 
+      // Debug log (dev only)
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[BulkAddStock] Submitting to POST /api/stock/bulk-add:', {
+          items,
+          note: bulkNote || undefined,
+          source: 'manual',
+        });
+      }
+
       try {
         await bulkAddStock.mutateAsync({
           items,
@@ -392,7 +428,10 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         });
         onOpenChange(false);
       } catch (error) {
-        // Error handled by mutation
+        // Error handled by mutation hook
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[BulkAddStock] Error:', error);
+        }
       }
       return;
     }
@@ -632,15 +671,16 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                         </div>
                         <div className="max-h-[400px] overflow-y-auto">
                           {bulkRows.map((row, index) => {
+                            const hasError = !row.itemId || !row.quantity || parseInt(row.quantity || '0', 10) < 1;
                             return (
-                              <div key={row.id} className="border-b border-gray-200 px-4 py-3 grid grid-cols-12 gap-2 items-center">
+                              <div key={row.id} className="border-b border-gray-200 px-4 py-3 grid grid-cols-[1fr_140px_56px] gap-3 items-start">
                                 <BulkRowItemPicker
                                   row={row}
                                   onSelect={(itemId, item) => handleBulkItemSelect(row.id, itemId, item)}
                                   onUpdate={(updates) => updateBulkRow(row.id, updates)}
                                   isLoading={isLoading}
                                 />
-                                <div className="col-span-4">
+                                <div className="flex flex-col">
                                   <Input
                                     type="text"
                                     inputMode="numeric"
@@ -660,14 +700,17 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                                         addBulkRow();
                                       }
                                     }}
-                                    className={cn('text-sm', row.quantityError && 'border-destructive')}
+                                    className={cn('h-10 text-sm', row.quantityError && 'border-destructive')}
                                     disabled={isLoading}
                                   />
                                   {row.quantityError && (
                                     <p className="text-xs text-destructive mt-1">{row.quantityError}</p>
                                   )}
+                                  {!row.itemId && hasError && (
+                                    <p className="text-xs text-destructive mt-1">Seleccioná un modelo</p>
+                                  )}
                                 </div>
-                                <div className="col-span-2 text-right">
+                                <div className="flex justify-end pt-1">
                                   {bulkRows.length > 1 && (
                                     <Button
                                       type="button"
@@ -675,6 +718,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
                                       size="sm"
                                       onClick={() => removeBulkRow(row.id)}
                                       disabled={isLoading}
+                                      className="h-8 w-8 p-0"
                                     >
                                       <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
