@@ -184,6 +184,8 @@ interface BulkRow {
   quantity: string;
   quantityError?: string;
   isOpen?: boolean; // For dropdown state per row
+  itemSku?: string; // For debugging/validation
+  itemName?: string; // For debugging/validation
 }
 
 export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogProps) {
@@ -335,13 +337,36 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   // Instead, each row's autocomplete will fetch independently
 
   const handleBulkItemSelect = (rowId: string, itemId: string, item: any) => {
+    // Debug log (dev only) - verify we're using the real ID
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[BulkAddStock] Item selected:', {
+        rowId,
+        itemId,
+        item: {
+          id: item.id,
+          name: item.name,
+          sku: item.sku,
+          organizationId: item.organizationId,
+        },
+      });
+    }
+
+    // Ensure we're using the real ID field
+    const realItemId = item.id || itemId;
+    if (!realItemId) {
+      console.error('[BulkAddStock] No ID found for item:', item);
+      return;
+    }
+
     const displayLabel =
       item.model && item.storageGb && item.color && item.condition
         ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
         : item.name || 'Item sin nombre';
     updateBulkRow(rowId, {
-      itemId,
+      itemId: realItemId, // Use real ID
       itemSearch: displayLabel,
+      itemSku: item.sku || undefined, // Store for debugging
+      itemName: item.name || undefined, // Store for debugging
       isOpen: false, // Close dropdown after selection
     });
   };
@@ -411,13 +436,21 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         quantity,
       }));
 
-      // Debug log (dev only)
+      // Debug log (dev only) - verify itemIds are real IDs
       if (process.env.NODE_ENV !== 'production') {
         console.debug('[BulkAddStock] Submitting to POST /api/stock/bulk-add:', {
           items,
           note: bulkNote || undefined,
           source: 'manual',
         });
+        console.debug('[BulkAddStock] Item IDs being sent:', items.map((i) => i.itemId));
+        console.debug('[BulkAddStock] Rows state:', bulkRows.map((r) => ({
+          rowId: r.id,
+          itemId: r.itemId,
+          itemSku: r.itemSku,
+          itemName: r.itemName,
+          quantity: r.quantity,
+        })));
       }
 
       try {
@@ -427,8 +460,26 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
           source: 'manual',
         });
         onOpenChange(false);
-      } catch (error) {
-        // Error handled by mutation hook
+      } catch (error: any) {
+        // Error handled by mutation hook, but also mark rows with missing IDs
+        const missingItemIds = error?.missingItemIds || [];
+        if (missingItemIds.length > 0) {
+          // Mark rows with missing item IDs
+          setBulkRows((prev) =>
+            prev.map((r) => {
+              if (missingItemIds.includes(r.itemId)) {
+                return {
+                  ...r,
+                  quantityError: 'Modelo inválido (no existe en tu org). Re-seleccioná.',
+                  itemId: '', // Clear invalid ID
+                  itemSearch: '', // Clear selection
+                };
+              }
+              return r;
+            }),
+          );
+        }
+        // Error toast already shown by mutation hook
         if (process.env.NODE_ENV !== 'production') {
           console.error('[BulkAddStock] Error:', error);
         }

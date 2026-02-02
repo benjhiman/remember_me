@@ -1519,7 +1519,42 @@ export class StockService {
     if (items.length !== itemIds.length) {
       const foundIds = new Set(items.map((i) => i.id));
       const missingIds = itemIds.filter((id) => !foundIds.has(id));
-      throw new NotFoundException(`Items not found: ${missingIds.join(', ')}`);
+      
+      // Check if missing items exist but don't belong to this org
+      const missingItemsCheck = await this.prisma.item.findMany({
+        where: {
+          id: { in: missingIds },
+        },
+        select: {
+          id: true,
+          organizationId: true,
+          deletedAt: true,
+          isActive: true,
+        },
+      });
+
+      const notInOrg = missingItemsCheck
+        .filter((item) => item.organizationId !== organizationId)
+        .map((item) => item.id);
+      const notExists = missingIds.filter((id) => !missingItemsCheck.some((item) => item.id === id));
+      const deleted = missingItemsCheck
+        .filter((item) => item.deletedAt !== null)
+        .map((item) => item.id);
+      const inactive = missingItemsCheck
+        .filter((item) => !item.isActive)
+        .map((item) => item.id);
+
+      throw new BadRequestException({
+        code: 'ITEMS_NOT_FOUND',
+        message: 'Some items were not found in this organization',
+        missingItemIds: missingIds,
+        details: {
+          notFound: notExists,
+          notInOrganization: notInOrg,
+          deleted: deleted,
+          inactive: inactive,
+        },
+      });
     }
 
     // Create a map for quick lookup

@@ -41,11 +41,16 @@ export function useBulkAddStock() {
     },
     onError: (error: any) => {
       const statusCode = error?.response?.status || 'Unknown';
+      const errorData = error?.response?.data || {};
       const errorMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.error ||
+        errorData?.message ||
+        errorData?.error ||
         error?.message ||
         'Error al agregar stock. Por favor, intentá nuevamente.';
+
+      // Check for structured error with missing item IDs
+      const missingItemIds = errorData?.missingItemIds || [];
+      const errorCode = errorData?.code;
 
       // Build detailed error message
       let title = 'Error al agregar stock';
@@ -54,12 +59,32 @@ export function useBulkAddStock() {
       if (statusCode === 403) {
         title = 'Sin permisos';
         description = 'No tenés permisos para agregar stock. Contactá a un administrador.';
-      } else if (statusCode === 400) {
-        title = `Error de validación (${statusCode})`;
-        description = errorMessage;
-      } else if (statusCode === 404) {
-        title = `Item no encontrado (${statusCode})`;
-        description = errorMessage;
+      } else if (statusCode === 400 || statusCode === 404) {
+        if (errorCode === 'ITEMS_NOT_FOUND' && missingItemIds.length > 0) {
+          title = `Items no encontrados (${statusCode})`;
+          const details = errorData?.details || {};
+          const reasons: string[] = [];
+          if (details.notFound?.length > 0) {
+            reasons.push(`${details.notFound.length} no existen`);
+          }
+          if (details.notInOrganization?.length > 0) {
+            reasons.push(`${details.notInOrganization.length} no pertenecen a tu organización`);
+          }
+          if (details.deleted?.length > 0) {
+            reasons.push(`${details.deleted.length} están eliminados`);
+          }
+          if (details.inactive?.length > 0) {
+            reasons.push(`${details.inactive.length} están inactivos`);
+          }
+          description = `${errorMessage}. ${reasons.join(', ')}.`;
+          
+          // Return missing IDs for row marking (via callback or event)
+          // This will be handled by the component that calls the mutation
+          (error as any).missingItemIds = missingItemIds;
+        } else {
+          title = `Error de validación (${statusCode})`;
+          description = errorMessage;
+        }
       } else if (statusCode !== 'Unknown') {
         title = `Error (${statusCode})`;
         description = errorMessage;
@@ -75,8 +100,11 @@ export function useBulkAddStock() {
       if (process.env.NODE_ENV !== 'production') {
         console.error('[useBulkAddStock] Error details:', {
           status: statusCode,
+          code: errorCode,
           message: errorMessage,
-          response: error?.response?.data,
+          missingItemIds,
+          details: errorData?.details,
+          response: errorData,
           error,
         });
       }

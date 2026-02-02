@@ -56,8 +56,26 @@ export function useItemSearch(params: UseItemSearchParams = {}) {
       queryParams.set('q', debouncedQ);
 
       const response = await api.get<ItemListResponse>(`/items?${queryParams.toString()}`);
+      
+      // Normalize items to ensure we have the correct ID field
+      const normalizedData = response.data.map((item) => {
+        // Ensure we always use 'id' as the ID field
+        const normalizedItem = {
+          ...item,
+          id: item.id || (item as any).itemId || (item as any).uuid || (item as any)._id,
+        };
+        
+        // Warn if ID is missing (dev only)
+        if (process.env.NODE_ENV !== 'production' && !normalizedItem.id) {
+          console.warn('[useItemSearch] Item missing ID field:', item);
+        }
+        
+        return normalizedItem;
+      }).filter((item) => !!item.id); // Filter out items without ID
+      
       return {
         ...response,
+        data: normalizedData,
         nextPage: response.meta.page < response.meta.totalPages ? response.meta.page + 1 : undefined,
       };
     },
