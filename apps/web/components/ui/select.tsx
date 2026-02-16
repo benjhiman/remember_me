@@ -19,6 +19,7 @@ export const SelectTrigger = React.forwardRef<
 >(({ className, children, hideChevron = false, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
+    data-radix-select-trigger=""
     className={cn(
       'flex h-10 w-full min-w-0 overflow-hidden items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
       className,
@@ -41,14 +42,41 @@ export const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
+  const [triggerWidth, setTriggerWidth] = React.useState<number | undefined>(undefined);
+
+  React.useEffect(() => {
+    // Find the trigger element to measure its width
+    const findTrigger = () => {
+      const trigger = document.querySelector('[data-radix-select-trigger]') as HTMLElement;
+      if (trigger) {
+        const width = trigger.offsetWidth;
+        setTriggerWidth(width);
+      }
+    };
+
+    // Try immediately and on next frame
+    findTrigger();
+    requestAnimationFrame(findTrigger);
+    
+    // Also try after a short delay
+    const timeout = setTimeout(findTrigger, 100);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, []);
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          'relative z-50 min-w-[var(--radix-select-trigger-width)] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
+          'relative z-50 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
           className,
         )}
+        style={{
+          ...(triggerWidth ? { width: `${triggerWidth}px`, minWidth: `${triggerWidth}px` } : {}),
+        }}
         position="popper"
         side="bottom"
         align="start"
