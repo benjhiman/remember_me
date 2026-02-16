@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { RefreshCw, Plus, Package, Eye } from 'lucide-react';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { AddStockItemDialog } from '@/components/stock/add-stock-item-dialog';
+import { StockEntryDetailsDialog } from '@/components/stock/stock-entry-details-dialog';
 import { conditionLabel } from '@/lib/items/condition-label';
 
 type TabType = 'summary' | 'movements';
@@ -28,6 +29,8 @@ export default function InventoryStockPage() {
   const [conditionFilter, setConditionFilter] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [quickAddItemId, setQuickAddItemId] = useState<string | undefined>(undefined);
+  const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   const summaryParams = useMemo(
@@ -82,6 +85,12 @@ export default function InventoryStockPage() {
   }, [queryClient, activeTab, refetchSummary, refetchMovements, toast]);
 
   const handleOpenCreate = useCallback(() => {
+    setQuickAddItemId(undefined);
+    setIsAddDialogOpen(true);
+  }, []);
+  
+  const handleQuickAdd = useCallback((itemId: string) => {
+    setQuickAddItemId(itemId);
     setIsAddDialogOpen(true);
   }, []);
 
@@ -272,10 +281,7 @@ export default function InventoryStockPage() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => {
-                                    setIsAddDialogOpen(true);
-                                    // TODO: Preload itemId in dialog
-                                  }}
+                                  onClick={() => handleQuickAdd(row.itemId)}
                                 >
                                   <Plus className="h-4 w-4 mr-1" />
                                   Agregar
@@ -346,7 +352,11 @@ export default function InventoryStockPage() {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {movementsData.data.map((movement) => (
-                          <tr key={movement.id} className="hover:bg-gray-50">
+                          <tr 
+                            key={movement.id} 
+                            className="hover:bg-gray-50 cursor-pointer"
+                            onClick={() => setSelectedMovementId(movement.id)}
+                          >
                             <td className="px-4 py-3 text-sm text-gray-900">{movement.type}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{movement.qty}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">{formatDate(movement.createdAt)}</td>
@@ -366,7 +376,27 @@ export default function InventoryStockPage() {
         )}
       </PageShell>
 
-      <AddStockItemDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
+      <AddStockItemDialog 
+        open={isAddDialogOpen} 
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open);
+          if (!open) {
+            setQuickAddItemId(undefined);
+          }
+        }}
+        initialItemId={quickAddItemId}
+        variant={quickAddItemId ? 'quick' : 'default'}
+      />
+      
+      <StockEntryDetailsDialog
+        open={!!selectedMovementId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMovementId(null);
+          }
+        }}
+        movementId={selectedMovementId}
+      />
     </>
   );
 }

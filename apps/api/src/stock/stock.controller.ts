@@ -62,6 +62,15 @@ export class StockController {
     return this.stockService.getStockMovements(organizationId, user.userId, query);
   }
 
+  @Get('movements/:id')
+  async getStockMovementDetail(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.stockService.getStockMovementDetail(organizationId, user.userId, id);
+  }
+
   // Reservations (MUST come before @Get(':id') to avoid route conflicts)
   @Get('reservations')
   async listReservations(

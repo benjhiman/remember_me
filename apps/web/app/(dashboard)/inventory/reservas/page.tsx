@@ -16,7 +16,8 @@ import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { formatDate } from '@/lib/utils/lead-utils';
-import { RefreshCw, Plus, Clock } from 'lucide-react';
+import { RefreshCw, Plus, Clock, X } from 'lucide-react';
+import { useItems } from '@/lib/api/hooks/use-items';
 import { CreateReservationDialog } from '@/components/stock/create-reservation-dialog';
 import {
   AlertDialog,
@@ -173,8 +174,29 @@ export default function InventoryReservasPage() {
     </div>
   );
 
+  // Get item name for filter badge
+  const { data: itemData } = useItems({
+    limit: 1,
+    enabled: !!itemIdFromQuery,
+  });
+  const filteredItem = itemIdFromQuery && itemData?.data?.find((item) => item.id === itemIdFromQuery);
+
   const toolbar = (
     <div className="flex items-center gap-3">
+      {itemIdFromQuery && filteredItem && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 text-primary rounded-md text-sm">
+          <span>Filtrando por: {filteredItem.name || filteredItem.model || 'Item'}</span>
+          <button
+            onClick={() => {
+              router.push('/inventory/reservas');
+            }}
+            className="ml-2 hover:opacity-70"
+            aria-label="Limpiar filtro"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       <div className="flex-1 max-w-sm">
         <Input
           placeholder="Buscar por item, SKU, cliente..."

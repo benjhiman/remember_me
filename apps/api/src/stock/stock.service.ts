@@ -1985,6 +1985,145 @@ export class StockService {
     };
   }
 
+  async getStockMovementDetail(organizationId: string, userId: string, movementId: string) {
+    await this.verifyMembership(organizationId, userId);
+
+    const movement = await this.prisma.stockMovement.findFirst({
+      where: {
+        id: movementId,
+        organizationId,
+      },
+      include: {
+        stockItem: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                brand: true,
+                model: true,
+                storageGb: true,
+                color: true,
+                condition: true,
+              },
+            },
+          },
+        },
+        reservation: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                brand: true,
+                model: true,
+                storageGb: true,
+                color: true,
+                condition: true,
+              },
+            },
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!movement) {
+      throw new NotFoundException('Movement not found');
+    }
+
+    // Get all movements created at the same time for the same item (grouped operation)
+    const relatedMovements = await this.prisma.stockMovement.findMany({
+      where: {
+        organizationId,
+        stockItem: {
+          itemId: movement.stockItem.itemId,
+        },
+        createdAt: {
+          gte: new Date(movement.createdAt.getTime() - 1000), // Within 1 second
+          lte: new Date(movement.createdAt.getTime() + 1000),
+        },
+        type: movement.type,
+        createdById: movement.createdById,
+      },
+      include: {
+        stockItem: {
+          include: {
+            item: {
+              select: {
+                id: true,
+                name: true,
+                sku: true,
+                brand: true,
+                model: true,
+                storageGb: true,
+                color: true,
+                condition: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Group by itemId and aggregate quantities
+    const itemsMap = new Map<string, {
+      itemId: string;
+      itemName: string;
+      sku: string | null;
+      quantity: number;
+      imeis: string[];
+    }>();
+
+    for (const m of relatedMovements) {
+      const itemId = m.stockItem.itemId;
+      const item = m.stockItem.item;
+      const itemName = item?.name || m.stockItem.model || 'Unknown';
+      const sku = item?.sku || m.stockItem.sku || null;
+
+      if (!itemsMap.has(itemId)) {
+        itemsMap.set(itemId, {
+          itemId,
+          itemName,
+          sku,
+          quantity: 0,
+          imeis: [],
+        });
+      }
+
+      const entry = itemsMap.get(itemId)!;
+      entry.quantity += m.quantity;
+      if (m.stockItem.imei) {
+        entry.imeis.push(m.stockItem.imei);
+      }
+    }
+
+    return {
+      id: movement.id,
+      type: movement.type,
+      quantity: movement.quantity,
+      quantityBefore: movement.quantityBefore,
+      quantityAfter: movement.quantityAfter,
+      reason: movement.reason,
+      createdAt: movement.createdAt,
+      createdBy: movement.createdBy,
+      metadata: movement.metadata,
+      items: Array.from(itemsMap.values()),
+      totalItems: itemsMap.size,
+      totalQuantity: Array.from(itemsMap.values()).reduce((sum, item) => sum + item.quantity, 0),
+      totalImeis: Array.from(itemsMap.values()).reduce((sum, item) => sum + item.imeis.length, 0),
+    };
+  }
+
   health() {
     return { ok: true, module: 'stock' };
   }

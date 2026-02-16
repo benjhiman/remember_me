@@ -207,6 +207,8 @@ function BulkRowItemPicker({
 interface AddStockItemDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialItemId?: string; // For quick add mode
+  variant?: 'default' | 'quick'; // 'quick' = only quantity input, no item picker
 }
 
 type Step = 1 | 2 | 3;
@@ -223,11 +225,14 @@ interface BulkRow {
   itemName?: string; // For debugging/validation
 }
 
-export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogProps) {
-  const [step, setStep] = useState<Step>(1);
-  const [mode, setMode] = useState<EntryMode | ''>('');
+export function AddStockItemDialog({ open, onOpenChange, initialItemId, variant = 'default' }: AddStockItemDialogProps) {
+  const isQuickMode = variant === 'quick' && !!initialItemId;
+  
+  // Initialize with quick mode if initialItemId is provided
+  const [step, setStep] = useState<Step>(isQuickMode ? 3 : 1);
+  const [mode, setMode] = useState<EntryMode | ''>(isQuickMode ? StockEntryMode.QUANTITY : '');
   const [itemSearch, setItemSearch] = useState('');
-  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  const [selectedItemId, setSelectedItemId] = useState<string>(initialItemId || '');
   const [imeisText, setImeisText] = useState('');
   const [quantity, setQuantity] = useState<string>('');
   const [quantityError, setQuantityError] = useState<string>('');
@@ -274,14 +279,28 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
   const bulkAddStock = useBulkAddStock();
   const { toast } = useToast();
 
-  // Fetch items for selection (enabled in step 2)
+  // Fetch items for selection (enabled in step 2 or quick mode)
   const { data: itemsData, isLoading: itemsLoading } = useItems({
     q: itemSearch || undefined,
     limit: 50,
-    enabled: open && step >= 2,
+    enabled: open && (step >= 2 || isQuickMode),
   });
 
-  const items = itemsData?.data || [];
+  const items = useMemo(() => itemsData?.data || [], [itemsData?.data]);
+  
+  // In quick mode, fetch the specific item by ID
+  const { data: quickItemData } = useItems({
+    limit: 100, // Fetch more to ensure we get the item
+    enabled: isQuickMode && !!initialItemId && open,
+  });
+  
+  // Find the selected item (for quick mode or normal mode)
+  const selectedItem = useMemo(() => {
+    if (isQuickMode && quickItemData?.data && initialItemId) {
+      return quickItemData.data.find((item) => item.id === initialItemId) || null;
+    }
+    return items.find((item) => item.id === selectedItemId) || null;
+  }, [isQuickMode, quickItemData?.data, initialItemId, items, selectedItemId]);
 
   // Filter items based on search
   const filteredItems = useMemo(() => {
@@ -297,8 +316,6 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         item.color?.toLowerCase().includes(searchLower)
     );
   }, [items, itemSearch]);
-
-  const selectedItem = items.find((item) => item.id === selectedItemId);
 
   // Parse IMEIs from textarea - each line must be exactly 15 digits
   const parsedImeis = useMemo(() => {
@@ -910,10 +927,12 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     try {
       await createStockEntry.mutateAsync(dto);
       // Reset form and close dialog
-      setStep(1);
-      setMode('');
-      setItemSearch('');
-      setSelectedItemId('');
+      if (!isQuickMode) {
+        setStep(1);
+        setMode('');
+        setItemSearch('');
+        setSelectedItemId('');
+      }
       setImeisText('');
       setQuantity('');
       setQuantityError('');
@@ -949,18 +968,19 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
         <DialogHeader>
           <DialogTitle>Agregar stock</DialogTitle>
           <DialogDescription>
-            {step === 1 && 'Elegí el modo de agregado'}
-            {step === 2 && 'Seleccioná el item del catálogo'}
-            {step === 3 && mode === 'BULK' && 'Agregá múltiples items a la vez'}
-            {step === 3 && mode !== 'BULK' && 'Completá los datos del stock'}
+            {isQuickMode && 'Ingresá la cantidad a agregar'}
+            {!isQuickMode && step === 1 && 'Elegí el modo de agregado'}
+            {!isQuickMode && step === 2 && 'Seleccioná el item del catálogo'}
+            {!isQuickMode && step === 3 && mode === 'BULK' && 'Agregá múltiples items a la vez'}
+            {!isQuickMode && step === 3 && mode !== 'BULK' && 'Completá los datos del stock'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[calc(90vh-180px)] overflow-y-auto">
           <form onSubmit={handleSubmit}>
             <div className="space-y-6 py-4">
-            {/* Step 1: Mode Selection */}
-            {step === 1 && (
+            {/* Step 1: Mode Selection (skip in quick mode) */}
+            {step === 1 && !isQuickMode && (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Modo de agregado</Label>
@@ -1015,8 +1035,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
               </div>
             )}
 
-            {/* Step 2: Item Selection */}
-            {step === 2 && (
+            {/* Step 2: Item Selection (skip in quick mode) */}
+            {step === 2 && !isQuickMode && (
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="item-search">Buscar item</Label>
@@ -1501,7 +1521,20 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                 ) : (
                   // MANUAL MODE: Show all fields (item selection already done in step 2)
                   <>
-                    {mode === StockEntryMode.IMEI && (
+                    {/* Show selected item info in quick mode */}
+                    {isQuickMode && selectedItem && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <div className="text-sm font-medium">Item:</div>
+                        <div className="text-sm text-muted-foreground">
+                          {selectedItem.model && selectedItem.storageGb && selectedItem.color && selectedItem.condition
+                            ? `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${conditionLabel(selectedItem.condition)}`
+                            : selectedItem.name}
+                          {selectedItem.sku && ` (SKU: ${selectedItem.sku})`}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {mode === StockEntryMode.IMEI && !isQuickMode && (
                   <div className="space-y-2">
                     <Label htmlFor="imeis">
                       IMEIs (uno por línea) <span className="text-muted-foreground">({parsedImeis.length})</span>
@@ -1583,7 +1616,7 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                           placeholder="Ingresá la cantidad (ej: 20)"
                           disabled={isLoading}
                           className={cn('text-lg font-medium', quantityError && 'border-destructive')}
-                          autoFocus
+                          autoFocus={isQuickMode}
                         />
                         <p className="text-xs text-muted-foreground">Solo números. Mínimo: 1</p>
                         {quantityError && (
@@ -1591,6 +1624,10 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                         )}
                       </div>
                     )}
+                    
+                    {/* Hide condition, status, cost, location, notes in quick mode */}
+                    {!isQuickMode && (
+                      <>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1630,6 +1667,8 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                         disabled={isLoading}
                       />
                     </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1639,7 +1678,7 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
             <DialogFooter>
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
-                  {step > 1 && (
+                  {step > 1 && !isQuickMode && (
                     <Button type="button" variant="outline" onClick={handleBack} disabled={isLoading}>
                       Atrás
                     </Button>
