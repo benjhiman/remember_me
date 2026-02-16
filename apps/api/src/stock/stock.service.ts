@@ -639,13 +639,16 @@ export class StockService {
         const reservedQty = activeReservations.reduce((sum, r) => sum + r.quantity, 0);
         const availableQty = totalQty - reservedQty;
 
-        // If not enough stock available, create stock with negative quantity
+        // If not enough stock available, create/adjust stock with negative quantity
         let stockItemForMovement = stockItems.length > 0 ? stockItems[0] : null;
         let finalTotalQty = totalQty;
 
         if (availableQty < dto.quantity) {
-          // Calculate how much stock we need to create (negative)
-          const stockDeficit = dto.quantity - availableQty;
+          // Calculate the deficit: how much more stock we need beyond what's available
+          // If availableQty is already negative, we just need to subtract the reservation quantity
+          // If availableQty is positive but insufficient, we need (dto.quantity - availableQty)
+          // But we should simply subtract dto.quantity from current totalQty to get the new total
+          const newTotalQty = totalQty - dto.quantity;
 
           // If no stock items exist, create one with negative quantity
           if (stockItems.length === 0) {
@@ -661,7 +664,7 @@ export class StockService {
                 color: item.color || null,
                 condition: item.condition || 'NEW',
                 imei: null, // No IMEI for quantity-based stock
-                quantity: -stockDeficit, // Negative quantity to indicate we need to purchase
+                quantity: newTotalQty, // This will be negative if dto.quantity > 0
                 costPrice,
                 basePrice,
                 status: StockStatus.AVAILABLE,
@@ -669,7 +672,7 @@ export class StockService {
                 notes: `Stock creado automáticamente por reserva (pendiente de compra)`,
                 metadata: {
                   autoCreated: true,
-                  reservationDeficit: stockDeficit,
+                  reservationQuantity: dto.quantity,
                 },
               } as any,
             });
@@ -681,26 +684,27 @@ export class StockService {
               stockItemForMovement.id,
               StockMovementType.IN,
               0,
-              -stockDeficit, // Negative quantity
+              newTotalQty, // Negative quantity
               userId,
-              `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${stockDeficit} unidades)`,
+              `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${dto.quantity} unidades)`,
               undefined,
               undefined,
-              { autoCreated: true, reservationDeficit: stockDeficit },
+              { autoCreated: true, reservationQuantity: dto.quantity },
             );
 
-            finalTotalQty = -stockDeficit;
+            finalTotalQty = newTotalQty;
           } else {
-            // If stock items exist but insufficient, adjust the first one to negative if needed
+            // If stock items exist but insufficient, adjust the first one
             const firstStockItem = stockItems[0];
-            const newQuantity = firstStockItem.quantity - stockDeficit;
+            const quantityChange = -dto.quantity; // Always subtract the reservation quantity
+            const newQuantity = firstStockItem.quantity + quantityChange;
 
             stockItemForMovement = await tx.stockItem.update({
               where: { id: firstStockItem.id },
               data: { quantity: newQuantity },
             });
 
-            // Create movement (ADJUST type) to reflect the negative adjustment
+            // Create movement (ADJUST type) to reflect the adjustment
             await this.createMovement(
               tx,
               organizationId,
@@ -709,10 +713,10 @@ export class StockService {
               firstStockItem.quantity,
               newQuantity,
               userId,
-              `Ajuste automático por reserva sin stock suficiente (déficit: ${stockDeficit} unidades, pendiente de compra)`,
+              `Ajuste automático por reserva sin stock suficiente (reserva: ${dto.quantity} unidades, pendiente de compra)`,
               undefined,
               undefined,
-              { autoAdjusted: true, reservationDeficit: stockDeficit },
+              { autoAdjusted: true, reservationQuantity: dto.quantity },
             );
 
             finalTotalQty = newQuantity;
