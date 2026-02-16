@@ -49,6 +49,7 @@ function BulkRowItemPicker({
   isLoading: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [allLoadedItems, setAllLoadedItems] = useState<any[]>([]); // Cache all loaded items
 
   const {
     items: rowItems,
@@ -59,7 +60,23 @@ function BulkRowItemPicker({
     enabled: true, // Always enabled to show items on open
   });
 
-  const selectedItem = rowItems.find((i) => i.id === row.itemId);
+  // Update cache when new items are loaded
+  useEffect(() => {
+    if (rowItems.length > 0) {
+      setAllLoadedItems((prev) => {
+        const existingIds = new Set(prev.map((i) => i.id));
+        const newItems = rowItems.filter((i) => !existingIds.has(i.id));
+        return [...prev, ...newItems];
+      });
+    }
+  }, [rowItems]);
+
+  // Find selected item from cache (not just current rowItems)
+  const selectedItem = useMemo(() => {
+    if (!row.itemId) return null;
+    // First try current rowItems, then cache
+    return rowItems.find((i) => i.id === row.itemId) || allLoadedItems.find((i) => i.id === row.itemId);
+  }, [row.itemId, rowItems, allLoadedItems]);
   
   // Filter items client-side for typeahead search
   const filteredItems = useMemo(() => {
@@ -83,31 +100,50 @@ function BulkRowItemPicker({
 
   const handleValueChange = (value: string) => {
     if (value) {
-      const item = rowItems.find((i) => i.id === value);
+      // Search in both current items and cache
+      const item = rowItems.find((i) => i.id === value) || allLoadedItems.find((i) => i.id === value);
       if (item) {
         onSelect(value, item);
+        setSearchQuery(''); // Clear search after selection
+      } else {
+        // If item not found, still update itemId (it might be from a different search)
+        onSelect(value, { id: value } as any);
         setSearchQuery('');
       }
+    } else {
+      // Clear selection
+      onUpdate({ itemId: undefined, itemSearch: undefined });
+      setSearchQuery('');
     }
   };
 
+  const displayLabel = useMemo(() => {
+    if (!selectedItem) return null;
+    if (selectedItem.model && selectedItem.storageGb && selectedItem.color && selectedItem.condition) {
+      return `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${conditionLabel(selectedItem.condition)}`;
+    }
+    return selectedItem.name || 'Item sin nombre';
+  }, [selectedItem]);
+
   return (
-    <div className="flex-1 min-h-[64px] flex flex-col justify-start">
+    <div className="flex-1 min-w-0 min-h-[64px] flex flex-col justify-start">
       <Select
         value={row.itemId || undefined}
         onValueChange={handleValueChange}
         disabled={isLoading}
       >
         <SelectTrigger className={cn(
-          'w-full h-10 text-sm font-normal',
+          'w-full h-10 min-w-0 text-sm font-normal',
           !row.itemId && 'text-muted-foreground'
         )}>
           <SelectValue placeholder="Buscar modelo...">
-            {selectedItem ? (
-              <span className="truncate text-left">
-                {selectedItem.model && selectedItem.storageGb && selectedItem.color && selectedItem.condition
-                  ? `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${conditionLabel(selectedItem.condition)}`
-                  : selectedItem.name || 'Item sin nombre'}
+            {displayLabel ? (
+              <span className="block min-w-0 truncate text-left">
+                {displayLabel}
+              </span>
+            ) : row.itemId ? (
+              <span className="block min-w-0 truncate text-left text-muted-foreground">
+                (cargando...)
               </span>
             ) : (
               'Buscar modelo...'
