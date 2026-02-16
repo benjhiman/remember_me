@@ -277,13 +277,13 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
   const selectedItem = items.find((item) => item.id === selectedItemId);
 
-  // Parse IMEIs from textarea
+  // Parse IMEIs from textarea - each line must be exactly 15 digits
   const parsedImeis = useMemo(() => {
     if (!imeisText.trim()) return [];
     return imeisText
       .split('\n')
       .map((line) => line.trim().replace(/\s+/g, ''))
-      .filter((imei) => imei.length > 0);
+      .filter((imei) => imei.length === 15 && /^\d{15}$/.test(imei)); // Only valid 15-digit IMEIs
   }, [imeisText]);
 
   // Check for duplicate IMEIs in textarea
@@ -864,8 +864,8 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
     const dto: CreateStockEntryDto = {
       mode,
       itemId: selectedItemId,
-      condition,
-      status,
+      condition: 'NEW', // Default: backend will use this
+      status: 'AVAILABLE', // Default: backend will use this
       location: location || undefined,
       notes: notes || undefined,
       ...(cost ? { cost: parseFloat(cost) } : {}),
@@ -922,7 +922,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Agregar stock</DialogTitle>
           <DialogDescription>
@@ -933,8 +933,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-6 py-4">
+        <div className="max-h-[calc(90vh-180px)] overflow-y-auto">
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-6 py-4">
             {/* Step 1: Mode Selection */}
             {step === 1 && (
               <div className="space-y-4">
@@ -1486,7 +1487,18 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                       id="imeis"
                       placeholder="123456789012345&#10;123456789012346&#10;123456789012347"
                       value={imeisText}
-                      onChange={(e) => setImeisText(e.target.value)}
+                      onChange={(e) => {
+                        // Extract only digits
+                        const digitsOnly = e.target.value.replace(/\D/g, '');
+                        // Chunk into groups of 15 digits
+                        const chunks: string[] = [];
+                        for (let i = 0; i < digitsOnly.length; i += 15) {
+                          chunks.push(digitsOnly.slice(i, i + 15));
+                        }
+                        // Join with newlines
+                        const formatted = chunks.join('\n');
+                        setImeisText(formatted);
+                      }}
                       rows={8}
                       disabled={isLoading}
                       className="font-mono text-sm"
@@ -1559,39 +1571,6 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="condition">Condición</Label>
-                        <Select value={condition} onValueChange={(v) => setCondition(v as any)} disabled={isLoading}>
-                          <SelectTrigger id="condition">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NEW">NEW</SelectItem>
-                            <SelectItem value="USED">Usado</SelectItem>
-                            <SelectItem value="OEM">OEM</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Estado</Label>
-                        <Select value={status} onValueChange={(v) => setStatus(v as any)} disabled={isLoading}>
-                          <SelectTrigger id="status">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="AVAILABLE">Disponible</SelectItem>
-                            <SelectItem value="RESERVED">Reservado</SelectItem>
-                            <SelectItem value="SOLD">Vendido</SelectItem>
-                            <SelectItem value="DAMAGED">Dañado</SelectItem>
-                            <SelectItem value="RETURNED">Devuelto</SelectItem>
-                            <SelectItem value="CANCELLED">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
                         <Label htmlFor="cost">Costo (opcional)</Label>
                         <Input
                           id="cost"
@@ -1634,48 +1613,49 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
             )}
           </div>
 
-          <DialogFooter>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                {step > 1 && (
-                  <Button type="button" variant="outline" onClick={handleBack} disabled={isLoading}>
-                    Atrás
+            <DialogFooter>
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  {step > 1 && (
+                    <Button type="button" variant="outline" onClick={handleBack} disabled={isLoading}>
+                      Atrás
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+                    Cancelar
                   </Button>
-                )}
+                  {step < 3 ? (
+                    <Button 
+                      type="button" 
+                      onClick={handleNext} 
+                      disabled={(step === 1 && !canProceedStep1) || (step === 2 && !canProceedStep2) || isLoading}
+                    >
+                      Siguiente
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      disabled={
+                        (mode === 'BULK' ? !canSubmitBulk : !canSubmitStep3) || isLoading
+                      }
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : (
+                        'Guardar'
+                      )}
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-                  Cancelar
-                </Button>
-                {step < 3 ? (
-                  <Button 
-                    type="button" 
-                    onClick={handleNext} 
-                    disabled={(step === 1 && !canProceedStep1) || (step === 2 && !canProceedStep2) || isLoading}
-                  >
-                    Siguiente
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    disabled={
-                      (mode === 'BULK' ? !canSubmitBulk : !canSubmitStep3) || isLoading
-                    }
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      'Guardar'
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </DialogFooter>
-        </form>
+            </DialogFooter>
+          </form>
+        </div>
       </DialogContent>
 
       {/* Confirm Save Valid Only Dialog */}
