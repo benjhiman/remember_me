@@ -94,7 +94,11 @@ function BulkRowItemPicker({
               <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[520px] max-w-[calc(100vw-3rem)] p-0" align="start">
+          <PopoverContent 
+            className="w-[520px] max-w-[calc(100vw-3rem)] p-0 pointer-events-auto" 
+            align="start"
+            style={{ pointerEvents: 'auto', zIndex: 99999 }}
+          >
             <Command shouldFilter={false}>
               <CommandInput
                 placeholder="Buscar modelo, SKU, marca..."
@@ -1468,40 +1472,6 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                         </div>
                       </div>
                     )}
-
-                    {/* Condition and Status for BULK mode */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="bulk-condition">Condición</Label>
-                        <Select value={condition} onValueChange={(v) => setCondition(v as any)} disabled={isLoading}>
-                          <SelectTrigger id="bulk-condition">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NEW">NEW</SelectItem>
-                            <SelectItem value="USED">Usado</SelectItem>
-                            <SelectItem value="OEM">OEM</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="bulk-status">Estado</Label>
-                        <Select value={status} onValueChange={(v) => setStatus(v as any)} disabled={isLoading}>
-                          <SelectTrigger id="bulk-status">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="AVAILABLE">Disponible</SelectItem>
-                            <SelectItem value="RESERVED">Reservado</SelectItem>
-                            <SelectItem value="SOLD">Vendido</SelectItem>
-                            <SelectItem value="DAMAGED">Dañado</SelectItem>
-                            <SelectItem value="RETURNED">Devuelto</SelectItem>
-                            <SelectItem value="CANCELLED">Cancelado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
                   </div>
                   </>
                 ) : (
