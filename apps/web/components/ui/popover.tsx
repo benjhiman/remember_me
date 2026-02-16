@@ -11,12 +11,15 @@ const PopoverTrigger = PopoverPrimitive.Trigger;
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = 'center', sideOffset = 4, onInteractOutside, ...props }, ref) => (
+>(({ className, align = 'center', side = 'bottom', sideOffset = 4, collisionPadding = 8, avoidCollisions = true, onInteractOutside, ...props }, ref) => (
   <PopoverPrimitive.Portal>
     <PopoverPrimitive.Content
       ref={ref}
       align={align}
+      side={side}
       sideOffset={sideOffset}
+      collisionPadding={collisionPadding}
+      avoidCollisions={avoidCollisions}
       onInteractOutside={(e) => {
         // Allow custom handler to override
         if (onInteractOutside) {

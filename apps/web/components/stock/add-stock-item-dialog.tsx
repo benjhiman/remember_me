@@ -99,11 +99,16 @@ function BulkRowItemPicker({
           </PopoverTrigger>
           <PopoverContent 
             className="w-[520px] max-w-[calc(100vw-3rem)] p-0 pointer-events-auto" 
+            side="bottom"
             align="start"
+            sideOffset={4}
+            collisionPadding={8}
+            avoidCollisions={true}
             onInteractOutside={(e) => {
-              // Only prevent if clicking on dialog overlay, not on popover content
+              // Prevent dialog overlay from intercepting clicks
               const target = e.target as HTMLElement;
-              if (target.closest('[role="dialog"]')) {
+              const dialogOverlay = target.closest('[data-radix-dialog-overlay]');
+              if (dialogOverlay) {
                 e.preventDefault();
               }
             }}
@@ -111,10 +116,14 @@ function BulkRowItemPicker({
               onUpdate({ isOpen: false });
             }}
             onPointerDownOutside={(e) => {
-              // Only close if clicking outside both popover and dialog
+              // Close if clicking outside popover (but not on dialog overlay)
               const target = e.target as HTMLElement;
-              if (!target.closest('[role="dialog"]')) {
+              const dialogOverlay = target.closest('[data-radix-dialog-overlay]');
+              if (!dialogOverlay) {
                 onUpdate({ isOpen: false });
+              } else {
+                // Prevent dialog from closing when clicking overlay
+                e.preventDefault();
               }
             }}
           >
@@ -954,7 +963,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[calc(90vh-180px)] overflow-y-auto">
+        <div className="max-h-[calc(90vh-180px)] overflow-y-auto" style={{ isolation: 'isolate' }}>
           <form onSubmit={handleSubmit}>
             <div className="space-y-6 py-4">
             {/* Step 1: Mode Selection */}
