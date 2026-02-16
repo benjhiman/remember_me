@@ -138,11 +138,11 @@ function BulkRowItemPicker({
         )}>
           <SelectValue placeholder="Buscar modelo...">
             {displayLabel ? (
-              <span className="block min-w-0 truncate text-left">
+              <span className="block min-w-0 flex-1 truncate whitespace-nowrap overflow-hidden text-left">
                 {displayLabel}
               </span>
             ) : row.itemId ? (
-              <span className="block min-w-0 truncate text-left text-muted-foreground">
+              <span className="block min-w-0 flex-1 truncate whitespace-nowrap overflow-hidden text-left text-muted-foreground">
                 (cargando...)
               </span>
             ) : (
@@ -150,7 +150,7 @@ function BulkRowItemPicker({
             )}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="w-[520px] max-w-[calc(100vw-3rem)] max-h-[300px]">
+        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-3rem)]">
           <div className="p-2 border-b">
             <Input
               placeholder="Buscar modelo, SKU, marca..."
