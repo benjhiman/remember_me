@@ -18,8 +18,7 @@ const PopoverContent = React.forwardRef<
       align={align}
       sideOffset={sideOffset}
       onInteractOutside={(e) => {
-        // Prevent dialog from closing when clicking outside popover
-        e.preventDefault();
+        // Allow custom handler to override
         if (onInteractOutside) {
           onInteractOutside(e);
         }

@@ -59,8 +59,8 @@ function BulkRowItemPicker({
     hasNextPage,
     isFetchingNextPage,
   } = useItemSearchFlattened({
-    q: rowSearchQuery,
-    limit: 20,
+    q: rowSearchQuery || '', // Always send empty string if no query (to get initial items)
+    limit: 50, // Increased to show more items initially
     enabled: row.isOpen || false,
   });
 
@@ -77,14 +77,17 @@ function BulkRowItemPicker({
               setRowSearchQuery('');
             }
           }}
+          modal={false}
         >
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               role="combobox"
+              aria-expanded={row.isOpen}
               className={cn(
                 'w-full h-10 justify-between text-sm font-normal',
-                !row.itemId && 'text-muted-foreground'
+                !row.itemId && 'text-muted-foreground',
+                row.isOpen && 'ring-2 ring-ring ring-offset-2'
               )}
               disabled={isLoading}
             >
@@ -95,14 +98,27 @@ function BulkRowItemPicker({
             </Button>
           </PopoverTrigger>
           <PopoverContent 
-            className="w-[520px] max-w-[calc(100vw-3rem)] p-0" 
+            className="w-[520px] max-w-[calc(100vw-3rem)] p-0 pointer-events-auto" 
             align="start"
             onInteractOutside={(e) => {
-              // Prevent dialog from intercepting clicks on popover
-              e.preventDefault();
+              // Only prevent if clicking on dialog overlay, not on popover content
+              const target = e.target as HTMLElement;
+              if (target.closest('[role="dialog"]')) {
+                e.preventDefault();
+              }
+            }}
+            onEscapeKeyDown={() => {
+              onUpdate({ isOpen: false });
+            }}
+            onPointerDownOutside={(e) => {
+              // Only close if clicking outside both popover and dialog
+              const target = e.target as HTMLElement;
+              if (!target.closest('[role="dialog"]')) {
+                onUpdate({ isOpen: false });
+              }
             }}
           >
-            <Command shouldFilter={false}>
+            <Command shouldFilter={false} className="pointer-events-auto">
               <CommandInput
                 placeholder="Buscar modelo, SKU, marca..."
                 value={rowSearchQuery}
@@ -110,7 +126,7 @@ function BulkRowItemPicker({
                   setRowSearchQuery(value);
                 }}
               />
-              <CommandList className="max-h-[300px] overflow-y-auto">
+              <CommandList className="max-h-[300px] overflow-y-auto pointer-events-auto">
                 {rowItemsLoading && rowItems.length === 0 ? (
                   <div className="py-6 text-center text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
@@ -121,7 +137,7 @@ function BulkRowItemPicker({
                     {rowSearchQuery ? 'No se encontraron items' : 'No hay items disponibles'}
                   </CommandEmpty>
                 ) : (
-                  <CommandGroup>
+                  <CommandGroup className="pointer-events-auto">
                     {rowItems.map((item) => {
                       const displayLabel =
                         item.model && item.storageGb && item.color && item.condition
@@ -133,10 +149,12 @@ function BulkRowItemPicker({
                           value={item.id}
                           onSelect={() => {
                             onSelect(item.id, item);
+                            onUpdate({ isOpen: false }); // Close popover after selection
+                            setRowSearchQuery(''); // Clear search
                           }}
-                          className="cursor-pointer min-h-[40px] flex items-center"
+                          className="cursor-pointer min-h-[40px] flex items-center pointer-events-auto"
                         >
-                          <div className="flex flex-col w-full">
+                          <div className="flex flex-col w-full pointer-events-none">
                             <span className="font-medium truncate">{displayLabel}</span>
                             {item.sku && (
                               <span className="text-xs text-muted-foreground truncate">
@@ -148,14 +166,14 @@ function BulkRowItemPicker({
                       );
                     })}
                     {hasNextPage && (
-                      <div className="px-2 py-1.5 text-center">
+                      <div className="px-2 py-1.5 text-center pointer-events-auto">
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => fetchNextPage()}
                           disabled={isFetchingNextPage}
-                          className="w-full"
+                          className="w-full pointer-events-auto"
                         >
                           {isFetchingNextPage ? (
                             <>
