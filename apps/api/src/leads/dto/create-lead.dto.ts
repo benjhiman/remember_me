@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsDecimal, IsArray, IsObject, IsEmail, Matches } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsOptional, IsDecimal, IsArray, IsObject, IsEmail, Matches, ValidateIf } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateLeadDto {
   @IsString()
@@ -11,10 +11,14 @@ export class CreateLeadDto {
   @IsString()
   name!: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @ValidateIf((o) => o.email !== undefined && o.email !== null && o.email !== '')
   @IsEmail({}, { message: 'Email must be a valid email address' })
   @IsOptional()
   email?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  @ValidateIf((o) => o.phone !== undefined && o.phone !== null && o.phone !== '')
   @IsString()
   @IsOptional()
   @Matches(/^[\d\s\+\-\(\)]+$/, {
@@ -22,10 +26,12 @@ export class CreateLeadDto {
   })
   phone?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   @IsOptional()
   source?: string;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   @IsOptional()
   city?: string;
@@ -35,6 +41,7 @@ export class CreateLeadDto {
   @IsOptional()
   budget?: number;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsString()
   @IsOptional()
   model?: string;

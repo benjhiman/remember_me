@@ -40,7 +40,24 @@ export function useCreateLead() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (data: CreateLeadData) => api.post<Lead>('/leads', data),
+    mutationFn: (data: CreateLeadData) => {
+      // Normalize empty strings to undefined for optional fields
+      const normalizedData: CreateLeadData = {
+        ...data,
+        email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
+        phone: data.phone && data.phone.trim() !== '' ? data.phone.trim() : undefined,
+        source: data.source && data.source.trim() !== '' ? data.source.trim() : undefined,
+        city: data.city && data.city.trim() !== '' ? data.city.trim() : undefined,
+        model: data.model && data.model.trim() !== '' ? data.model.trim() : undefined,
+      };
+      
+      // Debug logging (only in dev)
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[useCreateLead] Payload:', normalizedData);
+      }
+      
+      return api.post<Lead>('/leads', normalizedData);
+    },
     onSuccess: (lead) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast({
@@ -50,11 +67,21 @@ export function useCreateLead() {
       });
       router.push(`/board/leads/${lead.id}`);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      // Debug logging (only in dev)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[useCreateLead] Error:', {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+        });
+      }
+      
+      const errorMessage = getErrorMessage(error);
       toast({
         variant: 'destructive',
         title: 'Error al crear lead',
-        description: getErrorMessage(error),
+        description: errorMessage,
       });
     },
   });
@@ -67,7 +94,17 @@ export function useUpdateLead(leadId: string) {
 
   return useMutation({
     mutationFn: (data: UpdateLeadData) => {
-      return api.put<Lead>(`/leads/${leadId}`, data);
+      // Normalize empty strings to undefined for optional fields
+      const normalizedData: UpdateLeadData = {
+        ...data,
+        email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
+        phone: data.phone && data.phone.trim() !== '' ? data.phone.trim() : undefined,
+        source: data.source && data.source.trim() !== '' ? data.source.trim() : undefined,
+        city: data.city && data.city.trim() !== '' ? data.city.trim() : undefined,
+        model: data.model && data.model.trim() !== '' ? data.model.trim() : undefined,
+      };
+      
+      return api.put<Lead>(`/leads/${leadId}`, normalizedData);
     },
     onSuccess: (lead) => {
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] });
@@ -79,11 +116,21 @@ export function useUpdateLead(leadId: string) {
       });
       router.push(`/board/leads/${lead.id}`);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      // Debug logging (only in dev)
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[useUpdateLead] Error:', {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+        });
+      }
+      
+      const errorMessage = getErrorMessage(error);
       toast({
         variant: 'destructive',
         title: 'Error al actualizar lead',
-        description: getErrorMessage(error),
+        description: errorMessage,
       });
     },
   });

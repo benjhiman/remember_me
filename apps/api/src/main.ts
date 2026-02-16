@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
@@ -175,7 +175,23 @@ async function bootstrap() {
       transformOptions: {
         enableImplicitConversion: true,
       },
-      disableErrorMessages: process.env.NODE_ENV === 'production',
+      // Always show error messages for better debugging and user experience
+      disableErrorMessages: false,
+      // Return detailed validation errors
+      exceptionFactory: (errors) => {
+        const messages = errors.map((error) => {
+          const constraints = error.constraints;
+          if (constraints) {
+            return Object.values(constraints)[0];
+          }
+          return `${error.property} has invalid value`;
+        });
+        return new BadRequestException({
+          message: messages.length === 1 ? messages[0] : messages,
+          error: 'Validation failed',
+          statusCode: 400,
+        });
+      },
     }),
   );
 
