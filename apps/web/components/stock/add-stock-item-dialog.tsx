@@ -1061,7 +1061,9 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
             {/* Step 3: Fields */}
             {step === 3 && (
               <div className="space-y-4">
-                {mode === 'BULK' && (
+                {mode === 'BULK' ? (
+                  // BULK MODE: Only show bulk table, condition, status
+                  <>
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1466,10 +1468,46 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                         </div>
                       </div>
                     )}
-                  </div>
-                )}
 
-                {mode === StockEntryMode.IMEI && (
+                    {/* Condition and Status for BULK mode */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="bulk-condition">Condición</Label>
+                        <Select value={condition} onValueChange={(v) => setCondition(v as any)} disabled={isLoading}>
+                          <SelectTrigger id="bulk-condition">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NEW">NEW</SelectItem>
+                            <SelectItem value="USED">Usado</SelectItem>
+                            <SelectItem value="OEM">OEM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bulk-status">Estado</Label>
+                        <Select value={status} onValueChange={(v) => setStatus(v as any)} disabled={isLoading}>
+                          <SelectTrigger id="bulk-status">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AVAILABLE">Disponible</SelectItem>
+                            <SelectItem value="RESERVED">Reservado</SelectItem>
+                            <SelectItem value="SOLD">Vendido</SelectItem>
+                            <SelectItem value="DAMAGED">Dañado</SelectItem>
+                            <SelectItem value="RETURNED">Devuelto</SelectItem>
+                            <SelectItem value="CANCELLED">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  </>
+                ) : (
+                  // MANUAL MODE: Show all fields (item selection already done in step 2)
+                  <>
+                    {mode === StockEntryMode.IMEI && (
                   <div className="space-y-2">
                     <Label htmlFor="imeis">
                       IMEIs (uno por línea) <span className="text-muted-foreground">({parsedImeis.length})</span>
@@ -1547,79 +1585,160 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                       <p className="text-xs text-destructive">{quantityError}</p>
                     )}
                   </div>
+                  </>
+
+                ) : (
+                  // MANUAL MODE: Show all fields (item selection already done in step 2)
+                  <>
+                    {mode === StockEntryMode.IMEI && (
+                      <div className="space-y-2">
+                        <Label htmlFor="imeis">
+                          IMEIs (uno por línea) <span className="text-muted-foreground">({parsedImeis.length})</span>
+                        </Label>
+                        <Textarea
+                          id="imeis"
+                          placeholder="123456789012345&#10;123456789012346&#10;123456789012347"
+                          value={imeisText}
+                          onChange={(e) => setImeisText(e.target.value)}
+                          rows={8}
+                          disabled={isLoading}
+                          className="font-mono text-sm"
+                        />
+                        {duplicateImeisInText.length > 0 && (
+                          <div className="text-sm text-destructive">
+                            IMEIs duplicados en la lista: {duplicateImeisInText.join(', ')}
+                          </div>
+                        )}
+                        {parsedImeis.length > 0 && duplicateImeisInText.length === 0 && (
+                          <div className="text-sm text-muted-foreground">
+                            {parsedImeis.length} IMEI{parsedImeis.length !== 1 ? 's' : ''} válido{parsedImeis.length !== 1 ? 's' : ''}
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setImeisText('')}
+                          disabled={!imeisText || isLoading}
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Limpiar
+                        </Button>
+                      </div>
+                    )}
+
+                    {mode === StockEntryMode.QUANTITY && (
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity">Cantidad *</Label>
+                        <Input
+                          id="quantity"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={quantity}
+                          onChange={(e) => {
+                            const digitsOnly = e.target.value.replace(/\D/g, '');
+                            setQuantity(digitsOnly);
+                            setQuantityError('');
+                          }}
+                          onWheel={(e) => {
+                            // Prevent scroll wheel from changing value
+                            e.currentTarget.blur();
+                          }}
+                          onBlur={() => {
+                            // Validate on blur but don't auto-fill
+                            const quantityParsed = parseInt(quantity || '0', 10);
+                            if (isNaN(quantityParsed) || quantityParsed < 1) {
+                              setQuantityError('Debes ingresar una cantidad mayor o igual a 1');
+                            } else {
+                              setQuantityError('');
+                            }
+                          }}
+                          placeholder="Ingresá la cantidad (ej: 20)"
+                          disabled={isLoading}
+                          className={cn('text-lg font-medium', quantityError && 'border-destructive')}
+                          autoFocus
+                        />
+                        <p className="text-xs text-muted-foreground">Solo números. Mínimo: 1</p>
+                        {quantityError && (
+                          <p className="text-xs text-destructive">{quantityError}</p>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="condition">Condición</Label>
+                        <Select value={condition} onValueChange={(v) => setCondition(v as any)} disabled={isLoading}>
+                          <SelectTrigger id="condition">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NEW">NEW</SelectItem>
+                            <SelectItem value="USED">Usado</SelectItem>
+                            <SelectItem value="OEM">OEM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="status">Estado</Label>
+                        <Select value={status} onValueChange={(v) => setStatus(v as any)} disabled={isLoading}>
+                          <SelectTrigger id="status">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AVAILABLE">Disponible</SelectItem>
+                            <SelectItem value="RESERVED">Reservado</SelectItem>
+                            <SelectItem value="SOLD">Vendido</SelectItem>
+                            <SelectItem value="DAMAGED">Dañado</SelectItem>
+                            <SelectItem value="RETURNED">Devuelto</SelectItem>
+                            <SelectItem value="CANCELLED">Cancelado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cost">Costo (opcional)</Label>
+                        <Input
+                          id="cost"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cost}
+                          onChange={(e) => setCost(e.target.value)}
+                          placeholder="0.00"
+                          disabled={isLoading}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="location">Ubicación (opcional)</Label>
+                        <Input
+                          id="location"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          placeholder="Almacén A"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="notes">Notas (opcional)</Label>
+                      <Textarea
+                        id="notes"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Notas adicionales..."
+                        rows={3}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  </>
                 )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="condition">Condición</Label>
-                    <Select value={condition} onValueChange={(v) => setCondition(v as any)} disabled={isLoading}>
-                      <SelectTrigger id="condition">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NEW">NEW</SelectItem>
-                        <SelectItem value="USED">Usado</SelectItem>
-                        <SelectItem value="OEM">OEM</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Estado</Label>
-                    <Select value={status} onValueChange={(v) => setStatus(v as any)} disabled={isLoading}>
-                      <SelectTrigger id="status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="AVAILABLE">Disponible</SelectItem>
-                        <SelectItem value="RESERVED">Reservado</SelectItem>
-                        <SelectItem value="SOLD">Vendido</SelectItem>
-                        <SelectItem value="DAMAGED">Dañado</SelectItem>
-                        <SelectItem value="RETURNED">Devuelto</SelectItem>
-                        <SelectItem value="CANCELLED">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cost">Costo (opcional)</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={cost}
-                      onChange={(e) => setCost(e.target.value)}
-                      placeholder="0.00"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Ubicación (opcional)</Label>
-                    <Input
-                      id="location"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="Almacén A"
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notas (opcional)</Label>
-                  <Textarea
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Notas adicionales..."
-                    rows={3}
-                    disabled={isLoading}
-                  />
-                </div>
               </div>
             )}
           </div>

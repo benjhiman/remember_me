@@ -1287,8 +1287,9 @@ export class StockService {
     const itemName = item.name;
     const itemAttributes = (item.attributes as any) || {};
     const model = itemAttributes.model || itemName;
-    const storage = itemAttributes.storage;
-    const color = itemAttributes.color;
+    // Normalize storage to string (Prisma expects String | Null, not Int)
+    const storage = itemAttributes.storage != null ? String(itemAttributes.storage) : (item.storageGb != null ? String(item.storageGb) : null);
+    const color = itemAttributes.color || item.color || null;
 
     // Validate mode-specific fields
     if (dto.mode === StockEntryMode.IMEI) {
@@ -1617,7 +1618,8 @@ export class StockService {
           } else {
             // Create new stock item
             const model = item.model || item.name;
-            const storage = item.storageGb || null;
+            // Normalize storage to string (Prisma expects String | Null, not Int)
+            const storage = item.storageGb != null ? String(item.storageGb) : null;
             const color = item.color || null;
 
             stockItem = await tx.stockItem.create({
