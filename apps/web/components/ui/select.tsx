@@ -9,10 +9,14 @@ export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
 export const SelectValue = SelectPrimitive.Value;
 
+export interface SelectTriggerProps extends React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> {
+  hideChevron?: boolean;
+}
+
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+  SelectTriggerProps
+>(({ className, children, hideChevron = false, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -24,9 +28,11 @@ export const SelectTrigger = React.forwardRef<
     <div className="flex min-w-0 flex-1 items-center">
       {children}
     </div>
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-    </SelectPrimitive.Icon>
+    {!hideChevron && (
+      <SelectPrimitive.Icon asChild>
+        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+      </SelectPrimitive.Icon>
+    )}
   </SelectPrimitive.Trigger>
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
@@ -50,7 +56,7 @@ export const SelectContent = React.forwardRef<
       avoidCollisions={true}
       {...props}
     >
-      <SelectPrimitive.Viewport className="p-1 max-h-[min(320px,calc(100vh-140px))] overflow-y-auto">
+      <SelectPrimitive.Viewport className="p-1 max-h-[min(320px,calc(100vh-160px))] overflow-y-auto">
         {children}
       </SelectPrimitive.Viewport>
     </SelectPrimitive.Content>

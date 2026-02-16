@@ -132,10 +132,13 @@ function BulkRowItemPicker({
         onValueChange={handleValueChange}
         disabled={isLoading}
       >
-        <SelectTrigger className={cn(
-          'w-full h-10 min-w-0 text-sm font-normal',
-          !row.itemId && 'text-muted-foreground'
-        )}>
+        <SelectTrigger 
+          hideChevron={!!row.itemId}
+          className={cn(
+            'w-full h-10 min-w-0 text-sm font-normal',
+            !row.itemId && 'text-muted-foreground'
+          )}
+        >
           <SelectValue placeholder="Buscar modelo...">
             {displayLabel ? (
               <span className="block min-w-0 flex-1 truncate whitespace-nowrap overflow-hidden text-left">
