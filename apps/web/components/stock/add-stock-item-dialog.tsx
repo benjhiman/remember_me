@@ -153,13 +153,13 @@ function BulkRowItemPicker({
             )}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-3rem)]">
-          <div className="p-2 border-b">
+        <SelectContent className="max-w-[calc(100vw-3rem)]">
+          <div className="p-2 border-b w-full">
             <Input
               placeholder="Buscar modelo, SKU, marca..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9"
+              className="h-9 w-full"
             />
           </div>
           <div className="max-h-[250px] overflow-y-auto">

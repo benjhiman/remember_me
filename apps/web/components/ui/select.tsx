@@ -41,39 +41,23 @@ export const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
-  const [collisionBoundary, setCollisionBoundary] = React.useState<HTMLElement | null>(null);
-
-  React.useEffect(() => {
-    // Find the DialogContent container if we're inside a Dialog
-    // Try multiple selectors to find the dialog content
-    const dialogContent = 
-      document.querySelector('[data-radix-dialog-content]') as HTMLElement ||
-      document.querySelector('[role="dialog"]') as HTMLElement ||
-      document.querySelector('[data-state="open"][role="dialog"]') as HTMLElement;
-    
-    if (dialogContent) {
-      setCollisionBoundary(dialogContent);
-    }
-  }, []);
-
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          'relative z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
+          'relative z-50 min-w-[var(--radix-select-trigger-width)] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
           className,
         )}
         position="popper"
         side="bottom"
         align="start"
         sideOffset={4}
-        collisionPadding={8}
-        avoidCollisions={true}
-        collisionBoundary={collisionBoundary ?? undefined}
+        collisionPadding={0}
+        avoidCollisions={false}
         {...props}
       >
-        <SelectPrimitive.Viewport className="p-1 max-h-[min(320px,calc(100vh-160px))] overflow-y-auto">
+        <SelectPrimitive.Viewport className="w-full p-1 max-h-[min(320px,calc(100vh-160px))] overflow-y-auto">
           {children}
         </SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
