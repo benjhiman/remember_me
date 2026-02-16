@@ -639,14 +639,87 @@ export class StockService {
         const reservedQty = activeReservations.reduce((sum, r) => sum + r.quantity, 0);
         const availableQty = totalQty - reservedQty;
 
-        // Check if enough quantity is available
+        // If not enough stock available, create stock with negative quantity
+        let stockItemForMovement = stockItems.length > 0 ? stockItems[0] : null;
+        let finalTotalQty = totalQty;
+
         if (availableQty < dto.quantity) {
-          throw new ConflictException(
-            `Not enough stock available. Available: ${availableQty}, Requested: ${dto.quantity}`,
-          );
+          // Calculate how much stock we need to create (negative)
+          const stockDeficit = dto.quantity - availableQty;
+
+          // If no stock items exist, create one with negative quantity
+          if (stockItems.length === 0) {
+            const costPrice = new Decimal(0);
+            const basePrice = new Decimal(0);
+
+            stockItemForMovement = await tx.stockItem.create({
+              data: {
+                organizationId,
+                itemId: dto.itemId,
+                model: item.model || item.name || 'N/A',
+                storage: item.storageGb ? String(item.storageGb) : null,
+                color: item.color || null,
+                condition: item.condition || 'NEW',
+                imei: null, // No IMEI for quantity-based stock
+                quantity: -stockDeficit, // Negative quantity to indicate we need to purchase
+                costPrice,
+                basePrice,
+                status: StockStatus.AVAILABLE,
+                location: null,
+                notes: `Stock creado automáticamente por reserva (pendiente de compra)`,
+                metadata: {
+                  autoCreated: true,
+                  reservationDeficit: stockDeficit,
+                },
+              } as any,
+            });
+
+            // Create movement (IN type) with negative quantity
+            await this.createMovement(
+              tx,
+              organizationId,
+              stockItemForMovement.id,
+              StockMovementType.IN,
+              0,
+              -stockDeficit, // Negative quantity
+              userId,
+              `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${stockDeficit} unidades)`,
+              undefined,
+              undefined,
+              { autoCreated: true, reservationDeficit: stockDeficit },
+            );
+
+            finalTotalQty = -stockDeficit;
+          } else {
+            // If stock items exist but insufficient, adjust the first one to negative if needed
+            const firstStockItem = stockItems[0];
+            const newQuantity = firstStockItem.quantity - stockDeficit;
+
+            stockItemForMovement = await tx.stockItem.update({
+              where: { id: firstStockItem.id },
+              data: { quantity: newQuantity },
+            });
+
+            // Create movement (ADJUST type) to reflect the negative adjustment
+            await this.createMovement(
+              tx,
+              organizationId,
+              stockItemForMovement.id,
+              StockMovementType.ADJUST,
+              firstStockItem.quantity,
+              newQuantity,
+              userId,
+              `Ajuste automático por reserva sin stock suficiente (déficit: ${stockDeficit} unidades, pendiente de compra)`,
+              undefined,
+              undefined,
+              { autoAdjusted: true, reservationDeficit: stockDeficit },
+            );
+
+            finalTotalQty = newQuantity;
+          }
         }
 
-        // Create reservation
+        // Create reservation (always allow, even if stock is negative)
         const reservation = await tx.stockReservation.create({
           data: {
             organizationId,
@@ -661,16 +734,15 @@ export class StockService {
           },
         });
 
-        // Create a general movement record (we don't track individual stock items for item-based reservations)
-        // We'll use the first stock item ID for the movement record, or create a placeholder
-        if (stockItems.length > 0) {
+        // Create a general movement record for the reservation
+        if (stockItemForMovement) {
           await this.createMovement(
             tx,
             organizationId,
-            stockItems[0].id, // Use first stock item for movement tracking
+            stockItemForMovement.id,
             StockMovementType.RESERVE,
-            totalQty,
-            totalQty, // quantity doesn't change on reserve
+            finalTotalQty,
+            finalTotalQty, // quantity doesn't change on reserve
             userId,
             `Stock reserved for item ${item.name}`,
             reservation.id,
