@@ -40,10 +40,12 @@ export function useCreateLead() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (data: CreateLeadData) => {
+    mutationFn: (data: CreateLeadData & { status?: any }) => {
+      // Remove status field (only allowed in updates, not creation)
       // Normalize empty strings to undefined for optional fields
+      const { status, ...dataWithoutStatus } = data;
       const normalizedData: CreateLeadData = {
-        ...data,
+        ...dataWithoutStatus,
         email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
         phone: data.phone && data.phone.trim() !== '' ? data.phone.trim() : undefined,
         source: data.source && data.source.trim() !== '' ? data.source.trim() : undefined,
