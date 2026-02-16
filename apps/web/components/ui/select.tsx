@@ -43,39 +43,68 @@ export const SelectContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
   const [triggerWidth, setTriggerWidth] = React.useState<number | undefined>(undefined);
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
+  // Measure trigger width when content is mounted/opened
   React.useEffect(() => {
-    // Find the trigger element to measure its width
-    const findTrigger = () => {
-      const trigger = document.querySelector('[data-radix-select-trigger]') as HTMLElement;
-      if (trigger) {
-        const width = trigger.offsetWidth;
-        setTriggerWidth(width);
+    const measureTrigger = () => {
+      // Find the trigger that is currently open (has aria-expanded="true")
+      const openTrigger = document.querySelector('[data-radix-select-trigger][aria-expanded="true"]') as HTMLElement;
+      if (openTrigger) {
+        const rect = openTrigger.getBoundingClientRect();
+        setTriggerWidth(rect.width);
+      } else {
+        // Fallback: find any trigger in the same Select context
+        // Radix sets data-radix-select-trigger on the trigger
+        const trigger = document.querySelector('[data-radix-select-trigger]') as HTMLElement;
+        if (trigger) {
+          const rect = trigger.getBoundingClientRect();
+          setTriggerWidth(rect.width);
+        }
       }
     };
 
-    // Try immediately and on next frame
-    findTrigger();
-    requestAnimationFrame(findTrigger);
-    
-    // Also try after a short delay
-    const timeout = setTimeout(findTrigger, 100);
+    // Measure immediately
+    measureTrigger();
+
+    // Also measure after a short delay to ensure DOM is ready
+    const timeout1 = setTimeout(measureTrigger, 50);
+    const timeout2 = setTimeout(measureTrigger, 200);
+
+    // Listen for when Select opens (Radix sets aria-expanded)
+    const observer = new MutationObserver(() => {
+      measureTrigger();
+    });
+
+    // Observe all triggers for aria-expanded changes
+    const triggers = document.querySelectorAll('[data-radix-select-trigger]');
+    triggers.forEach((trigger) => {
+      observer.observe(trigger, {
+        attributes: true,
+        attributeFilter: ['aria-expanded'],
+      });
+    });
 
     return () => {
-      clearTimeout(timeout);
+      clearTimeout(timeout1);
+      clearTimeout(timeout2);
+      observer.disconnect();
     };
   }, []);
+
+  // Combine refs
+  React.useImperativeHandle(ref, () => contentRef.current as any, []);
 
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
-        ref={ref}
+        ref={contentRef}
         className={cn(
           'relative z-50 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md',
           className,
         )}
         style={{
-          ...(triggerWidth ? { width: `${triggerWidth}px`, minWidth: `${triggerWidth}px` } : {}),
+          ...(triggerWidth ? { width: `${triggerWidth}px`, minWidth: `${triggerWidth}px`, maxWidth: `${triggerWidth}px` } : {}),
         }}
         position="popper"
         side="bottom"

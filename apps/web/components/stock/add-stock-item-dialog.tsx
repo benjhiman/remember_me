@@ -153,7 +153,7 @@ function BulkRowItemPicker({
             )}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent className="max-w-[calc(100vw-3rem)]">
+        <SelectContent>
           <div className="p-2 border-b w-full">
             <Input
               placeholder="Buscar modelo, SKU, marca..."
@@ -945,7 +945,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>Agregar stock</DialogTitle>
           <DialogDescription>
