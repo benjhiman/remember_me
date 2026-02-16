@@ -1542,89 +1542,6 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                       Limpiar
                     </Button>
                   </div>
-                )}
-
-                {mode === StockEntryMode.QUANTITY && (
-                  <div className="space-y-2">
-                    <Label htmlFor="quantity">Cantidad *</Label>
-                    <Input
-                      id="quantity"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      value={quantity}
-                      onChange={(e) => {
-                        // Only allow digits
-                        const digitsOnly = e.target.value.replace(/\D/g, '');
-                        setQuantity(digitsOnly);
-                        // Clear error when user types
-                        if (quantityError) {
-                          setQuantityError('');
-                        }
-                      }}
-                      onWheel={(e) => {
-                        // Prevent scroll wheel from changing value
-                        e.currentTarget.blur();
-                      }}
-                      onBlur={() => {
-                        // Validate on blur but don't auto-fill
-                        const quantityParsed = parseInt(quantity || '0', 10);
-                        if (isNaN(quantityParsed) || quantityParsed < 1) {
-                          setQuantityError('Debes ingresar una cantidad mayor o igual a 1');
-                        } else {
-                          setQuantityError('');
-                        }
-                      }}
-                      placeholder="Ingresá la cantidad (ej: 20)"
-                      disabled={isLoading}
-                      className={cn('text-lg font-medium', quantityError && 'border-destructive')}
-                      autoFocus
-                    />
-                    <p className="text-xs text-muted-foreground">Solo números. Mínimo: 1</p>
-                    {quantityError && (
-                      <p className="text-xs text-destructive">{quantityError}</p>
-                    )}
-                  </div>
-                  </>
-
-                ) : (
-                  // MANUAL MODE: Show all fields (item selection already done in step 2)
-                  <>
-                    {mode === StockEntryMode.IMEI && (
-                      <div className="space-y-2">
-                        <Label htmlFor="imeis">
-                          IMEIs (uno por línea) <span className="text-muted-foreground">({parsedImeis.length})</span>
-                        </Label>
-                        <Textarea
-                          id="imeis"
-                          placeholder="123456789012345&#10;123456789012346&#10;123456789012347"
-                          value={imeisText}
-                          onChange={(e) => setImeisText(e.target.value)}
-                          rows={8}
-                          disabled={isLoading}
-                          className="font-mono text-sm"
-                        />
-                        {duplicateImeisInText.length > 0 && (
-                          <div className="text-sm text-destructive">
-                            IMEIs duplicados en la lista: {duplicateImeisInText.join(', ')}
-                          </div>
-                        )}
-                        {parsedImeis.length > 0 && duplicateImeisInText.length === 0 && (
-                          <div className="text-sm text-muted-foreground">
-                            {parsedImeis.length} IMEI{parsedImeis.length !== 1 ? 's' : ''} válido{parsedImeis.length !== 1 ? 's' : ''}
-                          </div>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setImeisText('')}
-                          disabled={!imeisText || isLoading}
-                        >
-                          <X className="h-4 w-4 mr-1" />
-                          Limpiar
-                        </Button>
-                      </div>
                     )}
 
                     {mode === StockEntryMode.QUANTITY && (
@@ -1637,9 +1554,13 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                           pattern="[0-9]*"
                           value={quantity}
                           onChange={(e) => {
+                            // Only allow digits
                             const digitsOnly = e.target.value.replace(/\D/g, '');
                             setQuantity(digitsOnly);
-                            setQuantityError('');
+                            // Clear error when user types
+                            if (quantityError) {
+                              setQuantityError('');
+                            }
                           }}
                           onWheel={(e) => {
                             // Prevent scroll wheel from changing value
