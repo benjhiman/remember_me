@@ -27,8 +27,6 @@ import { useBulkAddStock, type BulkStockAddItem } from '@/lib/api/hooks/use-bulk
 import { Loader2, Search, X, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { conditionLabel } from '@/lib/items/condition-label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { parseBulkPaste } from '@/lib/stock/bulk-paste-parser';
 import { batchMatchQueries } from '@/lib/stock/bulk-item-matcher';
 import { parseFile, type ImportRow } from '@/lib/stock/bulk-file-import';
@@ -50,158 +48,114 @@ function BulkRowItemPicker({
   onUpdate: (updates: Partial<BulkRow>) => void;
   isLoading: boolean;
 }) {
-  const [rowSearchQuery, setRowSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     items: rowItems,
     isLoading: rowItemsLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
   } = useItemSearchFlattened({
-    q: rowSearchQuery || '', // Always send empty string if no query (to get initial items)
-    limit: 50, // Increased to show more items initially
-    enabled: row.isOpen || false,
+    q: searchQuery || '',
+    limit: 50,
+    enabled: true, // Always enabled to show items on open
   });
 
   const selectedItem = rowItems.find((i) => i.id === row.itemId);
+  
+  // Filter items client-side for typeahead search
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return rowItems.slice(0, 50); // Show first 50 when no search
+    }
+    const queryLower = searchQuery.toLowerCase();
+    return rowItems.filter((item) => {
+      const displayLabel =
+        item.model && item.storageGb && item.color && item.condition
+          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+          : item.name || 'Item sin nombre';
+      return (
+        displayLabel.toLowerCase().includes(queryLower) ||
+        item.sku?.toLowerCase().includes(queryLower) ||
+        item.brand?.toLowerCase().includes(queryLower) ||
+        item.model?.toLowerCase().includes(queryLower)
+      );
+    });
+  }, [rowItems, searchQuery]);
+
+  const handleValueChange = (value: string) => {
+    if (value) {
+      const item = rowItems.find((i) => i.id === value);
+      if (item) {
+        onSelect(value, item);
+        setSearchQuery('');
+      }
+    }
+  };
 
   return (
-    <div className="col-span-6 min-h-[64px] flex flex-col justify-start">
-      <div className="flex-1">
-        <Popover
-          open={row.isOpen}
-          onOpenChange={(open) => {
-            onUpdate({ isOpen: open });
-            if (!open) {
-              setRowSearchQuery('');
-            }
-          }}
-          modal={false}
-        >
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={row.isOpen}
-              className={cn(
-                'w-full h-10 justify-between text-sm font-normal',
-                !row.itemId && 'text-muted-foreground',
-                row.isOpen && 'ring-2 ring-ring ring-offset-2'
-              )}
-              disabled={isLoading}
-            >
+    <div className="flex-1 min-h-[64px] flex flex-col justify-start">
+      <Select
+        value={row.itemId || undefined}
+        onValueChange={handleValueChange}
+        disabled={isLoading}
+      >
+        <SelectTrigger className={cn(
+          'w-full h-10 text-sm font-normal',
+          !row.itemId && 'text-muted-foreground'
+        )}>
+          <SelectValue placeholder="Buscar modelo...">
+            {selectedItem ? (
               <span className="truncate text-left">
-                {row.itemSearch || 'Buscar modelo...'}
+                {selectedItem.model && selectedItem.storageGb && selectedItem.color && selectedItem.condition
+                  ? `${selectedItem.brand || 'N/A'} ${selectedItem.model} ${selectedItem.storageGb}GB - ${selectedItem.color} - ${conditionLabel(selectedItem.condition)}`
+                  : selectedItem.name || 'Item sin nombre'}
               </span>
-              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent 
-            className="w-[520px] max-w-[calc(100vw-3rem)] p-0 pointer-events-auto" 
-            side="bottom"
-            align="start"
-            sideOffset={4}
-            collisionPadding={8}
-            avoidCollisions={true}
-            onInteractOutside={(e) => {
-              // Prevent dialog overlay from intercepting clicks
-              const target = e.target as HTMLElement;
-              const dialogOverlay = target.closest('[data-radix-dialog-overlay]');
-              if (dialogOverlay) {
-                e.preventDefault();
-              }
-            }}
-            onEscapeKeyDown={() => {
-              onUpdate({ isOpen: false });
-            }}
-            onPointerDownOutside={(e) => {
-              // Close if clicking outside popover (but not on dialog overlay)
-              const target = e.target as HTMLElement;
-              const dialogOverlay = target.closest('[data-radix-dialog-overlay]');
-              if (!dialogOverlay) {
-                onUpdate({ isOpen: false });
-              } else {
-                // Prevent dialog from closing when clicking overlay
-                e.preventDefault();
-              }
-            }}
-          >
-            <Command shouldFilter={false} className="pointer-events-auto">
-              <CommandInput
-                placeholder="Buscar modelo, SKU, marca..."
-                value={rowSearchQuery}
-                onValueChange={(value) => {
-                  setRowSearchQuery(value);
-                }}
-              />
-              <CommandList className="max-h-[300px] overflow-y-auto pointer-events-auto">
-                {rowItemsLoading && rowItems.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
-                    Cargando items...
-                  </div>
-                ) : rowItems.length === 0 ? (
-                  <CommandEmpty>
-                    {rowSearchQuery ? 'No se encontraron items' : 'No hay items disponibles'}
-                  </CommandEmpty>
-                ) : (
-                  <CommandGroup className="pointer-events-auto">
-                    {rowItems.map((item) => {
-                      const displayLabel =
-                        item.model && item.storageGb && item.color && item.condition
-                          ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
-                          : item.name || 'Item sin nombre';
-                      return (
-                        <CommandItem
-                          key={item.id}
-                          value={item.id}
-                          onSelect={() => {
-                            onSelect(item.id, item);
-                            onUpdate({ isOpen: false }); // Close popover after selection
-                            setRowSearchQuery(''); // Clear search
-                          }}
-                          className="cursor-pointer min-h-[40px] flex items-center pointer-events-auto"
-                        >
-                          <div className="flex flex-col w-full pointer-events-none">
-                            <span className="font-medium truncate">{displayLabel}</span>
-                            {item.sku && (
-                              <span className="text-xs text-muted-foreground truncate">
-                                SKU: {item.sku}
-                              </span>
-                            )}
-                          </div>
-                        </CommandItem>
-                      );
-                    })}
-                    {hasNextPage && (
-                      <div className="px-2 py-1.5 text-center pointer-events-auto">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => fetchNextPage()}
-                          disabled={isFetchingNextPage}
-                          className="w-full pointer-events-auto"
-                        >
-                          {isFetchingNextPage ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Cargando más...
-                            </>
-                          ) : (
-                            'Cargar más items'
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                  </CommandGroup>
-                )}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
+            ) : (
+              'Buscar modelo...'
+            )}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="w-[520px] max-w-[calc(100vw-3rem)] max-h-[300px]">
+          <div className="p-2 border-b">
+            <Input
+              placeholder="Buscar modelo, SKU, marca..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="max-h-[250px] overflow-y-auto">
+            {rowItemsLoading && filteredItems.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                Cargando items...
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                {searchQuery ? 'No se encontraron items' : 'No hay items disponibles'}
+              </div>
+            ) : (
+              filteredItems.map((item) => {
+                const displayLabel =
+                  item.model && item.storageGb && item.color && item.condition
+                    ? `${item.brand || 'N/A'} ${item.model} ${item.storageGb}GB - ${item.color} - ${conditionLabel(item.condition)}`
+                    : item.name || 'Item sin nombre';
+                return (
+                  <SelectItem key={item.id} value={item.id} className="cursor-pointer">
+                    <div className="flex flex-col w-full">
+                      <span className="font-medium truncate">{displayLabel}</span>
+                      {item.sku && (
+                        <span className="text-xs text-muted-foreground truncate">
+                          SKU: {item.sku}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                );
+              })
+            )}
+          </div>
+        </SelectContent>
+      </Select>
       {selectedItem && (
         <div className="text-xs text-muted-foreground mt-1 truncate">
           {selectedItem.sku && `SKU: ${selectedItem.sku}`}
@@ -963,7 +917,7 @@ export function AddStockItemDialog({ open, onOpenChange }: AddStockItemDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[calc(90vh-180px)] overflow-y-auto" style={{ isolation: 'isolate' }}>
+        <div className="max-h-[calc(90vh-180px)] overflow-y-auto">
           <form onSubmit={handleSubmit}>
             <div className="space-y-6 py-4">
             {/* Step 1: Mode Selection */}
