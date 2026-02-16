@@ -637,90 +637,68 @@ export class StockService {
         });
 
         const reservedQty = activeReservations.reduce((sum, r) => sum + r.quantity, 0);
-        const availableQty = totalQty - reservedQty;
+        // Calculate available quantity
+        // IMPORTANT: If totalQty is negative (auto-created stock for deficit), it already represents the deficit
+        // In this case, we should NOT subtract reservedQty again because it would double-count
+        // Rule: 
+        // - If totalQty >= 0: availableQty = totalQty - reservedQty (normal case)
+        // - If totalQty < 0: availableQty = totalQty (negative stock already accounts for the deficit)
+        const availableQty = totalQty < 0 ? totalQty : totalQty - reservedQty;
 
-        // If not enough stock available, create/adjust stock with negative quantity
+        // Determine if we need to create/adjust stock for negative quantity
+        // Only create/adjust stock if there's no stock at all (totalQty = 0)
+        // If stock exists but is insufficient, don't modify it - let the reservation handle it
         let stockItemForMovement = stockItems.length > 0 ? stockItems[0] : null;
         let finalTotalQty = totalQty;
+        let needsStockCreation = false;
 
-        if (availableQty < dto.quantity) {
-          // Calculate the deficit: how much more stock we need beyond what's available
-          // If availableQty is already negative, we just need to subtract the reservation quantity
-          // If availableQty is positive but insufficient, we need (dto.quantity - availableQty)
-          // But we should simply subtract dto.quantity from current totalQty to get the new total
-          const newTotalQty = totalQty - dto.quantity;
+        // Only create/adjust stock if there's absolutely no stock items
+        // AND we're trying to reserve more than available
+        if (stockItems.length === 0 && availableQty < dto.quantity) {
+          needsStockCreation = true;
+          const costPrice = new Decimal(0);
+          const basePrice = new Decimal(0);
 
-          // If no stock items exist, create one with negative quantity
-          if (stockItems.length === 0) {
-            const costPrice = new Decimal(0);
-            const basePrice = new Decimal(0);
-
-            stockItemForMovement = await tx.stockItem.create({
-              data: {
-                organizationId,
-                itemId: dto.itemId,
-                model: item.model || item.name || 'N/A',
-                storage: item.storageGb ? String(item.storageGb) : null,
-                color: item.color || null,
-                condition: item.condition || 'NEW',
-                imei: null, // No IMEI for quantity-based stock
-                quantity: newTotalQty, // This will be negative if dto.quantity > 0
-                costPrice,
-                basePrice,
-                status: StockStatus.AVAILABLE,
-                location: null,
-                notes: `Stock creado automáticamente por reserva (pendiente de compra)`,
-                metadata: {
-                  autoCreated: true,
-                  reservationQuantity: dto.quantity,
-                },
-              } as any,
-            });
-
-            // Create movement (IN type) with negative quantity
-            await this.createMovement(
-              tx,
+          // Create stock with negative quantity equal to the reservation quantity
+          // This indicates we need to purchase this amount
+          stockItemForMovement = await tx.stockItem.create({
+            data: {
               organizationId,
-              stockItemForMovement.id,
-              StockMovementType.IN,
-              0,
-              newTotalQty, // Negative quantity
-              userId,
-              `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${dto.quantity} unidades)`,
-              undefined,
-              undefined,
-              { autoCreated: true, reservationQuantity: dto.quantity },
-            );
+              itemId: dto.itemId,
+              model: item.model || item.name || 'N/A',
+              storage: item.storageGb ? String(item.storageGb) : null,
+              color: item.color || null,
+              condition: item.condition || 'NEW',
+              imei: null, // No IMEI for quantity-based stock
+              quantity: -dto.quantity, // Negative quantity = amount to purchase
+              costPrice,
+              basePrice,
+              status: StockStatus.AVAILABLE,
+              location: null,
+              notes: `Stock creado automáticamente por reserva (pendiente de compra)`,
+              metadata: {
+                autoCreated: true,
+                reservationQuantity: dto.quantity,
+              },
+            } as any,
+          });
 
-            finalTotalQty = newTotalQty;
-          } else {
-            // If stock items exist but insufficient, adjust the first one
-            const firstStockItem = stockItems[0];
-            const quantityChange = -dto.quantity; // Always subtract the reservation quantity
-            const newQuantity = firstStockItem.quantity + quantityChange;
+          // Create movement (IN type) with negative quantity
+          await this.createMovement(
+            tx,
+            organizationId,
+            stockItemForMovement.id,
+            StockMovementType.IN,
+            0,
+            -dto.quantity, // Negative quantity
+            userId,
+            `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${dto.quantity} unidades)`,
+            undefined,
+            undefined,
+            { autoCreated: true, reservationQuantity: dto.quantity },
+          );
 
-            stockItemForMovement = await tx.stockItem.update({
-              where: { id: firstStockItem.id },
-              data: { quantity: newQuantity },
-            });
-
-            // Create movement (ADJUST type) to reflect the adjustment
-            await this.createMovement(
-              tx,
-              organizationId,
-              stockItemForMovement.id,
-              StockMovementType.ADJUST,
-              firstStockItem.quantity,
-              newQuantity,
-              userId,
-              `Ajuste automático por reserva sin stock suficiente (reserva: ${dto.quantity} unidades, pendiente de compra)`,
-              undefined,
-              undefined,
-              { autoAdjusted: true, reservationQuantity: dto.quantity },
-            );
-
-            finalTotalQty = newQuantity;
-          }
+          finalTotalQty = -dto.quantity;
         }
 
         // Create reservation (always allow, even if stock is negative)
@@ -738,8 +716,12 @@ export class StockService {
           },
         });
 
-        // Create a general movement record for the reservation
-        if (stockItemForMovement) {
+        // Create movement record for the reservation
+        // Only create if we have a stock item to reference
+        // If we just created stock, use that; otherwise use existing first stock item
+        // IMPORTANT: Only create RESERVE movement if we didn't just create stock (to avoid duplicate movements)
+        // If we created stock, the IN movement already represents the reservation impact
+        if (stockItemForMovement && !needsStockCreation) {
           await this.createMovement(
             tx,
             organizationId,
@@ -752,6 +734,29 @@ export class StockService {
             reservation.id,
             dto.saleId,
           );
+        } else if (stockItemForMovement && needsStockCreation) {
+          // If we created stock, link the reservation to the IN movement we just created
+          // Find the most recent IN movement for this stock item (the one we just created)
+          const recentInMovement = await tx.stockMovement.findFirst({
+            where: {
+              organizationId,
+              stockItemId: stockItemForMovement.id,
+              type: StockMovementType.IN,
+              reservationId: null, // Only update if not already linked
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (recentInMovement) {
+            // Update the IN movement to include the reservation ID
+            await tx.stockMovement.update({
+              where: { id: recentInMovement.id },
+              data: {
+                reservationId: reservation.id,
+                reason: `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${dto.quantity} unidades) - Reserva: ${dto.customerName || 'N/A'}`,
+              },
+            });
+          }
         }
 
         return reservation;
@@ -1897,7 +1902,13 @@ export class StockService {
         });
 
         const reservedQty = activeReservations.reduce((sum, r) => sum + r.quantity, 0);
-        const availableQty = totalQty - reservedQty;
+        // Calculate available quantity
+        // IMPORTANT: If totalQty is negative (auto-created stock for deficit), it already represents the deficit
+        // In this case, we should NOT subtract reservedQty again because it would double-count
+        // Rule: 
+        // - If totalQty >= 0: availableQty = totalQty - reservedQty (normal case)
+        // - If totalQty < 0: availableQty = totalQty (negative stock already accounts for the deficit)
+        const availableQty = totalQty < 0 ? totalQty : totalQty - reservedQty;
 
         // Get last IN movement date
         const lastInMovement = await this.prisma.stockMovement.findFirst({
