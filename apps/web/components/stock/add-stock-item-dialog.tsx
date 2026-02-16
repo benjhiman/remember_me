@@ -95,9 +95,12 @@ function BulkRowItemPicker({
             </Button>
           </PopoverTrigger>
           <PopoverContent 
-            className="w-[520px] max-w-[calc(100vw-3rem)] p-0 pointer-events-auto" 
+            className="w-[520px] max-w-[calc(100vw-3rem)] p-0" 
             align="start"
-            style={{ pointerEvents: 'auto', zIndex: 99999 }}
+            onInteractOutside={(e) => {
+              // Prevent dialog from intercepting clicks on popover
+              e.preventDefault();
+            }}
           >
             <Command shouldFilter={false}>
               <CommandInput
