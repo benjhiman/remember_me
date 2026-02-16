@@ -359,39 +359,6 @@ export function AddStockItemDialog({ open, onOpenChange, initialItemId, variant 
     return duplicates;
   }, [parsedImeis]);
 
-  // Reset form when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setStep(1);
-      setMode('');
-      setItemSearch('');
-      setSelectedItemId('');
-      setImeisText('');
-      setQuantity('');
-      setQuantityError('');
-      setCondition('NEW');
-      setStatus('AVAILABLE');
-      setCost('');
-      setLocation('');
-      setNotes('');
-      setBulkNote('');
-      setBulkRows([
-        { id: '1', itemId: '', itemSearch: '', quantity: '', isOpen: false },
-        { id: '2', itemId: '', itemSearch: '', quantity: '', isOpen: false },
-      ]);
-      setPasteOpen(false);
-      setPasteText('');
-      setPasteSummary(null);
-      setPasteProcessing(false);
-      setPasteProgress({ current: 0, total: 0 });
-      setImportOpen(false);
-      setImportFile(null);
-      setImportPreview([]);
-      setImportSummary(null);
-      setImportProcessing(false);
-      setImportProgress({ current: 0, total: 0 });
-    }
-  }, [open]);
 
   const handleNext = (e?: React.MouseEvent) => {
     e?.preventDefault();
