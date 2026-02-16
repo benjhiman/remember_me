@@ -229,10 +229,29 @@ export function AddStockItemDialog({ open, onOpenChange, initialItemId, variant 
   const isQuickMode = variant === 'quick' && !!initialItemId;
   
   // Initialize with quick mode if initialItemId is provided
-  const [step, setStep] = useState<Step>(isQuickMode ? 3 : 1);
-  const [mode, setMode] = useState<EntryMode | ''>(isQuickMode ? StockEntryMode.QUANTITY : '');
+  const [step, setStep] = useState<Step>(1);
+  const [mode, setMode] = useState<EntryMode | ''>('');
   const [itemSearch, setItemSearch] = useState('');
-  const [selectedItemId, setSelectedItemId] = useState<string>(initialItemId || '');
+  const [selectedItemId, setSelectedItemId] = useState<string>('');
+  
+  // Reset and setup quick mode when dialog opens or initialItemId changes
+  useEffect(() => {
+    if (open) {
+      if (isQuickMode && initialItemId) {
+        setStep(3);
+        setMode(StockEntryMode.QUANTITY);
+        setSelectedItemId(initialItemId);
+        setQuantity('');
+        setQuantityError('');
+      } else {
+        setStep(1);
+        setMode('');
+        setSelectedItemId('');
+        setQuantity('');
+        setQuantityError('');
+      }
+    }
+  }, [open, isQuickMode, initialItemId]);
   const [imeisText, setImeisText] = useState('');
   const [quantity, setQuantity] = useState<string>('');
   const [quantityError, setQuantityError] = useState<string>('');
@@ -1688,7 +1707,7 @@ SELLADO 16 128 TEAL (ACTIVADO) 5`}
                   <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
                     Cancelar
                   </Button>
-                  {step < 3 ? (
+                  {step < 3 && !isQuickMode ? (
                     <Button 
                       type="button" 
                       onClick={handleNext} 
