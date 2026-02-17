@@ -405,28 +405,51 @@ export class ItemsService {
   async listFolders(organizationId: string, userId: string) {
     await this.verifyMembership(organizationId, userId);
 
-    // Get all folders for this organization
-    const folders = await this.prisma.folder.findMany({
-      where: { organizationId },
-      include: {
-        _count: {
-          select: { items: true },
+    try {
+      // Get all folders for this organization
+      const folders = await this.prisma.folder.findMany({
+        where: { organizationId },
+        include: {
+          _count: {
+            select: { items: true },
+          },
         },
-      },
-      orderBy: { name: 'asc' },
-    });
+        orderBy: { name: 'asc' },
+      });
 
-    // Return folders with item count
-    return {
-      data: folders.map((folder) => ({
-        id: folder.id,
-        name: folder.name,
-        description: folder.description,
-        count: folder._count.items,
-        createdAt: folder.createdAt,
-        updatedAt: folder.updatedAt,
-      })),
-    };
+      // Log for debugging (only in non-production or when folders count is interesting)
+      if (process.env.NODE_ENV !== 'production' || folders.length > 0) {
+        console.log(`[ItemsService.listFolders] Found ${folders.length} folders for orgId: ${organizationId}`);
+      }
+
+      // Return folders with item count - ALWAYS return 200 with array (never 404)
+      return {
+        data: folders.map((folder) => ({
+          id: folder.id,
+          name: folder.name,
+          description: folder.description,
+          count: folder._count.items,
+          createdAt: folder.createdAt,
+          updatedAt: folder.updatedAt,
+        })),
+      };
+    } catch (error: any) {
+      // Handle Prisma errors (e.g., table doesn't exist = migration not applied)
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.error(`[ItemsService.listFolders] CRITICAL: Folder table does not exist. Migration not applied.`, {
+          organizationId,
+          error: error.message,
+        });
+        throw new Error('Folders table missing. Migration not applied in production. Please contact support.');
+      }
+
+      // Log other errors
+      console.error(`[ItemsService.listFolders] Error fetching folders for orgId: ${organizationId}`, {
+        error: error.message,
+        code: error.code,
+      });
+      throw error;
+    }
   }
 
   async createFolder(organizationId: string, userId: string, dto: { name: string; description?: string }) {

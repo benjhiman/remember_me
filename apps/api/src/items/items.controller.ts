@@ -37,6 +37,15 @@ export class ItemsController {
     return this.itemsService.listItems(organizationId, user.userId, query);
   }
 
+  // Folders endpoints - MUST be before @Get(':id') to avoid route collision
+  @Get('folders')
+  async listFolders(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.itemsService.listFolders(organizationId, user.userId);
+  }
+
   @Get(':id')
   async getItem(
     @CurrentOrganization() organizationId: string,
@@ -81,15 +90,7 @@ export class ItemsController {
     return this.itemsService.deleteItem(organizationId, user.userId, id);
   }
 
-  // Folders endpoints
-  @Get('folders')
-  async listFolders(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-  ) {
-    return this.itemsService.listFolders(organizationId, user.userId);
-  }
-
+  // Folders endpoints (POST and DELETE - GET is above)
   @Post('folders')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
