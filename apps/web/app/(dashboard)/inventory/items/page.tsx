@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useItems } from '@/lib/api/hooks/use-items';
-import { useItemFolders, useUnpinFolder } from '@/lib/api/hooks/use-item-folders';
+import { useItemFolders, useDeleteFolder } from '@/lib/api/hooks/use-item-folders';
 import { usePermissions } from '@/lib/auth/use-permissions';
 import { useDeleteItem } from '@/lib/api/hooks/use-item-mutations';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
-import { Plus, Search, Edit, Trash2, RefreshCw, Hash, Folder, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, RefreshCw, Hash, Folder, ArrowLeft, List, Grid } from 'lucide-react';
 import { conditionLabel } from '@/lib/items/condition-label';
 import { ItemFormDialog } from '@/components/items/item-form-dialog';
 import { ItemsFoldersGrid } from '@/components/items/items-folders-grid';
@@ -52,15 +52,22 @@ export default function InventoryItemsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('itemsViewMode');
+      return (saved === 'list' || saved === 'grid') ? saved : 'grid';
+    }
+    return 'grid';
+  });
 
-  // Get prefix from URL params
-  const prefix = searchParams.get('prefix')?.toUpperCase() ?? null;
+  // Get folderId from URL params
+  const folderId = searchParams.get('folderId') ?? null;
 
   const deleteItem = useDeleteItem();
-  const unpinFolder = useUnpinFolder();
+  const deleteFolder = useDeleteFolder();
 
-  // Fetch folders (only when not in prefix mode)
-  const { data: foldersData, isLoading: isLoadingFolders } = useItemFolders(!prefix && !!user);
+  // Fetch folders (only when not in folder mode)
+  const { data: foldersData, isLoading: isLoadingFolders } = useItemFolders(!folderId && !!user);
 
   // Debounce search
   useEffect(() => {
@@ -71,20 +78,17 @@ export default function InventoryItemsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Build query for items: if prefix exists, use it as search (backend will handle startsWith)
+  // Build query for items: if folderId exists, filter by folder
   const itemsQuery = useMemo(() => {
-    if (prefix) {
-      // When in prefix mode, search by prefix (backend should handle startsWith for SKU)
-      return prefix;
-    }
     return debouncedSearch || undefined;
-  }, [prefix, debouncedSearch]);
+  }, [debouncedSearch]);
 
   const { data, isLoading, error, refetch } = useItems({
     page,
     limit: 20,
     q: itemsQuery,
-    enabled: !!user && !!prefix, // Only fetch items when in prefix mode
+    folderId: folderId || undefined,
+    enabled: !!user && !!folderId, // Only fetch items when in folder mode
   });
 
   useEffect(() => {
@@ -111,7 +115,7 @@ export default function InventoryItemsPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      if (prefix) {
+      if (folderId) {
         await queryClient.invalidateQueries({ queryKey: ['items'] });
         await refetch();
       } else {
@@ -132,8 +136,15 @@ export default function InventoryItemsPage() {
     }
   };
 
-  const handleOpenFolder = (folderPrefix: string) => {
-    router.push(`/inventory/items?prefix=${encodeURIComponent(folderPrefix)}`);
+  const handleOpenFolder = (folderId: string) => {
+    router.push(`/inventory/items?folderId=${encodeURIComponent(folderId)}`);
+  };
+
+  const handleViewModeChange = (mode: 'list' | 'grid') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('itemsViewMode', mode);
+    }
   };
 
   const handleBackToFolders = () => {
@@ -160,7 +171,7 @@ export default function InventoryItemsPage() {
     setIsCreateFolderOpen(true);
   };
 
-  const handleUnpinFolder = (folderPrefix: string) => {
+  const handleDeleteFolder = (folderId: string) => {
     const canWrite =
       can('stock.write') ||
       can('inventory.write') ||
@@ -170,11 +181,11 @@ export default function InventoryItemsPage() {
       toast({
         variant: 'destructive',
         title: 'Sin permisos',
-        description: 'No tenés permiso para desanclar carpetas. Pedile a un admin que te habilite.',
+        description: 'No tenés permiso para eliminar carpetas. Pedile a un admin que te habilite.',
       });
       return;
     }
-    unpinFolder.mutate(folderPrefix);
+    deleteFolder.mutate(folderId);
   };
 
   // Filter folders by search (when in folders mode)
@@ -182,8 +193,14 @@ export default function InventoryItemsPage() {
     if (!foldersData?.data) return [];
     if (!search.trim()) return foldersData.data;
     const searchLower = search.toLowerCase();
-    return foldersData.data.filter((folder) => folder.prefix.toLowerCase().includes(searchLower));
+    return foldersData.data.filter((folder) => folder.name.toLowerCase().includes(searchLower));
   }, [foldersData, search]);
+
+  // Get folder name for breadcrumb
+  const currentFolder = useMemo(() => {
+    if (!folderId || !foldersData?.data) return null;
+    return foldersData.data.find((f) => f.id === folderId);
+  }, [folderId, foldersData]);
 
   const handleDelete = async () => {
     if (!deletingItem) return;
@@ -293,12 +310,12 @@ export default function InventoryItemsPage() {
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory/stock' },
     { label: 'Items', href: '/inventory/items' },
-    ...(prefix ? [{ label: `Carpeta: ${prefix}`, href: `/inventory/items?prefix=${prefix}` }] : []),
+    ...(currentFolder ? [{ label: currentFolder.name, href: `/inventory/items?folderId=${folderId}` }] : []),
   ];
 
   const actions = (
     <div className="flex items-center gap-2">
-      {prefix && (
+      {folderId && (
         <Button size="sm" variant="outline" onClick={handleBackToFolders}>
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Volver a carpetas
@@ -313,13 +330,33 @@ export default function InventoryItemsPage() {
         <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
         Actualizar
       </Button>
-      {!prefix && (
-        <Button size="sm" variant="outline" onClick={handleOpenCreateFolder}>
-          <Folder className="h-4 w-4 mr-1.5" />
-          Nueva carpeta
-        </Button>
+      {!folderId && (
+        <>
+          <Button size="sm" variant="outline" onClick={handleOpenCreateFolder}>
+            <Folder className="h-4 w-4 mr-1.5" />
+            Nueva carpeta
+          </Button>
+          <div className="flex items-center gap-1 border rounded-md p-1">
+            <Button
+              size="sm"
+              variant={viewMode === 'grid' ? 'default' : 'ghost'}
+              onClick={() => handleViewModeChange('grid')}
+              className="h-8 px-2"
+            >
+              <Grid className="h-4 w-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              onClick={() => handleViewModeChange('list')}
+              className="h-8 px-2"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </>
       )}
-      {selectedIds.size > 0 && prefix && (
+      {selectedIds.size > 0 && folderId && (
         <Button
           size="sm"
           variant="destructive"
@@ -344,9 +381,9 @@ export default function InventoryItemsPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder={
-              prefix
+              folderId
                 ? 'Buscar por nombre, SKU, categoría o marca...'
-                : 'Buscar carpetas por prefijo...'
+                : 'Buscar carpetas por nombre...'
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -354,16 +391,16 @@ export default function InventoryItemsPage() {
           />
         </div>
       </div>
-      {prefix && (
+      {currentFolder && (
         <Badge variant="secondary" className="text-sm">
-          Carpeta: {prefix}
+          Carpeta: {currentFolder.name}
         </Badge>
       )}
     </div>
   );
 
-  // Render folders view (when no prefix)
-  if (!prefix) {
+  // Render folders view (when no folderId)
+  if (!folderId) {
     return (
       <>
         <PageShell
@@ -388,13 +425,13 @@ export default function InventoryItemsPage() {
                 <h3 className="text-sm font-semibold text-gray-900 mb-1">No hay carpetas</h3>
                 <p className="text-xs text-gray-600 mb-4">
                   {search.trim()
-                    ? 'No se encontraron carpetas con ese prefijo.'
-                    : 'No hay items con SKU para mostrar carpetas. Creá items para que aparezcan automáticamente.'}
+                    ? 'No se encontraron carpetas con ese nombre.'
+                    : 'Creá una carpeta para organizar tus items.'}
                 </p>
                 {!search.trim() && (
-                  <Button onClick={handleOpenCreate} size="sm">
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Crear nuevo item
+                  <Button onClick={handleOpenCreateFolder} size="sm">
+                    <Folder className="h-4 w-4 mr-1.5" />
+                    Crear carpeta
                   </Button>
                 )}
               </div>
@@ -405,12 +442,13 @@ export default function InventoryItemsPage() {
             <ItemsFoldersGrid
               folders={filteredFolders}
               onOpen={handleOpenFolder}
-              onUnpin={handleUnpinFolder}
-              canUnpin={
+              onDelete={handleDeleteFolder}
+              canDelete={
                 can('stock.write') ||
                 can('inventory.write') ||
                 ['OWNER', 'ADMIN', 'MANAGER'].includes(user?.role ?? '')
               }
+              viewMode={viewMode}
             />
           )}
         </PageShell>
@@ -423,6 +461,7 @@ export default function InventoryItemsPage() {
               queryClient.invalidateQueries({ queryKey: ['item-folders'] });
             }
           }}
+          folderId={folderId}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['item-folders'] });
             queryClient.invalidateQueries({ queryKey: ['items'] });
@@ -432,7 +471,7 @@ export default function InventoryItemsPage() {
     );
   }
 
-  // Render table view (when prefix exists)
+  // Render table view (when folderId exists)
   return (
     <>
       <PageShell
@@ -613,11 +652,23 @@ export default function InventoryItemsPage() {
         )}
       </PageShell>
 
-      <ItemFormDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+      <ItemFormDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        folderId={folderId}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['items'] });
+          queryClient.invalidateQueries({ queryKey: ['item-folders'] });
+        }}
+      />
       <ItemFormDialog
         open={!!editingItem}
         onOpenChange={(open) => !open && setEditingItem(null)}
         item={editingItem}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['items'] });
+          queryClient.invalidateQueries({ queryKey: ['item-folders'] });
+        }}
       />
 
       <AlertDialog open={!!deletingItem} onOpenChange={(open) => !open && setDeletingItem(null)}>

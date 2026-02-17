@@ -3,9 +3,12 @@ import { api } from '../auth-client';
 import { useToast } from '@/components/ui/use-toast';
 
 export interface ItemFolder {
-  prefix: string;
+  id: string;
+  name: string;
+  description?: string | null;
   count: number;
-  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ItemFoldersResponse {
@@ -22,13 +25,13 @@ export function useItemFolders(enabled: boolean = true) {
   });
 }
 
-export function usePinFolder() {
+export function useCreateFolder() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (prefix: string) =>
-      api.post<ItemFolder>('/items/folders', { prefix: prefix.toUpperCase().trim() }),
+    mutationFn: (data: { name: string; description?: string }) =>
+      api.post<ItemFolder>('/items/folders', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['item-folders'] });
       toast({
@@ -48,12 +51,12 @@ export function usePinFolder() {
   });
 }
 
-export function useUnpinFolder() {
+export function useDeleteFolder() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: (prefix: string) => api.delete(`/items/folders/${encodeURIComponent(prefix.toUpperCase().trim())}`),
+    mutationFn: (folderId: string) => api.delete(`/items/folders/${folderId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['item-folders'] });
       toast({
@@ -72,3 +75,7 @@ export function useUnpinFolder() {
     },
   });
 }
+
+// Legacy exports for backward compatibility
+export const usePinFolder = useCreateFolder;
+export const useUnpinFolder = useDeleteFolder;

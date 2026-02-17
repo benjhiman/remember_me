@@ -22,12 +22,14 @@ import {
 import { Label } from '@/components/ui/label';
 import { useCreateItem, useUpdateItem, type CreateItemDto, type UpdateItemDto } from '@/lib/api/hooks/use-item-mutations';
 import type { Item } from '@/lib/api/hooks/use-items';
+import { useItemFolders } from '@/lib/api/hooks/use-item-folders';
 import { Loader2 } from 'lucide-react';
 
 interface ItemFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: Item | null;
+  folderId?: string | null; // If provided, item will be assigned to this folder (from context)
   onSuccess?: () => void;
 }
 
@@ -38,9 +40,10 @@ const CONDITION_OPTIONS = [
   { value: 'OEM', label: 'OEM' },
 ];
 
-export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemFormDialogProps) {
+export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }: ItemFormDialogProps) {
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
+  const { data: foldersData } = useItemFolders(!folderId && open); // Only fetch folders if not in folder context
   const [formData, setFormData] = useState<CreateItemDto | UpdateItemDto>({
     brand: '',
     model: '',
@@ -51,7 +54,9 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
     category: '',
     description: '',
     isActive: true,
+    folderId: folderId || undefined,
   });
+  const [folderError, setFolderError] = useState('');
 
   useEffect(() => {
     if (item) {
@@ -78,9 +83,11 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
         category: '',
         description: '',
         isActive: true,
+        folderId: folderId || undefined,
       });
+      setFolderError('');
     }
-  }, [item, open]);
+  }, [item, open, folderId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +100,14 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
       if (!formData.storageGb || formData.storageGb < 1) return;
       if (!formData.condition) return;
       if (!formData.color?.trim() || formData.color.length < 2) return;
+      
+      // FolderId is required when creating from root (not inside a folder)
+      const createData = formData as CreateItemDto;
+      if (!folderId && !createData.folderId) {
+        setFolderError('Debés seleccionar una carpeta');
+        return;
+      }
+      setFolderError('');
     } else {
       // Update mode: at least one field
       if (!formData.brand?.trim() && !formData.model?.trim() && !formData.color?.trim()) return;
@@ -102,7 +117,12 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
       if (item) {
         await updateItem.mutateAsync({ id: item.id, dto: formData as UpdateItemDto });
       } else {
-        await createItem.mutateAsync(formData as CreateItemDto);
+        const createData = formData as CreateItemDto;
+        // Ensure folderId is set (from context or form)
+        await createItem.mutateAsync({
+          ...createData,
+          folderId: folderId || createData.folderId,
+        });
       }
       onOpenChange(false);
       if (onSuccess) {
@@ -126,7 +146,8 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
         formData.storageGb >= 1 &&
         formData.condition &&
         formData.color?.trim() &&
-        formData.color.length >= 2
+        formData.color.length >= 2 &&
+        (folderId || (formData as CreateItemDto).folderId) // FolderId is required
       );
 
   return (
@@ -261,6 +282,59 @@ export function ItemFormDialog({ open, onOpenChange, item, onSuccess }: ItemForm
                 placeholder="Descripción adicional del item..."
               />
             </div>
+
+            {/* Folder selection - only show when creating from root (not inside a folder) */}
+            {!item && !folderId && (
+              <div className="space-y-2">
+                <Label htmlFor="folderId">
+                  Carpeta * <span className="text-muted-foreground">(obligatorio)</span>
+                </Label>
+                <Select
+                  value={(formData as CreateItemDto).folderId || ''}
+                  onValueChange={(v) => {
+                    setFormData({ ...formData, folderId: v } as CreateItemDto);
+                    setFolderError('');
+                  }}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="folderId">
+                    <SelectValue placeholder="Seleccioná una carpeta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {foldersData?.data && foldersData.data.length > 0 ? (
+                      foldersData.data.map((folder) => (
+                        <SelectItem key={folder.id} value={folder.id}>
+                          {folder.name} ({folder.count} {folder.count === 1 ? 'item' : 'items'})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value="" disabled>
+                        No hay carpetas disponibles
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {folderError && <p className="text-sm text-destructive">{folderError}</p>}
+                <p className="text-xs text-muted-foreground">
+                  El item se asignará a la carpeta seleccionada. Si no hay carpetas, creá una primero.
+                </p>
+              </div>
+            )}
+
+            {/* Show folder name when inside a folder (read-only) */}
+            {!item && folderId && foldersData?.data && (
+              <div className="space-y-2">
+                <Label>Carpeta</Label>
+                <Input
+                  value={foldersData.data.find((f) => f.id === folderId)?.name || 'Cargando...'}
+                  disabled
+                  className="bg-gray-50"
+                />
+                <p className="text-xs text-muted-foreground">
+                  El item se asignará automáticamente a esta carpeta.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>

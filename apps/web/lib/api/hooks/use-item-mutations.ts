@@ -15,6 +15,7 @@ export interface CreateItemDto {
   description?: string;
   attributes?: Record<string, any>;
   isActive?: boolean;
+  folderId?: string; // Required when creating from root, optional when inside folder
 }
 
 export interface UpdateItemDto {

@@ -52,4 +52,8 @@ export class CreateItemDto {
   @IsInt()
   @IsOptional()
   seedVersion?: number;
+
+  @IsString()
+  @IsOptional()
+  folderId?: string; // Folder ID - required when creating from root, optional when inside folder
 }

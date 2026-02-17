@@ -79,6 +79,7 @@ model Organization {
   MetaSpendDaily           MetaSpendDaily[]
   items                    Item[]
   folderPrefixes           FolderPrefix[]
+  folders                  Folder[]
   customers                Customer[]
   ledgerAccounts           LedgerAccount[]
   journalEntries           JournalEntry[]
@@ -313,7 +314,7 @@ model StockItem {
   updatedAt      DateTime      @updatedAt
 
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  item               Item              @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  item              Item               @relation(fields: [itemId], references: [id], onDelete: Restrict)
   reservations      SaleItem[]
   movements         StockMovement[]
   stockReservations StockReservation[]
@@ -329,8 +330,9 @@ model StockItem {
 // ===== ITEMS (Product Catalog) =====
 
 model Item {
-  id             String        @id @default(cuid())
+  id             String         @id @default(cuid())
   organizationId String
+  folderId       String? // FK to Folder - items must belong to a folder
   name           String
   sku            String?
   category       String?
@@ -339,17 +341,18 @@ model Item {
   storageGb      Int? // e.g., 64, 128, 256, 512, 1024
   condition      ItemCondition?
   color          String? // e.g., "Natural Titanium", "Blue"
-  description    String?       @db.Text
+  description    String?        @db.Text
   attributes     Json? // Flexible attributes (color, size, etc.)
-  isActive       Boolean       @default(true)
+  isActive       Boolean        @default(true)
   seedSource     String? // e.g., "APPLE_IPHONE"
   seedVersion    Int? // e.g., 2
-  sortKey        String?       @db.VarChar(64) // For canonical ordering
+  sortKey        String?        @db.VarChar(64) // For canonical ordering
   deletedAt      DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  folder       Folder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
   stockItems   StockItem[]
   reservations StockReservation[]
 
@@ -360,6 +363,8 @@ model Item {
   @@index([organizationId, model])
   @@index([organizationId, brand])
   @@index([organizationId, sortKey])
+  @@index([folderId])
+  @@index([organizationId, folderId])
 }
 
 enum ItemCondition {
@@ -374,13 +379,30 @@ enum ItemCondition {
 model FolderPrefix {
   id             String   @id @default(cuid())
   organizationId String
-  prefix         String   // e.g., "IPH", "IPAD", "SAM"
+  prefix         String // e.g., "IPH", "IPAD", "SAM"
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, prefix])
+  @@index([organizationId])
+}
+
+// ===== ITEMS FOLDERS (Real Folders) =====
+
+model Folder {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String // e.g., "iPhone", "iPad", "Samsung"
+  description    String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        Item[]
+
+  @@unique([organizationId, name])
   @@index([organizationId])
 }
 
@@ -600,11 +622,11 @@ model Purchase {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  organization             Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vendor                   Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  createdBy                User?                     @relation("PurchaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  lines                    PurchaseLine[]
-  stockApplication         PurchaseStockApplication?
+  organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendor           Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  createdBy        User?                     @relation("PurchaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  lines            PurchaseLine[]
+  stockApplication PurchaseStockApplication?
 
   @@index([organizationId, createdAt])
   @@index([organizationId, status])
@@ -651,8 +673,8 @@ model LedgerAccount {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  journalLines  JournalLine[]
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  journalLines JournalLine[]
 
   @@unique([organizationId, code])
   @@index([organizationId, type])
@@ -701,8 +723,8 @@ model JournalEntry {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User         @relation("JournalEntryCreator", fields: [createdById], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User          @relation("JournalEntryCreator", fields: [createdById], references: [id])
   lines        JournalLine[]
 
   @@index([organizationId, date])
@@ -711,14 +733,14 @@ model JournalEntry {
 }
 
 model JournalLine {
-  id            String   @id @default(cuid())
-  entryId       String
-  accountId     String
-  debit         Decimal  @db.Decimal(18, 2) @default(0)
-  credit        Decimal  @db.Decimal(18, 2) @default(0)
-  memo          String?  @db.Text
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  entryId   String
+  accountId String
+  debit     Decimal  @default(0) @db.Decimal(18, 2)
+  credit    Decimal  @default(0) @db.Decimal(18, 2)
+  memo      String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   entry   JournalEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
   account LedgerAccount @relation(fields: [accountId], references: [id])

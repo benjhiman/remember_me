@@ -12,8 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { usePinFolder } from '@/lib/api/hooks/use-item-folders';
+import { useCreateFolder } from '@/lib/api/hooks/use-item-folders';
 import { Loader2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 interface CreateFolderDialogProps {
   open: boolean;
@@ -21,13 +22,15 @@ interface CreateFolderDialogProps {
 }
 
 export function CreateFolderDialog({ open, onOpenChange }: CreateFolderDialogProps) {
-  const [prefix, setPrefix] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState('');
-  const pinFolder = usePinFolder();
+  const createFolder = useCreateFolder();
 
   useEffect(() => {
     if (!open) {
-      setPrefix('');
+      setName('');
+      setDescription('');
       setError('');
     }
   }, [open]);
@@ -37,29 +40,26 @@ export function CreateFolderDialog({ open, onOpenChange }: CreateFolderDialogPro
     setError('');
 
     // Validate
-    const prefixTrimmed = prefix.trim().toUpperCase();
-    if (!prefixTrimmed) {
-      setError('El prefijo es requerido');
+    const nameTrimmed = name.trim();
+    if (!nameTrimmed) {
+      setError('El nombre de la carpeta es requerido');
       return;
     }
 
-    if (!/^[A-Z0-9]{2,8}$/.test(prefixTrimmed)) {
-      setError('El prefijo debe tener entre 2 y 8 caracteres alfanuméricos');
+    if (nameTrimmed.length < 1) {
+      setError('El nombre debe tener al menos 1 carácter');
       return;
     }
 
     try {
-      await pinFolder.mutateAsync(prefixTrimmed);
+      await createFolder.mutateAsync({
+        name: nameTrimmed,
+        description: description.trim() || undefined,
+      });
       onOpenChange(false);
     } catch (error) {
       // Error handled by mutation
     }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    setPrefix(value);
-    if (error) setError('');
   };
 
   return (
@@ -68,34 +68,44 @@ export function CreateFolderDialog({ open, onOpenChange }: CreateFolderDialogPro
         <DialogHeader>
           <DialogTitle>Nueva carpeta</DialogTitle>
           <DialogDescription>
-            Creá una carpeta para organizar items por prefijo de SKU (ej: IPH, IPAD, SAM).
+            Creá una carpeta para organizar tus items (ej: iPhone, iPad, Samsung).
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="prefix">Prefijo</Label>
+              <Label htmlFor="name">Nombre de la carpeta</Label>
               <Input
-                id="prefix"
-                value={prefix}
-                onChange={handleChange}
-                placeholder="Ej: IPH, IPAD, SAM"
-                maxLength={8}
-                disabled={pinFolder.isPending}
+                id="name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder="Ej: iPhone, iPad, Samsung"
+                disabled={createFolder.isPending}
                 autoFocus
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
-              <p className="text-xs text-muted-foreground">
-                Solo letras y números. Se convertirá a mayúsculas automáticamente.
-              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Descripción (opcional)</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descripción de la carpeta..."
+                rows={3}
+                disabled={createFolder.isPending}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pinFolder.isPending}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={createFolder.isPending}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={pinFolder.isPending || !prefix.trim()}>
-              {pinFolder.isPending ? (
+            <Button type="submit" disabled={createFolder.isPending || !name.trim()}>
+              {createFolder.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Creando...

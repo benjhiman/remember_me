@@ -34,6 +34,7 @@ interface UseItemsParams {
   page?: number;
   limit?: number;
   q?: string;
+  folderId?: string;
   enabled?: boolean;
 }
 
@@ -46,6 +47,7 @@ export function useItems(params: UseItemsParams = {}) {
   });
 
   if (filters.q) queryParams.set('q', filters.q);
+  if (filters.folderId) queryParams.set('folderId', filters.folderId);
 
   return useQuery({
     queryKey: ['items', 'list', params],

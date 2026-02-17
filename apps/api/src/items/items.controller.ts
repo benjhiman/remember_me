@@ -20,7 +20,7 @@ import { CurrentOrganization } from '../common/decorators/current-organization.d
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { ListItemsDto } from './dto/list-items.dto';
-import { CreateFolderPrefixDto } from './dto/create-folder-prefix.dto';
+import { CreateFolderDto } from './dto/create-folder.dto';
 import { Role } from '@remember-me/prisma';
 
 @Controller('items')
@@ -96,20 +96,20 @@ export class ItemsController {
   async createFolder(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Body() dto: CreateFolderPrefixDto,
+    @Body() dto: CreateFolderDto,
   ) {
     return this.itemsService.createFolder(organizationId, user.userId, dto);
   }
 
-  @Delete('folders/:prefix')
+  @Delete('folders/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteFolder(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('prefix') prefix: string,
+    @Param('id') folderId: string,
   ) {
-    return this.itemsService.deleteFolder(organizationId, user.userId, prefix);
+    return this.itemsService.deleteFolder(organizationId, user.userId, folderId);
   }
 }

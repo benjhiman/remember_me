@@ -17,4 +17,8 @@ export class ListItemsDto {
   @IsString()
   @IsOptional()
   q?: string; // Search query (name, sku, brand, category)
+
+  @IsString()
+  @IsOptional()
+  folderId?: string; // Filter by folder ID
 }

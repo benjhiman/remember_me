@@ -77,6 +77,11 @@ export class ItemsService {
       deletedAt: null, // Soft delete: exclude deleted items
     };
 
+    // Filter by folderId if provided
+    if (dto.folderId) {
+      where.folderId = dto.folderId;
+    }
+
     if (dto.q) {
       const qTrimUpper = dto.q.trim().toUpperCase();
       // Detect if query looks like a SKU prefix (alphanumeric, 2-10 chars, starts with letter)
@@ -154,6 +159,20 @@ export class ItemsService {
       throw new ForbiddenException('Only admins and managers can create items');
     }
 
+    // Validate folderId if provided
+    if (dto.folderId) {
+      const folder = await this.prisma.folder.findFirst({
+        where: {
+          id: dto.folderId,
+          organizationId,
+        },
+      });
+
+      if (!folder) {
+        throw new NotFoundException('Folder not found or does not belong to this organization');
+      }
+    }
+
     // Normalize strings
     let brand = dto.brand?.trim() || '';
     if (!brand || brand.length < 2) {
@@ -185,6 +204,7 @@ export class ItemsService {
     const item = await this.prisma.item.create({
       data: {
         organizationId,
+        folderId: dto.folderId || null,
         name,
         sku,
         category: dto.category?.trim() || null,
@@ -385,100 +405,99 @@ export class ItemsService {
   async listFolders(organizationId: string, userId: string) {
     await this.verifyMembership(organizationId, userId);
 
-    // Get all items with SKU
-    const items = await this.prisma.item.findMany({
-      where: {
-        organizationId,
-        deletedAt: null,
-        isActive: true,
-        sku: { not: null },
-      },
-      select: { sku: true },
-    });
-
-    // Extract prefixes and count
-    const prefixCounts = new Map<string, number>();
-    items.forEach((item) => {
-      const prefix = this.extractSkuPrefix(item.sku);
-      if (prefix) {
-        prefixCounts.set(prefix, (prefixCounts.get(prefix) || 0) + 1);
-      }
-    });
-
-    // Get pinned folders
-    const pinnedFolders = await this.prisma.folderPrefix.findMany({
+    // Get all folders for this organization
+    const folders = await this.prisma.folder.findMany({
       where: { organizationId },
-      select: { prefix: true },
+      include: {
+        _count: {
+          select: { items: true },
+        },
+      },
+      orderBy: { name: 'asc' },
     });
 
-    const pinnedPrefixes = new Set(pinnedFolders.map((f: { prefix: string }) => f.prefix));
-
-    // Combine: all prefixes with counts + pinned folders (even if count=0)
-    const folders = Array.from(
-      new Set([...Array.from(prefixCounts.keys()), ...Array.from(pinnedPrefixes)]),
-    ).map((prefix: string) => ({
-      prefix,
-      count: prefixCounts.get(prefix) || 0,
-      pinned: pinnedPrefixes.has(prefix),
-    }));
-
-    // Sort by pinned first, then by count desc, then alphabetically
-    folders.sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (a.count !== b.count) return b.count - a.count;
-      return a.prefix.localeCompare(b.prefix);
-    });
-
-    return { data: folders };
+    // Return folders with item count
+    return {
+      data: folders.map((folder) => ({
+        id: folder.id,
+        name: folder.name,
+        description: folder.description,
+        count: folder._count.items,
+        createdAt: folder.createdAt,
+        updatedAt: folder.updatedAt,
+      })),
+    };
   }
 
-  async createFolder(organizationId: string, userId: string, dto: { prefix: string }) {
+  async createFolder(organizationId: string, userId: string, dto: { name: string; description?: string }) {
     const { role } = await this.verifyMembership(organizationId, userId);
 
     if (!this.hasAdminManagerAccess(role)) {
       throw new ForbiddenException('Only admins and managers can create folders');
     }
 
-    const prefixUpper = dto.prefix.toUpperCase().trim();
+    const nameTrimmed = dto.name.trim();
+
+    if (!nameTrimmed || nameTrimmed.length < 1) {
+      throw new BadRequestException('Folder name is required');
+    }
 
     // Check if already exists
-    const existing = await this.prisma.folderPrefix.findUnique({
+    const existing = await this.prisma.folder.findUnique({
       where: {
-        organizationId_prefix: {
+        organizationId_name: {
           organizationId,
-          prefix: prefixUpper,
+          name: nameTrimmed,
         },
       },
     });
 
     if (existing) {
-      return existing;
+      throw new BadRequestException('Folder with this name already exists');
     }
 
-    const folder = await this.prisma.folderPrefix.create({
+    const folder = await this.prisma.folder.create({
       data: {
         organizationId,
-        prefix: prefixUpper,
+        name: nameTrimmed,
+        description: dto.description?.trim() || null,
       },
     });
 
     return folder;
   }
 
-  async deleteFolder(organizationId: string, userId: string, prefix: string) {
+  async deleteFolder(organizationId: string, userId: string, folderId: string) {
     const { role } = await this.verifyMembership(organizationId, userId);
 
     if (!this.hasAdminManagerAccess(role)) {
       throw new ForbiddenException('Only admins and managers can delete folders');
     }
 
-    const prefixUpper = prefix.toUpperCase().trim();
-
-    await this.prisma.folderPrefix.deleteMany({
+    // Check if folder exists and belongs to organization
+    const folder = await this.prisma.folder.findFirst({
       where: {
+        id: folderId,
         organizationId,
-        prefix: prefixUpper,
       },
+      include: {
+        _count: {
+          select: { items: true },
+        },
+      },
+    });
+
+    if (!folder) {
+      throw new NotFoundException('Folder not found');
+    }
+
+    // Check if folder has items
+    if (folder._count.items > 0) {
+      throw new BadRequestException('Cannot delete folder with items. Move or delete items first.');
+    }
+
+    await this.prisma.folder.delete({
+      where: { id: folderId },
     });
   }
 }
