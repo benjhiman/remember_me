@@ -786,6 +786,60 @@ async function main() {
         }
       });
       
+      // Handle PriceLists migration specifically
+      const priceListsMigrationFailed = failedMigrations.find(
+        (m) => m.migration_name === PRICE_LISTS_MIGRATION
+      );
+      
+      if (priceListsMigrationFailed) {
+        console.log(`\n🔍 Auditing ${PRICE_LISTS_MIGRATION} migration state...`);
+        const priceListsAudit = await auditPriceListsMigration(prisma);
+        
+        console.log('   Migration audit results:');
+        console.log(`   - PriceList table: ${priceListsAudit.hasPriceListTable ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - PriceListItem table: ${priceListsAudit.hasPriceListItemTable ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - PriceListItemOverride table: ${priceListsAudit.hasPriceListItemOverrideTable ? '✅ exists' : '❌ missing'}`);
+        console.log(`   - All tables exist: ${priceListsAudit.allTablesExist ? '✅ YES' : '❌ NO'}`);
+        
+        if (priceListsAudit.allTablesExist) {
+          console.log('\n✅ All tables from migration are already created');
+          console.log('   → Marking migration as applied...');
+          
+          const resolved = await resolveMigrationViaPrisma('applied', PRICE_LISTS_MIGRATION);
+          if (!resolved) {
+            console.error('❌ Failed to resolve migration as applied');
+            await printMigrationStatus(prisma, PRICE_LISTS_MIGRATION);
+            await prisma.$disconnect();
+            process.exit(1);
+          }
+          
+          const cleared = await verifyMigrationCleared(prisma, PRICE_LISTS_MIGRATION);
+          if (!cleared) {
+            console.error('❌ Migration still appears as failed after resolve');
+            await printMigrationStatus(prisma, PRICE_LISTS_MIGRATION);
+            await prisma.$disconnect();
+            process.exit(1);
+          }
+          
+          console.log('✅ Migration resolved as applied');
+          console.log('   → Continuing with other migrations...\n');
+        } else {
+          console.log('\n⚠️  Tables are NOT fully created');
+          console.log('   → Marking migration as rolled-back to allow retry...');
+          
+          const resolved = await resolveMigrationViaPrisma('rolled-back', PRICE_LISTS_MIGRATION);
+          if (!resolved) {
+            console.error('❌ Failed to resolve migration as rolled-back');
+            await printMigrationStatus(prisma, PRICE_LISTS_MIGRATION);
+            await prisma.$disconnect();
+            process.exit(1);
+          }
+          
+          console.log('✅ Migration resolved as rolled-back');
+          console.log('   → Will be retried by migrate deploy\n');
+        }
+      }
+      
       // Handle PurchaseStockApplication migration specifically
       const purchaseStockMigration = failedMigrations.find(
         (m) => m.migration_name === PURCHASE_STOCK_MIGRATION
