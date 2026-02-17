@@ -23,7 +23,7 @@ async function isMigrationFailed(prisma: PrismaClient, migrationName: string): P
       `SELECT migration_name, finished_at, rolled_back_at
        FROM "_prisma_migrations"
        WHERE migration_name = $1`,
-      migrationName
+      migrationName,
     );
     
     if (result.length === 0) {
