@@ -160,14 +160,17 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
           {mode === 'FOLDERS' && (
             <div className="space-y-2">
               <Label>Carpetas</Label>
-              <Popover open={foldersOpen} onOpenChange={setFoldersOpen}>
+              <Popover open={foldersOpen} onOpenChange={setFoldersOpen} modal={false}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     Seleccionar carpetas ({selectedFolderIds.length})
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <Command>
+                <PopoverContent className="w-[400px] p-0" align="start" onInteractOutside={(e) => {
+                  // Don't close when clicking inside
+                  e.preventDefault();
+                }}>
+                  <Command shouldFilter={false}>
                     <CommandInput placeholder="Buscar carpetas..." />
                     <CommandList>
                       <CommandEmpty>No se encontraron carpetas.</CommandEmpty>
