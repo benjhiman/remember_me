@@ -60,10 +60,14 @@ export function BulkPricingStep({ priceListId, items, onComplete, onSkip }: Bulk
   const handleSave = async () => {
     const itemsToUpdate = Object.entries(prices)
       .filter(([_, value]) => value.trim() !== '')
-      .map(([itemId, value]) => ({
-        priceListItemId: itemId,
-        basePrice: parseFloat(value) || null,
-      }));
+      .map(([itemId, value]) => {
+        const numValue = parseFloat(value);
+        return {
+          priceListItemId: itemId,
+          basePrice: !isNaN(numValue) && isFinite(numValue) ? numValue : null,
+        };
+      })
+      .filter((item) => item.basePrice !== null); // Only include items with valid prices
 
     if (itemsToUpdate.length === 0) {
       onComplete();
