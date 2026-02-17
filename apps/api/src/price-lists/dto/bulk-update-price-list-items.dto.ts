@@ -1,11 +1,12 @@
-import { IsArray, ValidateNested, IsString, IsDecimal, IsOptional } from 'class-validator';
+import { IsArray, ValidateNested, IsString, IsNumber, IsOptional, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class BulkUpdateItemDto {
   @IsString()
   priceListItemId!: string;
 
-  @IsDecimal()
+  @ValidateIf((o) => o.basePrice !== null && o.basePrice !== undefined)
+  @IsNumber()
   @IsOptional()
   @Type(() => Number)
   basePrice?: number | null;
