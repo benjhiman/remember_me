@@ -19,12 +19,11 @@ const PRICE_LISTS_MIGRATION = '20250131000002_add_price_lists';
 // Helper to check if a migration is in failed state (P3018)
 async function isMigrationFailed(prisma: PrismaClient, migrationName: string): Promise<boolean> {
   try {
-    const result = await prisma.$queryRawUnsafe<Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>>(
-      `SELECT migration_name, finished_at, rolled_back_at
-       FROM "_prisma_migrations"
-       WHERE migration_name = $1`,
-      migrationName,
-    );
+    const result = await prisma.$queryRaw<Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>>`
+      SELECT migration_name, finished_at, rolled_back_at
+      FROM "_prisma_migrations"
+      WHERE migration_name = ${migrationName}
+    `;
     
     if (result.length === 0) {
       return false; // Migration not started yet
