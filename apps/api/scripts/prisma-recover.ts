@@ -795,7 +795,54 @@ async function main() {
     // CASO B: DB NO VACÍA - Continuar con recovery normal
     console.log('✅ Database has data - using normal migration flow\n');
 
-    // Check for ALL failed migrations (P3009 detection) - PRIORITY
+    // PRIORITY 1: Check for P3018 (migration failed during apply) - must resolve before P3009
+    console.log('📋 Checking for P3018 (migration failed during apply)...');
+    const priceListsFailedP3018 = await isMigrationFailed(prisma, PRICE_LISTS_MIGRATION);
+    
+    if (priceListsFailedP3018) {
+      console.log(`\n⚠️  P3018 detected: ${PRICE_LISTS_MIGRATION} failed during apply`);
+      console.log('   Checking if tables were partially created...');
+      
+      const priceListsAudit = await auditPriceListsMigration(prisma);
+      console.log('   Audit results:');
+      console.log(`   - PriceList table: ${priceListsAudit.hasPriceListTable ? '✅ exists' : '❌ missing'}`);
+      console.log(`   - PriceListItem table: ${priceListsAudit.hasPriceListItemTable ? '✅ exists' : '❌ missing'}`);
+      console.log(`   - PriceListItemOverride table: ${priceListsAudit.hasPriceListItemOverrideTable ? '✅ exists' : '❌ missing'}`);
+      
+      if (priceListsAudit.allTablesExist) {
+        console.log('\n✅ All tables exist - migration partially succeeded');
+        console.log('   → Marking migration as applied to unblock...');
+        
+        const resolved = await resolveMigrationViaPrisma('applied', PRICE_LISTS_MIGRATION);
+        if (!resolved) {
+          console.error('❌ Failed to resolve migration as applied');
+          await printMigrationStatus(prisma, PRICE_LISTS_MIGRATION);
+          await prisma.$disconnect();
+          process.exit(1);
+        }
+        
+        console.log('✅ Migration resolved as applied (P3018 cleared)');
+        console.log('   → Continuing with migration flow...\n');
+      } else {
+        console.log('\n⚠️  Tables are NOT fully created - migration failed mid-way');
+        console.log('   → Marking as rolled-back to allow retry...');
+        
+        const resolved = await resolveMigrationViaPrisma('rolled-back', PRICE_LISTS_MIGRATION);
+        if (!resolved) {
+          console.error('❌ Failed to resolve migration as rolled-back');
+          await printMigrationStatus(prisma, PRICE_LISTS_MIGRATION);
+          await prisma.$disconnect();
+          process.exit(1);
+        }
+        
+        console.log('✅ Migration resolved as rolled-back (P3018 cleared)');
+        console.log('   → Will be retried by migrate deploy\n');
+      }
+    } else {
+      console.log('✅ No P3018 errors detected\n');
+    }
+
+    // PRIORITY 2: Check for ALL failed migrations (P3009 detection)
     console.log('📋 Checking for failed migrations (P3009)...');
     const failedMigrations = await getAllFailedMigrations(prisma);
     
