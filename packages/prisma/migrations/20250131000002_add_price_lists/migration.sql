@@ -34,10 +34,14 @@ CREATE TABLE IF NOT EXISTS "PriceListItemOverride" (
     CONSTRAINT "PriceListItemOverride_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex (idempotent - drop if exists first to avoid conflicts)
+-- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceList_organizationId_idx' AND tablename = 'PriceList') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceList_organizationId_idx'
+    ) THEN
         CREATE INDEX "PriceList_organizationId_idx" ON "PriceList"("organizationId");
     END IF;
 END $$;
@@ -45,7 +49,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceList_organizationId_name_key' AND tablename = 'PriceList') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceList_organizationId_name_key'
+    ) THEN
         CREATE UNIQUE INDEX "PriceList_organizationId_name_key" ON "PriceList"("organizationId", "name");
     END IF;
 END $$;
@@ -53,7 +61,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItem_organizationId_idx' AND tablename = 'PriceListItem') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItem_organizationId_idx'
+    ) THEN
         CREATE INDEX "PriceListItem_organizationId_idx" ON "PriceListItem"("organizationId");
     END IF;
 END $$;
@@ -61,7 +73,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItem_priceListId_idx' AND tablename = 'PriceListItem') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItem_priceListId_idx'
+    ) THEN
         CREATE INDEX "PriceListItem_priceListId_idx" ON "PriceListItem"("priceListId");
     END IF;
 END $$;
@@ -69,7 +85,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItem_itemGroupKey_idx' AND tablename = 'PriceListItem') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItem_itemGroupKey_idx'
+    ) THEN
         CREATE INDEX "PriceListItem_itemGroupKey_idx" ON "PriceListItem"("itemGroupKey");
     END IF;
 END $$;
@@ -77,7 +97,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItem_priceListId_itemGroupKey_key' AND tablename = 'PriceListItem') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItem_priceListId_itemGroupKey_key'
+    ) THEN
         CREATE UNIQUE INDEX "PriceListItem_priceListId_itemGroupKey_key" ON "PriceListItem"("priceListId", "itemGroupKey");
     END IF;
 END $$;
@@ -85,7 +109,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItemOverride_organizationId_idx' AND tablename = 'PriceListItemOverride') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItemOverride_organizationId_idx'
+    ) THEN
         CREATE INDEX "PriceListItemOverride_organizationId_idx" ON "PriceListItemOverride"("organizationId");
     END IF;
 END $$;
@@ -93,7 +121,11 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItemOverride_priceListItemId_idx' AND tablename = 'PriceListItemOverride') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItemOverride_priceListItemId_idx'
+    ) THEN
         CREATE INDEX "PriceListItemOverride_priceListItemId_idx" ON "PriceListItemOverride"("priceListItemId");
     END IF;
 END $$;
@@ -101,18 +133,21 @@ END $$;
 -- CreateIndex (idempotent)
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'PriceListItemOverride_priceListItemId_variantKey_key' AND tablename = 'PriceListItemOverride') THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE schemaname = 'public' 
+        AND indexname = 'PriceListItemOverride_priceListItemId_variantKey_key'
+    ) THEN
         CREATE UNIQUE INDEX "PriceListItemOverride_priceListItemId_variantKey_key" ON "PriceListItemOverride"("priceListItemId", "variantKey");
     END IF;
 END $$;
 
--- AddForeignKey (idempotent - drop if exists first)
+-- AddForeignKey (idempotent)
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint 
-        WHERE conname = 'PriceList_organizationId_fkey' 
-        AND conrelid = 'PriceList'::regclass
+        WHERE conname = 'PriceList_organizationId_fkey'
     ) THEN
         ALTER TABLE "PriceList" ADD CONSTRAINT "PriceList_organizationId_fkey" 
         FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -124,8 +159,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint 
-        WHERE conname = 'PriceListItem_organizationId_fkey' 
-        AND conrelid = 'PriceListItem'::regclass
+        WHERE conname = 'PriceListItem_organizationId_fkey'
     ) THEN
         ALTER TABLE "PriceListItem" ADD CONSTRAINT "PriceListItem_organizationId_fkey" 
         FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -137,8 +171,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint 
-        WHERE conname = 'PriceListItem_priceListId_fkey' 
-        AND conrelid = 'PriceListItem'::regclass
+        WHERE conname = 'PriceListItem_priceListId_fkey'
     ) THEN
         ALTER TABLE "PriceListItem" ADD CONSTRAINT "PriceListItem_priceListId_fkey" 
         FOREIGN KEY ("priceListId") REFERENCES "PriceList"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -150,8 +183,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint 
-        WHERE conname = 'PriceListItemOverride_organizationId_fkey' 
-        AND conrelid = 'PriceListItemOverride'::regclass
+        WHERE conname = 'PriceListItemOverride_organizationId_fkey'
     ) THEN
         ALTER TABLE "PriceListItemOverride" ADD CONSTRAINT "PriceListItemOverride_organizationId_fkey" 
         FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -163,8 +195,7 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint 
-        WHERE conname = 'PriceListItemOverride_priceListItemId_fkey' 
-        AND conrelid = 'PriceListItemOverride'::regclass
+        WHERE conname = 'PriceListItemOverride_priceListItemId_fkey'
     ) THEN
         ALTER TABLE "PriceListItemOverride" ADD CONSTRAINT "PriceListItemOverride_priceListItemId_fkey" 
         FOREIGN KEY ("priceListItemId") REFERENCES "PriceListItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;

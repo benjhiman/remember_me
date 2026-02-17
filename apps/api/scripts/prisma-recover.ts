@@ -16,6 +16,28 @@ const TARGET_MIGRATION = '20250124120000_add_accounting_lite_models';
 const PURCHASE_STOCK_MIGRATION = '20250124130000_add_purchase_stock_application';
 const PRICE_LISTS_MIGRATION = '20250131000002_add_price_lists';
 
+// Helper to check if a migration is in failed state (P3018)
+async function isMigrationFailed(prisma: PrismaClient, migrationName: string): Promise<boolean> {
+  try {
+    const result = await prisma.$queryRaw<Array<{ migration_name: string; finished_at: Date | null; rolled_back_at: Date | null }>>`
+      SELECT migration_name, finished_at, rolled_back_at
+      FROM "_prisma_migrations"
+      WHERE migration_name = $1
+    `, migrationName);
+    
+    if (result.length === 0) {
+      return false; // Migration not started yet
+    }
+    
+    const record = result[0];
+    // Failed if started but not finished and not rolled back
+    return record.finished_at === null && record.rolled_back_at === null;
+  } catch (error) {
+    console.error(`Error checking migration status for ${migrationName}:`, error);
+    return false;
+  }
+}
+
 interface MigrationRecord {
   migration_name: string;
   started_at: Date | null;
