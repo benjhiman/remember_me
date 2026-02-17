@@ -412,6 +412,50 @@ async function verifyMigrationCleared(prisma: PrismaClient, migrationName?: stri
   return !isFailed(record); // Not failed anymore
 }
 
+interface PriceListsAudit {
+  hasPriceListTable: boolean;
+  hasPriceListItemTable: boolean;
+  hasPriceListItemOverrideTable: boolean;
+  allTablesExist: boolean;
+}
+
+async function auditPriceListsMigration(prisma: PrismaClient): Promise<PriceListsAudit> {
+  try {
+    // Check tables using to_regclass (PostgreSQL native)
+    const [priceList, priceListItem, priceListItemOverride] = await Promise.all([
+      prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT (to_regclass('public."PriceList"') IS NOT NULL) as exists
+      `,
+      prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT (to_regclass('public."PriceListItem"') IS NOT NULL) as exists
+      `,
+      prisma.$queryRaw<Array<{ exists: boolean }>>`
+        SELECT (to_regclass('public."PriceListItemOverride"') IS NOT NULL) as exists
+      `,
+    ]);
+
+    const hasPriceListTable = (priceList[0] as any)?.exists === true;
+    const hasPriceListItemTable = (priceListItem[0] as any)?.exists === true;
+    const hasPriceListItemOverrideTable = (priceListItemOverride[0] as any)?.exists === true;
+    const allTablesExist = hasPriceListTable && hasPriceListItemTable && hasPriceListItemOverrideTable;
+
+    return {
+      hasPriceListTable,
+      hasPriceListItemTable,
+      hasPriceListItemOverrideTable,
+      allTablesExist,
+    };
+  } catch (error) {
+    console.error('❌ Error auditing PriceLists migration:', error);
+    return {
+      hasPriceListTable: false,
+      hasPriceListItemTable: false,
+      hasPriceListItemOverrideTable: false,
+      allTablesExist: false,
+    };
+  }
+}
+
 interface PurchaseStockApplicationAudit {
   hasPurchaseStockApplicationTable: boolean;
   hasPurchaseLineStockItemIdColumn: boolean;
