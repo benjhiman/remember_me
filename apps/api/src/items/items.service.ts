@@ -159,8 +159,13 @@ export class ItemsService {
       throw new ForbiddenException('Only admins and managers can create items');
     }
 
-    // Validate folderId if provided
+    // Ensure default folder exists
+    const defaultFolderId = await this.ensureDefaultFolder(organizationId);
+
+    // Determine folderId: use provided one, or default to "IPHONE"
+    let folderIdToUse: string | null = null;
     if (dto.folderId) {
+      // Validate provided folderId
       const folder = await this.prisma.folder.findFirst({
         where: {
           id: dto.folderId,
@@ -171,6 +176,11 @@ export class ItemsService {
       if (!folder) {
         throw new NotFoundException('Folder not found or does not belong to this organization');
       }
+      folderIdToUse = dto.folderId;
+    } else {
+      // Auto-assign to default folder if no folderId provided
+      folderIdToUse = defaultFolderId;
+      console.log(`[ItemsService.createItem] Auto-assigning item to default IPHONE folder for orgId: ${organizationId}`);
     }
 
     // Normalize strings
@@ -204,7 +214,7 @@ export class ItemsService {
     const item = await this.prisma.item.create({
       data: {
         organizationId,
-        folderId: dto.folderId || null,
+        folderId: folderIdToUse, // Use determined folderId (provided or default)
         name,
         sku,
         category: dto.category?.trim() || null,
@@ -402,10 +412,43 @@ export class ItemsService {
     return skuUpper.substring(0, 3);
   }
 
+  /**
+   * Ensures the default "IPHONE" folder exists for the organization.
+   * Creates it if it doesn't exist.
+   */
+  private async ensureDefaultFolder(organizationId: string): Promise<string> {
+    // Check if default folder exists
+    let defaultFolder = await this.prisma.folder.findFirst({
+      where: {
+        organizationId,
+        name: 'IPHONE',
+        isDefault: true,
+      },
+    });
+
+    if (!defaultFolder) {
+      // Create default folder
+      defaultFolder = await this.prisma.folder.create({
+        data: {
+          organizationId,
+          name: 'IPHONE',
+          description: 'Carpeta por defecto para items iPhone',
+          isDefault: true,
+        },
+      });
+      console.log(`[ItemsService.ensureDefaultFolder] Created default IPHONE folder for orgId: ${organizationId}`);
+    }
+
+    return defaultFolder.id;
+  }
+
   async listFolders(organizationId: string, userId: string) {
     await this.verifyMembership(organizationId, userId);
 
     try {
+      // Ensure default folder exists before listing
+      await this.ensureDefaultFolder(organizationId);
+
       // Get all folders for this organization
       const folders = await this.prisma.folder.findMany({
         where: { organizationId },
@@ -414,7 +457,10 @@ export class ItemsService {
             select: { items: true },
           },
         },
-        orderBy: { name: 'asc' },
+        orderBy: [
+          { isDefault: 'desc' }, // Default folders first
+          { name: 'asc' },
+        ],
       });
 
       // Log for debugging (only in non-production or when folders count is interesting)
@@ -428,6 +474,7 @@ export class ItemsService {
           id: folder.id,
           name: folder.name,
           description: folder.description,
+          isDefault: folder.isDefault,
           count: folder._count.items,
           createdAt: folder.createdAt,
           updatedAt: folder.updatedAt,
@@ -512,6 +559,11 @@ export class ItemsService {
 
     if (!folder) {
       throw new NotFoundException('Folder not found');
+    }
+
+    // Block deletion of default folder
+    if (folder.isDefault) {
+      throw new BadRequestException('Cannot delete default folder. The default "IPHONE" folder is protected.');
     }
 
     // Check if folder has items

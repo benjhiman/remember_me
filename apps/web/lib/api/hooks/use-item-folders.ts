@@ -6,6 +6,7 @@ export interface ItemFolder {
   id: string;
   name: string;
   description?: string | null;
+  isDefault?: boolean;
   count: number;
   createdAt: string;
   updatedAt: string;

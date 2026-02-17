@@ -396,6 +396,7 @@ model Folder {
   organizationId String
   name           String // e.g., "iPhone", "iPad", "Samsung"
   description    String?  @db.Text
+  isDefault      Boolean  @default(false) // System default folder (e.g., "IPHONE")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -404,6 +405,7 @@ model Folder {
 
   @@unique([organizationId, name])
   @@index([organizationId])
+  @@index([organizationId, isDefault])
 }
 
 enum StockStatus {

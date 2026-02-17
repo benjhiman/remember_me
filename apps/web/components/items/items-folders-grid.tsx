@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Folder, X } from 'lucide-react';
+import { Folder, X, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ export interface ItemFolder {
   id: string;
   name: string;
   description?: string | null;
+  isDefault?: boolean;
   count: number;
   createdAt: string;
   updatedAt: string;
@@ -126,8 +127,8 @@ export function ItemsFoldersGrid({ folders, onOpen, onDelete, canDelete = false,
           onClick={() => handleClick(folder.id)}
           onDoubleClick={() => handleDoubleClick(folder.id)}
         >
-          {/* Delete button */}
-          {canDelete && onDelete && (
+          {/* Delete button - disabled for default folders */}
+          {canDelete && onDelete && !folder.isDefault && (
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost"
@@ -142,6 +143,15 @@ export function ItemsFoldersGrid({ folders, onOpen, onDelete, canDelete = false,
               </Button>
             </div>
           )}
+          
+          {/* Default folder badge */}
+          {folder.isDefault && (
+            <div className="absolute top-2 right-2">
+              <Badge variant="secondary" className="text-xs">
+                Por defecto
+              </Badge>
+            </div>
+          )}
 
           {/* Folder icon */}
           <div className="flex items-center justify-center mb-3">
@@ -150,7 +160,12 @@ export function ItemsFoldersGrid({ folders, onOpen, onDelete, canDelete = false,
 
           {/* Folder name */}
           <div className="text-center">
-            <h3 className="text-sm font-semibold text-gray-900 mb-1">{folder.name}</h3>
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <h3 className="text-sm font-semibold text-gray-900">{folder.name}</h3>
+              {folder.isDefault && (
+                <Lock className="h-3 w-3 text-muted-foreground" />
+              )}
+            </div>
             <Badge variant="secondary" className="text-xs">
               {folder.count} {folder.count === 1 ? 'item' : 'items'}
             </Badge>

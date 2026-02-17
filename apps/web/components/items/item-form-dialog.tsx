@@ -44,6 +44,10 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
   const createItem = useCreateItem();
   const updateItem = useUpdateItem();
   const { data: foldersData } = useItemFolders(!folderId && open); // Only fetch folders if not in folder context
+  
+  // Find default folder to preselect
+  const defaultFolder = foldersData?.data?.find((f) => f.isDefault);
+  
   const [formData, setFormData] = useState<CreateItemDto | UpdateItemDto>({
     brand: '',
     model: '',
@@ -54,7 +58,7 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
     category: '',
     description: '',
     isActive: true,
-    folderId: folderId || undefined,
+    folderId: folderId || defaultFolder?.id || undefined, // Preselect default folder if available
   });
   const [folderError, setFolderError] = useState('');
 
@@ -73,6 +77,8 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
         isActive: item.isActive,
       });
     } else {
+      // Find default folder when dialog opens (if not in folder context)
+      const defaultFolderOnOpen = foldersData?.data?.find((f) => f.isDefault);
       setFormData({
         brand: '',
         model: '',
@@ -83,11 +89,11 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
         category: '',
         description: '',
         isActive: true,
-        folderId: folderId || undefined,
+        folderId: folderId || defaultFolderOnOpen?.id || undefined, // Preselect default folder
       });
       setFolderError('');
     }
-  }, [item, open, folderId]);
+  }, [item, open, folderId, foldersData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,12 +107,11 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
       if (!formData.condition) return;
       if (!formData.color?.trim() || formData.color.length < 2) return;
       
-      // FolderId is required when creating from root (not inside a folder)
+      // FolderId validation: if not in folder context, ensure one is selected
+      // (Backend will auto-assign to default if not provided, but we validate for UX)
       const createData = formData as CreateItemDto;
-      if (!folderId && !createData.folderId) {
-        setFolderError('Debés seleccionar una carpeta');
-        return;
-      }
+      // Note: Backend will auto-assign to default folder if folderId is not provided
+      // So we don't need to block submission, but we can show a warning if user explicitly wants to
       setFolderError('');
     } else {
       // Update mode: at least one field
@@ -146,8 +151,8 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
         formData.storageGb >= 1 &&
         formData.condition &&
         formData.color?.trim() &&
-        formData.color.length >= 2 &&
-        (folderId || (formData as CreateItemDto).folderId) // FolderId is required
+        formData.color.length >= 2
+        // Note: folderId is optional - backend will auto-assign to default if not provided
       );
 
   return (
@@ -287,7 +292,7 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
             {!item && !folderId && (
               <div className="space-y-2">
                 <Label htmlFor="folderId">
-                  Carpeta * <span className="text-muted-foreground">(obligatorio)</span>
+                  Carpeta <span className="text-muted-foreground">(opcional, por defecto: IPHONE)</span>
                 </Label>
                 <Select
                   value={(formData as CreateItemDto).folderId || ''}
@@ -298,7 +303,7 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
                   disabled={isLoading}
                 >
                   <SelectTrigger id="folderId">
-                    <SelectValue placeholder="Seleccioná una carpeta" />
+                    <SelectValue placeholder="Se usará carpeta IPHONE por defecto" />
                   </SelectTrigger>
                   <SelectContent>
                     {foldersData?.data && foldersData.data.length > 0 ? (
@@ -316,7 +321,7 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
                 </Select>
                 {folderError && <p className="text-sm text-destructive">{folderError}</p>}
                 <p className="text-xs text-muted-foreground">
-                  El item se asignará a la carpeta seleccionada. Si no hay carpetas, creá una primero.
+                  Si no seleccionás una carpeta, el item se asignará automáticamente a &quot;IPHONE&quot;.
                 </p>
               </div>
             )}
