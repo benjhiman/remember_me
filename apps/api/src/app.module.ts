@@ -36,6 +36,7 @@ import { PurchasesModule } from './purchases/purchases.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { SellersModule } from './sellers/sellers.module';
 import { ItemsModule } from './items/items.module';
+import { PriceListsModule } from './price-lists/price-lists.module';
 
 // Resolve .env path relative to apps/api directory
 // Works from any CWD: finds apps/api/.env whether running from root or apps/api
@@ -117,6 +118,7 @@ const envFilePath = (() => {
     LedgerModule,
     SellersModule,
     ItemsModule,
+    PriceListsModule,
     RateLimitModule,
     MetricsModule,
     ExternalHttpClientModule,

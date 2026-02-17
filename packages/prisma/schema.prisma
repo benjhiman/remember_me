@@ -80,6 +80,7 @@ model Organization {
   items                    Item[]
   folderPrefixes           FolderPrefix[]
   folders                  Folder[]
+  priceLists               PriceList[]
   customers                Customer[]
   ledgerAccounts           LedgerAccount[]
   journalEntries           JournalEntry[]
@@ -88,6 +89,8 @@ model Organization {
   ledgerCategories         LedgerCategory[]
   customerBalanceSnapshots CustomerBalanceSnapshot[]
   PurchaseStockApplication PurchaseStockApplication[]
+  PriceListItem            PriceListItem[]
+  PriceListItemOverride    PriceListItemOverride[]
 
   @@index([slug])
 }
@@ -406,6 +409,60 @@ model Folder {
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([organizationId, isDefault])
+}
+
+// ===== PRICE LISTS =====
+
+model PriceList {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        PriceListItem[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model PriceListItem {
+  id             String   @id @default(cuid())
+  organizationId String
+  priceListId    String
+  itemGroupKey   String // Key for grouping items without color (e.g., "IPHONE_11_128GB_NEW")
+  displayName    String // Human-friendly name (e.g., "iPhone 11 128GB NEW")
+  baseSku        String? // Optional base SKU pattern
+  basePrice      Decimal? @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  priceList    PriceList               @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  overrides    PriceListItemOverride[]
+
+  @@unique([priceListId, itemGroupKey])
+  @@index([organizationId])
+  @@index([priceListId])
+  @@index([itemGroupKey])
+}
+
+model PriceListItemOverride {
+  id              String   @id @default(cuid())
+  organizationId  String
+  priceListItemId String
+  variantKey      String // e.g., "COLOR=GOLD" or specific SKU
+  price           Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  priceListItem PriceListItem @relation(fields: [priceListItemId], references: [id], onDelete: Cascade)
+
+  @@unique([priceListItemId, variantKey])
+  @@index([organizationId])
+  @@index([priceListItemId])
 }
 
 enum StockStatus {
