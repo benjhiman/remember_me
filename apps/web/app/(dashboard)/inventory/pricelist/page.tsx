@@ -57,7 +57,8 @@ export default function InventoryPricelistPage() {
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
           onSuccess={(priceListId) => {
-            router.push(`/inventory/pricelist/${priceListId}`);
+            // Use window.location for more reliable navigation after state changes
+            window.location.href = `/inventory/pricelist/${priceListId}`;
           }}
         />
       </PageShell>
@@ -106,7 +107,8 @@ export default function InventoryPricelistPage() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onSuccess={(priceListId) => {
-          router.push(`/inventory/pricelist/${priceListId}`);
+          // Use window.location for more reliable navigation after state changes
+          window.location.href = `/inventory/pricelist/${priceListId}`;
         }}
       />
     </PageShell>

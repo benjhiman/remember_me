@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/layout/page-shell';
 import { usePriceList } from '@/lib/api/hooks/use-price-lists';
@@ -9,13 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Plus } from 'lucide-react';
-import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 export default function PriceListDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
+  const [priceListId, setPriceListId] = useState<string | null>(null);
   const router = useRouter();
-  const { data: priceList, isLoading } = usePriceList(resolvedParams.id);
+  
+  useEffect(() => {
+    params.then((resolved) => {
+      setPriceListId(resolved.id);
+    });
+  }, [params]);
+  
+  const { data: priceList, isLoading } = usePriceList(priceListId);
   const updatePriceListItem = useUpdatePriceListItem();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<string>('');
@@ -37,9 +43,11 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
       return;
     }
 
+    if (!priceListId) return;
+    
     try {
       await updatePriceListItem.mutateAsync({
-        priceListId: resolvedParams.id,
+        priceListId: priceListId,
         priceListItemId: itemId,
         basePrice: priceValue,
       });

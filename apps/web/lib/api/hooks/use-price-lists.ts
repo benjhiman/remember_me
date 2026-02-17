@@ -68,8 +68,9 @@ export function useCreatePriceList() {
       folderIds?: string[];
       itemIds?: string[];
     }) => api.post<PriceList>('/price-lists', data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['price-lists'] });
+    onSuccess: async () => {
+      // Invalidate queries and wait for them to complete
+      await queryClient.invalidateQueries({ queryKey: ['price-lists'] });
       toast({
         title: 'Lista de precios creada',
         description: 'La lista de precios se ha creado correctamente.',

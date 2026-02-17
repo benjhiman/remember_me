@@ -63,8 +63,13 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
         itemIds: mode === 'ITEMS' ? selectedItemIds : undefined,
       });
 
-      onSuccess(result.id);
+      // Close dialog first
       onOpenChange(false);
+      
+      // Wait a bit for state to settle, then navigate
+      setTimeout(() => {
+        onSuccess(result.id);
+      }, 100);
     } catch (error) {
       // Error handled by hook
     }
@@ -170,16 +175,26 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                         {folders.map((folder) => (
                           <CommandItem
                             key={folder.id}
+                            value={folder.id}
                             onSelect={() => {
+                              // Toggle folder selection
                               toggleFolder(folder.id);
                             }}
+                            className="cursor-pointer"
                           >
                             <Checkbox
                               checked={selectedFolderIds.includes(folder.id)}
-                              onCheckedChange={() => toggleFolder(folder.id)}
-                              className="mr-2"
+                              onCheckedChange={() => {
+                                toggleFolder(folder.id);
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="mr-2 pointer-events-auto"
                             />
-                            {folder.name} ({folder.count} {folder.count === 1 ? 'item' : 'items'})
+                            <span className="flex-1">
+                              {folder.name} ({folder.count} {folder.count === 1 ? 'item' : 'items'})
+                            </span>
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -210,14 +225,17 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
           {mode === 'ITEMS' && (
             <div className="space-y-2">
               <Label>Items</Label>
-              <Popover open={itemsOpen} onOpenChange={setItemsOpen}>
+              <Popover open={itemsOpen} onOpenChange={setItemsOpen} modal={false}>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start">
                     Seleccionar items ({selectedItemIds.length})
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] p-0" align="start">
-                  <Command>
+                <PopoverContent className="w-[500px] p-0" align="start" onInteractOutside={(e) => {
+                  // Don't close when clicking inside
+                  e.preventDefault();
+                }}>
+                  <Command shouldFilter={false}>
                     <CommandInput
                       placeholder="Buscar por nombre o SKU..."
                       value={itemsSearch}
@@ -229,14 +247,22 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                         {filteredItems.map((item) => (
                           <CommandItem
                             key={item.id}
+                            value={item.id}
                             onSelect={() => {
+                              // Toggle item selection
                               toggleItem(item.id);
                             }}
+                            className="cursor-pointer"
                           >
                             <Checkbox
                               checked={selectedItemIds.includes(item.id)}
-                              onCheckedChange={() => toggleItem(item.id)}
-                              className="mr-2"
+                              onCheckedChange={() => {
+                                toggleItem(item.id);
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                              }}
+                              className="mr-2 pointer-events-auto"
                             />
                             <div className="flex-1">
                               <div className="font-medium">{item.name}</div>
