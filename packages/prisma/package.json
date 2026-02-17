@@ -15,7 +15,9 @@
     "build": "tsc -p tsconfig.json",
     "migrate:inspect": "tsx scripts/inspect-migration.ts",
     "migrate:resolve:rolled-back:add_folder_prefix": "prisma migrate resolve --rolled-back 20250130000000_add_folder_prefix",
-    "migrate:resolve:applied:add_folder_prefix": "prisma migrate resolve --applied 20250130000000_add_folder_prefix"
+    "migrate:resolve:applied:add_folder_prefix": "prisma migrate resolve --applied 20250130000000_add_folder_prefix",
+    "migrate:resolve:rolled-back:add_price_lists": "prisma migrate resolve --rolled-back 20250131000002_add_price_lists",
+    "migrate:resolve:applied:add_price_lists": "prisma migrate resolve --applied 20250131000002_add_price_lists"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

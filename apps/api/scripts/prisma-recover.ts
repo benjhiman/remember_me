@@ -14,6 +14,7 @@ import * as url from 'url';
 
 const TARGET_MIGRATION = '20250124120000_add_accounting_lite_models';
 const PURCHASE_STOCK_MIGRATION = '20250124130000_add_purchase_stock_application';
+const PRICE_LISTS_MIGRATION = '20250131000002_add_price_lists';
 
 interface MigrationRecord {
   migration_name: string;
@@ -730,6 +731,30 @@ async function main() {
 
     // Check for ALL failed migrations (P3009 detection) - PRIORITY
     console.log('📋 Checking for failed migrations (P3009)...');
+    
+    // Specific migration: 20250131000002_add_price_lists
+    const priceListsMigration = '20250131000002_add_price_lists';
+    const priceListsFailed = await checkFailedMigration(priceListsMigration);
+    if (priceListsFailed) {
+      console.log(`\n⚠️  Found failed migration: ${priceListsMigration}`);
+      console.log('   This migration creates PriceList tables.');
+      console.log('   Attempting to resolve automatically...');
+      
+      // Check if tables exist (migration partially succeeded)
+      const tablesExist = await checkTablesExist([
+        'PriceList',
+        'PriceListItem',
+        'PriceListItemOverride',
+      ]);
+      
+      if (tablesExist) {
+        console.log('   ✓ Tables exist - marking migration as applied');
+        await resolveMigration(priceListsMigration, 'applied');
+      } else {
+        console.log('   ✗ Tables do not exist - marking migration as rolled-back');
+        await resolveMigration(priceListsMigration, 'rolled-back');
+      }
+    }
     const failedMigrations = await getAllFailedMigrations(prisma);
     
     if (failedMigrations.length > 0) {
@@ -794,9 +819,9 @@ async function main() {
         }
       }
       
-      // Check if there are other failed migrations (besides PurchaseStockApplication)
+      // Check if there are other failed migrations (besides PurchaseStockApplication and PriceLists)
       const otherFailedMigrations = failedMigrations.filter(
-        (m) => m.migration_name !== PURCHASE_STOCK_MIGRATION
+        (m) => m.migration_name !== PURCHASE_STOCK_MIGRATION && m.migration_name !== PRICE_LISTS_MIGRATION
       );
       
       if (otherFailedMigrations.length > 0) {
