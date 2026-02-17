@@ -67,7 +67,7 @@ export default function InventoryItemsPage() {
   const deleteFolder = useDeleteFolder();
 
   // Fetch folders (only when not in folder mode)
-  const { data: foldersData, isLoading: isLoadingFolders } = useItemFolders(!folderId && !!user);
+  const { data: foldersData, isLoading: isLoadingFolders, error: foldersError } = useItemFolders(!folderId && !!user);
 
   // Debounce search
   useEffect(() => {
@@ -418,7 +418,21 @@ export default function InventoryItemsPage() {
             </div>
           )}
 
-          {!isLoadingFolders && filteredFolders.length === 0 && (
+          {foldersError && (
+            <div className="p-8 text-center">
+              <div className="max-w-md mx-auto">
+                <p className="text-red-600 font-medium mb-2">Error al cargar las carpetas</p>
+                <p className="text-sm text-gray-600 mb-4">
+                  {(foldersError as Error).message || 'No se pudo conectar con el servidor'}
+                </p>
+                <Button onClick={handleRefresh} variant="outline" size="sm">
+                  Reintentar
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!isLoadingFolders && !foldersError && filteredFolders.length === 0 && (
             <div className="p-12 text-center">
               <div className="max-w-sm mx-auto">
                 <Folder className="h-12 w-12 text-gray-300 mx-auto mb-4" />

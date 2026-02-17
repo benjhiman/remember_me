@@ -308,9 +308,9 @@ export function ItemFormDialog({ open, onOpenChange, item, folderId, onSuccess }
                         </SelectItem>
                       ))
                     ) : (
-                      <SelectItem value="" disabled>
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
                         No hay carpetas disponibles
-                      </SelectItem>
+                      </div>
                     )}
                   </SelectContent>
                 </Select>

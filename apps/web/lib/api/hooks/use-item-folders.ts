@@ -18,10 +18,18 @@ export interface ItemFoldersResponse {
 export function useItemFolders(enabled: boolean = true) {
   return useQuery({
     queryKey: ['item-folders'],
-    queryFn: () => api.get<ItemFoldersResponse>('/items/folders'),
+    queryFn: async () => {
+      const response = await api.get<ItemFoldersResponse>('/items/folders');
+      // Ensure data is always an array
+      return {
+        ...response,
+        data: response.data || [],
+      };
+    },
     enabled,
     staleTime: 30 * 1000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+    retry: 1,
   });
 }
 
