@@ -83,9 +83,11 @@ function InboxWhatsAppInner() {
     enabled: !!user,
   });
 
-  const convList = convListData
-    ? { data: convListData.pages.flatMap((p) => p.data) }
-    : undefined;
+  const convList = useMemo(() => {
+    return convListData
+      ? { data: convListData.pages.flatMap((p) => p.data) }
+      : undefined;
+  }, [convListData]);
 
   useEffect(() => {
     perfMark('inbox-whatsapp-mount');

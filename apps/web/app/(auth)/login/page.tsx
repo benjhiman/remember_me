@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, Suspense } from 'react';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -222,9 +223,11 @@ function LoginPageContent() {
         <CardHeader>
           <div className="flex items-center gap-3">
             {branding?.logoUrl ? (
-              <img
+              <Image
                 src={branding.logoUrl}
                 alt="Logo"
+                width={40}
+                height={40}
                 className="h-10 w-10 rounded-md border bg-white object-contain"
               />
             ) : (

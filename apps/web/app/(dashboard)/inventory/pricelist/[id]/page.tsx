@@ -11,14 +11,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArrowLeft, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-export default function PriceListDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function PriceListDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const [priceListId, setPriceListId] = useState<string | null>(null);
   const router = useRouter();
   
   useEffect(() => {
-    params.then((resolved) => {
-      setPriceListId(resolved.id);
-    });
+    // Handle both Promise and direct object cases
+    if (params instanceof Promise) {
+      params.then((resolved) => {
+        setPriceListId(resolved.id);
+      }).catch((error) => {
+        console.error('Error resolving params:', error);
+      });
+    } else {
+      setPriceListId(params.id);
+    }
   }, [params]);
   
   const { data: priceList, isLoading } = usePriceList(priceListId);
