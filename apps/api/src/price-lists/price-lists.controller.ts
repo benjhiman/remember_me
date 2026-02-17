@@ -16,6 +16,7 @@ import { CurrentOrganization } from '../common/decorators/current-organization.d
 import { Role } from '@remember-me/prisma';
 import { CreatePriceListDto } from './dto/create-price-list.dto';
 import { UpdatePriceListItemDto } from './dto/update-price-list-item.dto';
+import { BulkUpdatePriceListItemsDto } from './dto/bulk-update-price-list-items.dto';
 
 @Controller('price-lists')
 @UseGuards(JwtAuthGuard)
@@ -48,6 +49,18 @@ export class PriceListsController {
     @Body() dto: CreatePriceListDto,
   ) {
     return this.priceListsService.createPriceList(organizationId, user.userId, dto);
+  }
+
+  @Patch(':id/items/bulk')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  async bulkUpdatePriceListItems(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') priceListId: string,
+    @Body() dto: BulkUpdatePriceListItemsDto,
+  ) {
+    return this.priceListsService.bulkUpdatePriceListItems(organizationId, user.userId, priceListId, dto);
   }
 
   @Patch(':id/items/:itemId')

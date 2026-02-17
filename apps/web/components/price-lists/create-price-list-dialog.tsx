@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useCreatePriceList } from '@/lib/api/hooks/use-price-lists';
+import { useCreatePriceList, usePriceList } from '@/lib/api/hooks/use-price-lists';
 import { useItemFolders } from '@/lib/api/hooks/use-item-folders';
 import { useItems } from '@/lib/api/hooks/use-items';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { BulkPricingStep } from './bulk-pricing-step';
 
 interface CreatePriceListDialogProps {
   open: boolean;
@@ -26,6 +27,10 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
   const createPriceList = useCreatePriceList();
   const { data: foldersData } = useItemFolders(open);
   const { data: itemsData } = useItems({ enabled: open, limit: 1000 });
+
+  const [step, setStep] = useState<'config' | 'pricing'>('config');
+  const [createdPriceListId, setCreatedPriceListId] = useState<string | null>(null);
+  const { data: createdPriceList } = usePriceList(createdPriceListId);
 
   const [name, setName] = useState('');
   const [mode, setMode] = useState<'ALL' | 'FOLDERS' | 'ITEMS'>('ALL');
@@ -45,6 +50,8 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
       setSelectedFolderIds([]);
       setSelectedItemIds([]);
       setItemsSearch('');
+      setStep('config');
+      setCreatedPriceListId(null);
     }
   }, [open]);
 
@@ -63,13 +70,9 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
         itemIds: mode === 'ITEMS' ? selectedItemIds : undefined,
       });
 
-      // Close dialog first
-      onOpenChange(false);
-      
-      // Wait a bit for state to settle, then navigate
-      setTimeout(() => {
-        onSuccess(result.id);
-      }, 100);
+      // Move to pricing step
+      setCreatedPriceListId(result.id);
+      setStep('pricing');
     } catch (error) {
       // Error handled by hook
     }
@@ -106,17 +109,40 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
   const selectedFolders = folders.filter((f) => selectedFolderIds.includes(f.id));
   const selectedItems = items.filter((i) => selectedItemIds.includes(i.id));
 
+  const handlePricingComplete = () => {
+    onOpenChange(false);
+    setTimeout(() => {
+      if (createdPriceListId) {
+        onSuccess(createdPriceListId);
+      }
+    }, 100);
+  };
+
+  const handlePricingSkip = () => {
+    onOpenChange(false);
+    setTimeout(() => {
+      if (createdPriceListId) {
+        onSuccess(createdPriceListId);
+      }
+    }, 100);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Crear Lista de Precios</DialogTitle>
+          <DialogTitle>
+            {step === 'config' ? 'Crear Lista de Precios' : 'Asignar Precios'}
+          </DialogTitle>
           <DialogDescription>
-            Creá una nueva lista de precios para agrupar y gestionar precios de tus productos.
+            {step === 'config'
+              ? 'Creá una nueva lista de precios para agrupar y gestionar precios de tus productos.'
+              : 'Asigná precios a los items de la lista. Podés hacerlo ahora o más tarde.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {step === 'config' ? (
+          <form onSubmit={handleSubmit} className="space-y-6">
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name">
@@ -297,15 +323,25 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
             </div>
           )}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={createPriceList.isPending || !name.trim()}>
-              {createPriceList.isPending ? 'Creando...' : 'Crear'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createPriceList.isPending || !name.trim()}>
+                {createPriceList.isPending ? 'Creando...' : 'Crear y asignar precios'}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          createdPriceList && (
+            <BulkPricingStep
+              priceListId={createdPriceListId!}
+              items={createdPriceList.items}
+              onComplete={handlePricingComplete}
+              onSkip={handlePricingSkip}
+            />
+          )
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/layout/page-shell';
 import { usePriceList } from '@/lib/api/hooks/use-price-lists';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import type { PriceListItem } from '@/lib/api/hooks/use-price-lists';
 
 export default function PriceListDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const [priceListId, setPriceListId] = useState<string | null>(null);
@@ -70,6 +71,43 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
     setEditPrice('');
   };
 
+  // Group items by condition
+  const groupedItems = useMemo(() => {
+    if (!priceList) return {};
+
+    const groups: Record<string, PriceListItem[]> = {
+      NEW: [],
+      USED: [],
+      OEM: [],
+      UNKNOWN: [],
+    };
+
+    priceList.items.forEach((item) => {
+      const condition = item.condition || 'UNKNOWN';
+      if (groups[condition]) {
+        groups[condition].push(item);
+      } else {
+        groups.UNKNOWN.push(item);
+      }
+    });
+
+    // Sort each group by displayName
+    Object.keys(groups).forEach((key) => {
+      groups[key].sort((a, b) => a.displayName.localeCompare(b.displayName));
+    });
+
+    return groups;
+  }, [priceList]);
+
+  const conditionLabels: Record<string, string> = {
+    NEW: 'Nuevos',
+    USED: 'Usados',
+    OEM: 'OEM',
+    UNKNOWN: 'Otros',
+  };
+
+  const conditionOrder = ['NEW', 'USED', 'OEM', 'UNKNOWN'];
+
   if (isLoading) {
     return (
       <PageShell
@@ -129,70 +167,86 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
                 </TableCell>
               </TableRow>
             ) : (
-              priceList.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.displayName}</TableCell>
-                  <TableCell className="text-muted-foreground">{item.baseSku || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    {editingItemId === item.id ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(e.target.value)}
-                          className="w-32"
-                          placeholder="0.00"
-                          autoFocus
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleSavePrice(item.id)}
-                          disabled={updatePriceListItem.isPending}
-                        >
-                          Guardar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                          Cancelar
-                        </Button>
-                      </div>
-                    ) : (
-                      <span className="font-medium">
-                        {item.basePrice !== null && item.basePrice !== undefined
-                          ? `$${item.basePrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : '-'}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {item.overrideCount > 0 ? (
-                      <Badge variant="secondary">{item.overrideCount}</Badge>
-                    ) : (
-                      '-'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {editingItemId === item.id ? null : (
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditPrice(item.id, item.basePrice ?? null)}
-                        >
-                          {item.basePrice !== null && item.basePrice !== undefined ? 'Editar' : 'Agregar precio'}
-                        </Button>
-                        {item.overrideCount === 0 && (
-                          <Button size="sm" variant="ghost" disabled title="Próximamente">
-                            <Plus className="h-4 w-4 mr-1" />
-                            Excepción
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+              conditionOrder.map((condition) => {
+                const conditionItems = groupedItems[condition] || [];
+                if (conditionItems.length === 0) return null;
+
+                return (
+                  <React.Fragment key={condition}>
+                    {/* Condition Header */}
+                    <TableRow className="bg-muted/50">
+                      <TableCell colSpan={5} className="font-semibold text-sm">
+                        {conditionLabels[condition]} ({conditionItems.length})
+                      </TableCell>
+                    </TableRow>
+                    {/* Items in this condition */}
+                    {conditionItems.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.displayName}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.baseSku || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          {editingItemId === item.id ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editPrice}
+                                onChange={(e) => setEditPrice(e.target.value)}
+                                className="w-32"
+                                placeholder="0.00"
+                                autoFocus
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleSavePrice(item.id)}
+                                disabled={updatePriceListItem.isPending}
+                              >
+                                Guardar
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
+                                Cancelar
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="font-medium">
+                              {item.basePrice !== null && item.basePrice !== undefined
+                                ? `$${item.basePrice.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                : '-'}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.overrideCount > 0 ? (
+                            <Badge variant="secondary">{item.overrideCount}</Badge>
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {editingItemId === item.id ? null : (
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditPrice(item.id, item.basePrice ?? null)}
+                              >
+                                {item.basePrice !== null && item.basePrice !== undefined ? 'Editar' : 'Agregar precio'}
+                              </Button>
+                              {item.overrideCount === 0 && (
+                                <Button size="sm" variant="ghost" disabled title="Próximamente">
+                                  <Plus className="h-4 w-4 mr-1" />
+                                  Excepción
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </React.Fragment>
+                );
+              })
             )}
           </TableBody>
         </Table>

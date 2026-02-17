@@ -21,6 +21,7 @@ export interface PriceListItem {
   baseSku?: string | null;
   basePrice?: number | null;
   overrideCount: number;
+  condition?: 'NEW' | 'USED' | 'OEM' | 'UNKNOWN';
 }
 
 export interface PriceListDetail {
@@ -116,6 +117,41 @@ export function useUpdatePriceListItem() {
     onError: (error: any) => {
       const errorMessage =
         error?.response?.data?.message || 'Error al actualizar el precio. Por favor, intentá nuevamente.';
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
+    },
+  });
+}
+
+export function useBulkUpdatePriceListItems() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: ({
+      priceListId,
+      items,
+    }: {
+      priceListId: string;
+      items: Array<{ priceListItemId: string; basePrice?: number | null }>;
+    }) =>
+      api.patch<{ updated: PriceListItem[] }>(`/price-lists/${priceListId}/items/bulk`, {
+        items,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['price-lists', variables.priceListId] });
+      queryClient.invalidateQueries({ queryKey: ['price-lists'] });
+      toast({
+        title: 'Precios actualizados',
+        description: `${variables.items.length} precio(s) actualizado(s) correctamente.`,
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message || 'Error al actualizar los precios. Por favor, intentá nuevamente.';
       toast({
         variant: 'destructive',
         title: 'Error',

@@ -129,14 +129,19 @@ export class PriceListsService {
       name: priceList.name,
       createdAt: priceList.createdAt,
       updatedAt: priceList.updatedAt,
-      items: priceList.items.map((item) => ({
-        id: item.id,
-        itemGroupKey: item.itemGroupKey,
-        displayName: item.displayName,
-        baseSku: item.baseSku,
-        basePrice: item.basePrice ? parseFloat(item.basePrice.toString()) : null,
-        overrideCount: item._count.overrides,
-      })),
+      items: priceList.items.map((item) => {
+        // Extract condition from itemGroupKey (last part after last underscore)
+        const condition = item.itemGroupKey.split('_').pop() || 'UNKNOWN';
+        return {
+          id: item.id,
+          itemGroupKey: item.itemGroupKey,
+          displayName: item.displayName,
+          baseSku: item.baseSku,
+          basePrice: item.basePrice ? parseFloat(item.basePrice.toString()) : null,
+          overrideCount: item._count.overrides,
+          condition: condition as 'NEW' | 'USED' | 'OEM' | 'UNKNOWN',
+        };
+      }),
     };
   }
 
@@ -376,6 +381,66 @@ export class PriceListsService {
       itemGroupKey: updated.itemGroupKey,
       displayName: updated.displayName,
       basePrice: updated.basePrice ? parseFloat(updated.basePrice.toString()) : null,
+    };
+  }
+
+  async bulkUpdatePriceListItems(
+    organizationId: string,
+    userId: string,
+    priceListId: string,
+    dto: { items: Array<{ priceListItemId: string; basePrice?: number | null }> },
+  ) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can update price list items');
+    }
+
+    // Verify price list exists and belongs to organization
+    const priceList = await this.prisma.priceList.findFirst({
+      where: {
+        id: priceListId,
+        organizationId,
+      },
+    });
+
+    if (!priceList) {
+      throw new NotFoundException('Price list not found');
+    }
+
+    // Verify all price list items exist and belong to price list
+    const priceListItemIds = dto.items.map((item) => item.priceListItemId);
+    const existingItems = await this.prisma.priceListItem.findMany({
+      where: {
+        id: { in: priceListItemIds },
+        priceListId,
+        organizationId,
+      },
+    });
+
+    if (existingItems.length !== priceListItemIds.length) {
+      throw new BadRequestException('One or more price list items not found or do not belong to this price list');
+    }
+
+    // Update all items in transaction
+    const updated = await this.prisma.$transaction(
+      dto.items.map((item) =>
+        this.prisma.priceListItem.update({
+          where: { id: item.priceListItemId },
+          data: {
+            basePrice: item.basePrice !== null && item.basePrice !== undefined ? new Decimal(item.basePrice) : null,
+          },
+        }),
+      ),
+    );
+
+    return {
+      updated: updated.map((item) => ({
+        id: item.id,
+        itemGroupKey: item.itemGroupKey,
+        displayName: item.displayName,
+        basePrice: item.basePrice ? parseFloat(item.basePrice.toString()) : null,
+      })),
     };
   }
 }
