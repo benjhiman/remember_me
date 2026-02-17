@@ -775,30 +775,6 @@ async function main() {
 
     // Check for ALL failed migrations (P3009 detection) - PRIORITY
     console.log('📋 Checking for failed migrations (P3009)...');
-    
-    // Specific migration: 20250131000002_add_price_lists
-    const priceListsMigration = '20250131000002_add_price_lists';
-    const priceListsFailed = await checkFailedMigration(priceListsMigration);
-    if (priceListsFailed) {
-      console.log(`\n⚠️  Found failed migration: ${priceListsMigration}`);
-      console.log('   This migration creates PriceList tables.');
-      console.log('   Attempting to resolve automatically...');
-      
-      // Check if tables exist (migration partially succeeded)
-      const tablesExist = await checkTablesExist([
-        'PriceList',
-        'PriceListItem',
-        'PriceListItemOverride',
-      ]);
-      
-      if (tablesExist) {
-        console.log('   ✓ Tables exist - marking migration as applied');
-        await resolveMigration(priceListsMigration, 'applied');
-      } else {
-        console.log('   ✗ Tables do not exist - marking migration as rolled-back');
-        await resolveMigration(priceListsMigration, 'rolled-back');
-      }
-    }
     const failedMigrations = await getAllFailedMigrations(prisma);
     
     if (failedMigrations.length > 0) {
