@@ -46,7 +46,7 @@ export function CreateReservationDialog({
     enabled: open,
   });
 
-  const items = itemsData?.data || [];
+  const items = useMemo(() => itemsData?.data || [], [itemsData?.data]);
 
   // Filter items based on search
   const filteredItems = useMemo(() => {

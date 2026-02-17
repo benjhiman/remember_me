@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
@@ -241,9 +242,11 @@ function NavItemComponent({
     <>
       {item.iconSrc ? (
         <div className="h-5 w-5 flex-shrink-0 flex items-center justify-center">
-          <img
+          <Image
             src={item.iconSrc}
             alt={item.label}
+            width={20}
+            height={20}
             className="h-5 w-5 opacity-70"
             style={{ filter: 'brightness(0) saturate(100%)' }}
           />

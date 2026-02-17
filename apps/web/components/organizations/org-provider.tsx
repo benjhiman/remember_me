@@ -206,13 +206,13 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     }
     
     // NETWORK_ERROR - show error with retry
-    const errorMessage = (error as Error)?.message || orgError || 'Failed to load organizations';
+    const errorMessage = (error as Error)?.message || orgError || 'No se pudo conectar con el servidor. Verificá tu conexión y que el API esté disponible.';
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center max-w-md p-6 border border-red-200 rounded-lg bg-red-50 dark:bg-red-900/20 dark:border-red-800">
           <AlertCircle className="h-8 w-8 text-red-600 mx-auto mb-2" />
           <div className="text-red-600 font-medium mb-2">Error loading organizations</div>
-          <div className="text-sm text-muted-foreground mb-4">{errorMessage}</div>
+          <div className="text-sm text-red-700 dark:text-red-300 mb-4">{errorMessage}</div>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
