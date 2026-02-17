@@ -19,12 +19,33 @@ export function useItemFolders(enabled: boolean = true) {
   return useQuery({
     queryKey: ['item-folders'],
     queryFn: async () => {
-      const response = await api.get<ItemFoldersResponse>('/items/folders');
-      // Ensure data is always an array
-      return {
-        ...response,
-        data: response.data || [],
-      };
+      try {
+        const response = await api.get<ItemFoldersResponse>('/items/folders');
+        // Ensure data is always an array
+        const normalized = {
+          ...response,
+          data: response.data || [],
+        };
+        
+        // Debug logging (only in dev)
+        if (process.env.NODE_ENV !== 'production') {
+          console.debug('[useItemFolders] Response:', {
+            foldersCount: normalized.data.length,
+            folders: normalized.data.map((f) => ({ id: f.id, name: f.name, count: f.count })),
+          });
+        }
+        
+        return normalized;
+      } catch (error: any) {
+        // Log detailed error for debugging
+        console.error('[useItemFolders] Error fetching folders:', {
+          status: error?.response?.status,
+          statusText: error?.response?.statusText,
+          message: error?.response?.data?.message || error?.message,
+          data: error?.response?.data,
+        });
+        throw error;
+      }
     },
     enabled,
     staleTime: 30 * 1000, // 30 seconds
