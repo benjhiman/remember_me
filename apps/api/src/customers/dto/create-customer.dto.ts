@@ -17,6 +17,22 @@ export class CreateCustomerDto {
 
   @IsString()
   @IsOptional()
+  city?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @IsString()
+  @IsOptional()
+  instagram?: string;
+
+  @IsString()
+  @IsOptional()
+  web?: string;
+
+  @IsString()
+  @IsOptional()
   notes?: string;
 
   @IsString()

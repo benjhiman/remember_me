@@ -94,7 +94,7 @@ export class SalesService {
   // Helper: Generate unique sale number
   private async generateSaleNumber(organizationId: string): Promise<string> {
     const year = new Date().getFullYear();
-    const prefix = `SALE-${year}-`;
+    const prefix = `INV-${year}-`;
 
     const lastSale = await this.prisma.sale.findFirst({
       where: {
@@ -115,6 +115,21 @@ export class SalesService {
     }
 
     return `${prefix}${sequence.toString().padStart(3, '0')}`;
+  }
+
+  // Helper: Validate sale number uniqueness
+  private async validateSaleNumber(organizationId: string, saleNumber: string, excludeSaleId?: string): Promise<void> {
+    const existing = await this.prisma.sale.findFirst({
+      where: {
+        organizationId,
+        saleNumber,
+        ...(excludeSaleId ? { id: { not: excludeSaleId } } : {}),
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException(`Invoice number ${saleNumber} already exists`);
+    }
   }
 
   // Helper: Create stock movement (internal use)
@@ -499,9 +514,18 @@ export class SalesService {
   }
 
   const discount = dto.discount || 0;
-    const total = subtotal - discount;
+  const total = subtotal - discount;
 
-    const saleNumber = await this.generateSaleNumber(organizationId);
+  // Generate or validate sale number
+  let saleNumber: string;
+  if (dto.saleNumber) {
+    // Validate manual sale number
+    await this.validateSaleNumber(organizationId, dto.saleNumber);
+    saleNumber = dto.saleNumber;
+  } else {
+    // Auto-generate sale number
+    saleNumber = await this.generateSaleNumber(organizationId);
+  }
 
     return this.prisma.$transaction(async (tx) => {
       // Create sale
@@ -516,6 +540,7 @@ export class SalesService {
           customerName: dto.customerName,
           customerEmail: dto.customerEmail,
           customerPhone: dto.customerPhone,
+          customerCity: dto.customerCity,
           subtotal: new Decimal(subtotal),
           discount: new Decimal(discount),
           total: new Decimal(total),
@@ -527,6 +552,9 @@ export class SalesService {
             location: dto.location,
             orderNumber: dto.orderNumber,
             subject: dto.subject,
+            customerAddress: dto.customerAddress,
+            customerInstagram: dto.customerInstagram,
+            customerWeb: dto.customerWeb,
           },
           items: {
             create: [

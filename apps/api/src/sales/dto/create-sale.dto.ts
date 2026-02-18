@@ -56,6 +56,26 @@ export class CreateSaleDto {
   @IsOptional()
   orderNumber?: string; // Order number
 
+  @IsString()
+  @IsOptional()
+  saleNumber?: string; // Manual invoice number (optional, auto-generated if not provided)
+
+  @IsString()
+  @IsOptional()
+  customerCity?: string; // Customer city
+
+  @IsString()
+  @IsOptional()
+  customerAddress?: string; // Customer address
+
+  @IsString()
+  @IsOptional()
+  customerInstagram?: string; // Customer Instagram
+
+  @IsString()
+  @IsOptional()
+  customerWeb?: string; // Customer website
+
   @IsObject()
   @IsOptional()
   metadata?: Record<string, any>;

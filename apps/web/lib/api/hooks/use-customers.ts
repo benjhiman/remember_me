@@ -43,5 +43,10 @@ export function useCustomers(params: UseCustomersParams = {}) {
     queryKey: ['customers', params],
     queryFn: () => api.get<CustomerListResponse>(`/customers?${queryParams.toString()}`),
     enabled,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }
+
+// Re-export for convenience
+export { useCreateCustomer } from './use-customer-mutations';

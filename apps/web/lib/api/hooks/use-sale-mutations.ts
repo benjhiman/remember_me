@@ -16,12 +16,18 @@ interface CreateSaleData {
   customerName: string;
   customerEmail?: string;
   customerPhone?: string;
+  customerCity?: string;
+  customerAddress?: string;
+  customerInstagram?: string;
+  customerWeb?: string;
   discount?: number;
   currency?: string;
   notes?: string;
   subject?: string;
   location?: string;
   orderNumber?: string;
+  saleNumber?: string; // Manual invoice number
+  priceListId?: string; // Selected price list ID
   leadId?: string;
   metadata?: Record<string, any>;
 }
