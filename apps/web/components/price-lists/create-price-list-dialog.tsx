@@ -279,10 +279,17 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                     Seleccionar carpetas ({selectedFolderIds.length})
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start" side="bottom" onInteractOutside={(e) => {
-                  // Don't close when clicking inside
-                  e.preventDefault();
-                }}>
+                <PopoverContent 
+                  className="w-[400px] p-0" 
+                  align="start" 
+                  side="bottom" 
+                  sideOffset={8}
+                  collisionPadding={10}
+                  onInteractOutside={(e) => {
+                    // Don't close when clicking inside
+                    e.preventDefault();
+                  }}
+                >
                   <Command shouldFilter={false}>
                     <CommandInput placeholder="Buscar carpetas..." />
                     <CommandList>
@@ -347,10 +354,17 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                     Seleccionar modelos ({selectedItemGroupKeys.length})
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] p-0" align="start" side="bottom" onInteractOutside={(e) => {
-                  // Don't close when clicking inside
-                  e.preventDefault();
-                }}>
+                <PopoverContent 
+                  className="w-[500px] p-0" 
+                  align="start" 
+                  side="bottom" 
+                  sideOffset={8}
+                  collisionPadding={10}
+                  onInteractOutside={(e) => {
+                    // Don't close when clicking inside
+                    e.preventDefault();
+                  }}
+                >
                   <Command shouldFilter={false}>
                     <CommandInput
                       placeholder="Buscar por modelo..."
