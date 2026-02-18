@@ -105,7 +105,6 @@ export function BulkPricingStep({ priceListId, items, onComplete, onSkip }: Bulk
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
-              <TableHead>SKU Base</TableHead>
               <TableHead className="text-right">Precio Base</TableHead>
             </TableRow>
           </TableHeader>
@@ -135,7 +134,6 @@ export function BulkPricingStep({ priceListId, items, onComplete, onSkip }: Bulk
                   {conditionItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.displayName}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.baseSku || '-'}</TableCell>
                       <TableCell className="text-right">
                         <Input
                           type="number"

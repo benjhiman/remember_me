@@ -8,9 +8,10 @@ import { useUpdatePriceListItem } from '@/lib/api/hooks/use-price-lists';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { PriceListItem } from '@/lib/api/hooks/use-price-lists';
+import { GenerateWhatsAppListDialog } from '@/components/price-lists/generate-whatsapp-list-dialog';
 
 export default function PriceListDetailPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const [priceListId, setPriceListId] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
   const updatePriceListItem = useUpdatePriceListItem();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<string>('');
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
 
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory' },
@@ -142,10 +144,16 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
       description={`${priceList.items.length} ${priceList.items.length === 1 ? 'item' : 'items'}`}
       breadcrumbs={breadcrumbs}
       actions={
-        <Button variant="outline" onClick={() => router.push('/inventory/pricelist')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setGenerateDialogOpen(true)}>
+            <FileText className="h-4 w-4 mr-2" />
+            Generar Lista
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/inventory/pricelist')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver
+          </Button>
+        </div>
       }
     >
       <div className="bg-white rounded-lg border">
@@ -153,16 +161,14 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
           <TableHeader>
             <TableRow>
               <TableHead>Item</TableHead>
-              <TableHead>SKU Base</TableHead>
               <TableHead className="text-right">Precio Base</TableHead>
-              <TableHead className="text-right">Excepciones</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {priceList.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                   No hay items en esta lista.
                 </TableCell>
               </TableRow>
@@ -175,7 +181,7 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
                   <React.Fragment key={condition}>
                     {/* Condition Header */}
                     <TableRow className="bg-muted/50">
-                      <TableCell colSpan={5} className="font-semibold text-sm">
+                      <TableCell colSpan={3} className="font-semibold text-sm">
                         {conditionLabels[condition]} ({conditionItems.length})
                       </TableCell>
                     </TableRow>
@@ -183,7 +189,6 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
                     {conditionItems.map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.displayName}</TableCell>
-                        <TableCell className="text-muted-foreground">{item.baseSku || '-'}</TableCell>
                         <TableCell className="text-right">
                           {editingItemId === item.id ? (
                             <div className="flex items-center justify-end gap-2">
@@ -217,29 +222,14 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {item.overrideCount > 0 ? (
-                            <Badge variant="secondary">{item.overrideCount}</Badge>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
                           {editingItemId === item.id ? null : (
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditPrice(item.id, item.basePrice ?? null)}
-                              >
-                                {item.basePrice !== null && item.basePrice !== undefined ? 'Editar' : 'Agregar precio'}
-                              </Button>
-                              {item.overrideCount === 0 && (
-                                <Button size="sm" variant="ghost" disabled title="Próximamente">
-                                  <Plus className="h-4 w-4 mr-1" />
-                                  Excepción
-                                </Button>
-                              )}
-                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditPrice(item.id, item.basePrice ?? null)}
+                            >
+                              {item.basePrice !== null && item.basePrice !== undefined ? 'Editar' : 'Agregar precio'}
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -251,6 +241,13 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
           </TableBody>
         </Table>
       </div>
+
+      <GenerateWhatsAppListDialog
+        open={generateDialogOpen}
+        onOpenChange={setGenerateDialogOpen}
+        priceListName={priceList.name}
+        items={priceList.items}
+      />
     </PageShell>
   );
 }
