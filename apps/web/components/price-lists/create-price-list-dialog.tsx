@@ -279,7 +279,7 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                     Seleccionar carpetas ({selectedFolderIds.length})
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start" onInteractOutside={(e) => {
+                <PopoverContent className="w-[400px] p-0" align="start" side="bottom" onInteractOutside={(e) => {
                   // Don't close when clicking inside
                   e.preventDefault();
                 }}>
@@ -347,7 +347,7 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                     Seleccionar modelos ({selectedItemGroupKeys.length})
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[500px] p-0" align="start" onInteractOutside={(e) => {
+                <PopoverContent className="w-[500px] p-0" align="start" side="bottom" onInteractOutside={(e) => {
                   // Don't close when clicking inside
                   e.preventDefault();
                 }}>

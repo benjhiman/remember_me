@@ -89,9 +89,13 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
     
     try {
       await deletePriceList.mutateAsync(priceListId);
+      // Close dialog first
+      setDeleteDialogOpen(false);
+      // Then navigate
       router.push('/inventory/pricelist');
     } catch (error) {
       // Error handled by hook
+      console.error('Error deleting price list:', error);
     }
   };
 
