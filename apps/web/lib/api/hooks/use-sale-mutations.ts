@@ -3,14 +3,25 @@ import { useRouter } from 'next/navigation';
 import { api } from '../client';
 import type { Sale } from '@/types/sales';
 
+interface CreateSaleItem {
+  stockItemId?: string;
+  model: string;
+  quantity: number;
+  unitPrice: number;
+}
+
 interface CreateSaleData {
-  stockReservationIds: string[];
+  stockReservationIds?: string[];
+  items?: CreateSaleItem[];
   customerName: string;
   customerEmail?: string;
   customerPhone?: string;
   discount?: number;
   currency?: string;
   notes?: string;
+  subject?: string;
+  location?: string;
+  orderNumber?: string;
   leadId?: string;
   metadata?: Record<string, any>;
 }

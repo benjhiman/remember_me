@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useEffect } from 'react';
-import { SaleForm } from '@/components/sales/sale-form';
+import { SaleFormZoho } from '@/components/sales/sale-form-zoho';
 import { useCreateSale } from '@/lib/api/hooks/use-sale-mutations';
 
 export default function NewSalePage() {
@@ -36,10 +36,9 @@ export default function NewSalePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-5xl mx-auto p-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Crear Venta</h1>
-          <p className="text-gray-600">Crear una nueva venta desde reservas de stock</p>
+          <h1 className="text-3xl font-bold">Create Invoice</h1>
         </div>
 
         {createSale.isError && (
@@ -50,11 +49,13 @@ export default function NewSalePage() {
           </div>
         )}
 
-        <SaleForm
-          onSubmit={handleSubmit}
-          onCancel={handleCancel}
-          isLoading={createSale.isPending}
-        />
+        <div className="bg-white rounded-lg border shadow-sm p-6">
+          <SaleFormZoho
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            isLoading={createSale.isPending}
+          />
+        </div>
       </div>
     </div>
   );

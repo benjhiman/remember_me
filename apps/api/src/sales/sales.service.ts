@@ -356,8 +356,12 @@ export class SalesService {
       throw new ForbiddenException('Seller cannot create sales (disabled by organization settings)');
     }
 
-    if (!dto.stockReservationIds || dto.stockReservationIds.length === 0) {
-      throw new BadRequestException('Sale must have at least one stock reservation');
+    // Validate: must have either reservations or items
+    const hasReservations = dto.stockReservationIds && dto.stockReservationIds.length > 0;
+    const hasItems = dto.items && dto.items.length > 0;
+
+    if (!hasReservations && !hasItems) {
+      throw new BadRequestException('Sale must have at least one stock reservation or one item');
     }
 
     // Verify lead belongs to organization if provided
@@ -374,70 +378,72 @@ export class SalesService {
       }
     }
 
-    // Verify all reservations exist, are ACTIVE, and belong to organization
-    const reservations = await this.prisma.stockReservation.findMany({
-      where: {
-        id: { in: dto.stockReservationIds },
-        organizationId,
-      },
-      include: {
-        stockItem: true,
-        item: {
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            brand: true,
-            model: true,
+    let reservations: any[] = [];
+    let itemsToCreate: any[] = [];
+    let subtotal = 0;
+
+    // Process reservations if provided
+    if (hasReservations) {
+      // Verify all reservations exist, are ACTIVE, and belong to organization
+      reservations = await this.prisma.stockReservation.findMany({
+        where: {
+          id: { in: dto.stockReservationIds },
+          organizationId,
+        },
+        include: {
+          stockItem: true,
+          item: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              brand: true,
+              model: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (reservations.length !== dto.stockReservationIds.length) {
-      throw new NotFoundException('One or more reservations not found');
-    }
+      if (reservations.length !== dto.stockReservationIds!.length) {
+        throw new NotFoundException('One or more reservations not found');
+      }
 
-    // Verify all reservations are ACTIVE
-    const inactiveReservations = reservations.filter(
-      (r) => r.status !== ReservationStatus.ACTIVE,
-    );
-    if (inactiveReservations.length > 0) {
-      throw new BadRequestException(
-        `Reservations ${inactiveReservations.map((r) => r.id).join(', ')} are not ACTIVE`,
+      // Verify all reservations are ACTIVE
+      const inactiveReservations = reservations.filter(
+        (r) => r.status !== ReservationStatus.ACTIVE,
       );
-    }
+      if (inactiveReservations.length > 0) {
+        throw new BadRequestException(
+          `Reservations ${inactiveReservations.map((r) => r.id).join(', ')} are not ACTIVE`,
+        );
+      }
 
-    // Verify all reservations are not already linked to a sale
-    const linkedReservations = reservations.filter((r) => r.saleId !== null);
-    if (linkedReservations.length > 0) {
-      throw new BadRequestException(
-        `Reservations ${linkedReservations.map((r) => r.id).join(', ')} are already linked to a sale`,
-      );
-    }
+      // Verify all reservations are not already linked to a sale
+      const linkedReservations = reservations.filter((r) => r.saleId !== null);
+      if (linkedReservations.length > 0) {
+        throw new BadRequestException(
+          `Reservations ${linkedReservations.map((r) => r.id).join(', ')} are already linked to a sale`,
+        );
+      }
 
-    // Calculate totals from reservations
-    // For item-based reservations, get price from first available stock item
-    const reservationPrices = await Promise.all(
-      reservations.map(async (reservation) => {
-        if (reservation.stockItem) {
-          // Legacy: stockItem-based reservation
-          return parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity;
-        } else if (reservation.itemId) {
-          // Item-based reservation: get price from first available stock item
-          const stockItem = await this.prisma.stockItem.findFirst({
-            where: {
-              organizationId: reservation.organizationId,
-              itemId: reservation.itemId,
-              deletedAt: null,
-            },
-            orderBy: { createdAt: 'desc' }, // Get most recent stock item
-          });
+      // Calculate totals from reservations
+      const reservationPrices = await Promise.all(
+        reservations.map(async (reservation) => {
+          if (reservation.stockItem) {
+            return parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity;
+          } else if (reservation.itemId) {
+            const stockItem = await this.prisma.stockItem.findFirst({
+              where: {
+                organizationId: reservation.organizationId,
+                itemId: reservation.itemId,
+                deletedAt: null,
+              },
+              orderBy: { createdAt: 'desc' },
+            });
 
-          if (stockItem) {
-            return parseFloat(stockItem.basePrice.toString()) * reservation.quantity;
+            if (stockItem) {
+              return parseFloat(stockItem.basePrice.toString()) * reservation.quantity;
           } else {
-            // No stock item found - log warning but allow sale to proceed with 0 price
             this.logger.warn(
               `No stock item found for itemId ${reservation.itemId} in reservation ${reservation.id}. Using price 0.`,
             );
@@ -447,8 +453,52 @@ export class SalesService {
         return 0;
       }),
     );
-    const subtotal = reservationPrices.reduce((sum, price) => sum + price, 0);
-    const discount = dto.discount || 0;
+    subtotal = reservationPrices.reduce((sum, price) => sum + price, 0);
+  }
+
+  // Process direct items if provided
+  if (hasItems) {
+    itemsToCreate = await Promise.all(
+      dto.items!.map(async (item) => {
+        let stockItemId: string | null = null;
+        let unitPrice: Decimal;
+
+        // If stockItemId is provided, verify it exists and get price
+        if (item.stockItemId) {
+          const stockItem = await this.prisma.stockItem.findFirst({
+            where: {
+              id: item.stockItemId,
+              organizationId,
+              deletedAt: null,
+            },
+          });
+
+          if (!stockItem) {
+            throw new NotFoundException(`Stock item ${item.stockItemId} not found`);
+          }
+
+          stockItemId = stockItem.id;
+          unitPrice = stockItem.basePrice || new Decimal(0);
+        } else {
+          // Use provided unitPrice directly
+          unitPrice = new Decimal(item.unitPrice);
+        }
+
+        const totalPrice = new Decimal(parseFloat(unitPrice.toString()) * item.quantity);
+        subtotal += parseFloat(totalPrice.toString());
+
+        return {
+          stockItemId,
+          model: item.model,
+          quantity: item.quantity,
+          unitPrice,
+          totalPrice,
+        };
+      }),
+    );
+  }
+
+  const discount = dto.discount || 0;
     const total = subtotal - discount;
 
     const saleNumber = await this.generateSaleNumber(organizationId);
@@ -462,7 +512,7 @@ export class SalesService {
           assignedToId: userId,
           leadId: dto.leadId,
           saleNumber,
-          status: SaleStatus.RESERVED,
+          status: hasReservations ? SaleStatus.RESERVED : SaleStatus.DRAFT,
           customerName: dto.customerName,
           customerEmail: dto.customerEmail,
           customerPhone: dto.customerPhone,
@@ -470,52 +520,61 @@ export class SalesService {
           discount: new Decimal(discount),
           total: new Decimal(total),
           currency: dto.currency || 'USD',
-          reservedAt: new Date(),
-          notes: dto.notes,
-          metadata: dto.metadata || {},
+          reservedAt: hasReservations ? new Date() : null,
+          notes: dto.notes || dto.subject,
+          metadata: {
+            ...(dto.metadata || {}),
+            location: dto.location,
+            orderNumber: dto.orderNumber,
+            subject: dto.subject,
+          },
           items: {
-            create: await Promise.all(
-              reservations.map(async (reservation) => {
-                if (reservation.stockItemId && reservation.stockItem) {
-                  // Legacy: stockItem-based reservation
-                  return {
-                    stockItemId: reservation.stockItemId,
-                    model: reservation.stockItem.model,
-                    quantity: reservation.quantity,
-                    unitPrice: reservation.stockItem.basePrice,
-                    totalPrice: new Decimal(
-                      parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity,
-                    ),
-                  };
-                } else if (reservation.itemId && reservation.item) {
-                  // Item-based reservation: get price from first available stock item
-                  const stockItem = await tx.stockItem.findFirst({
-                    where: {
-                      organizationId: reservation.organizationId,
-                      itemId: reservation.itemId,
-                      deletedAt: null,
-                    },
-                    orderBy: { createdAt: 'desc' },
-                  });
+            create: [
+              // Items from reservations
+              ...(await Promise.all(
+                reservations.map(async (reservation) => {
+                  if (reservation.stockItemId && reservation.stockItem) {
+                    const basePrice = reservation.stockItem.basePrice || new Decimal(0);
+                    return {
+                      stockItemId: reservation.stockItemId,
+                      model: reservation.stockItem.model,
+                      quantity: reservation.quantity,
+                      unitPrice: basePrice,
+                      totalPrice: new Decimal(
+                        parseFloat(basePrice.toString()) * reservation.quantity,
+                      ),
+                    };
+                  } else if (reservation.itemId && reservation.item) {
+                    const stockItem = await tx.stockItem.findFirst({
+                      where: {
+                        organizationId: reservation.organizationId,
+                        itemId: reservation.itemId,
+                        deletedAt: null,
+                      },
+                      orderBy: { createdAt: 'desc' },
+                    });
 
-                  const modelName = reservation.item.model || reservation.item.name;
-                  const unitPrice = stockItem ? stockItem.basePrice : new Decimal(0);
-                  const totalPrice = new Decimal(parseFloat(unitPrice.toString()) * reservation.quantity);
+                    const modelName = reservation.item.model || reservation.item.name;
+                    const unitPrice = stockItem?.basePrice || new Decimal(0);
+                    const totalPrice = new Decimal(parseFloat(unitPrice.toString()) * reservation.quantity);
 
-                  return {
-                    stockItemId: stockItem?.id || null,
-                    model: modelName,
-                    quantity: reservation.quantity,
-                    unitPrice,
-                    totalPrice,
-                  };
-                } else {
-                  throw new BadRequestException(
-                    `Reservation ${reservation.id} must have either stockItemId or itemId`,
-                  );
-                }
-              }),
-            ),
+                    return {
+                      stockItemId: stockItem?.id || null,
+                      model: modelName,
+                      quantity: reservation.quantity,
+                      unitPrice,
+                      totalPrice,
+                    };
+                  } else {
+                    throw new BadRequestException(
+                      `Reservation ${reservation.id} must have either stockItemId or itemId`,
+                    );
+                  }
+                }),
+              )),
+              // Direct items (without reservations)
+              ...itemsToCreate,
+            ],
           },
         },
         include: {
@@ -548,15 +607,17 @@ export class SalesService {
         },
       });
 
-      // Link reservations to sale
-      await tx.stockReservation.updateMany({
-        where: {
-          id: { in: dto.stockReservationIds },
-        },
-        data: {
-          saleId: sale.id,
-        },
-      });
+      // Link reservations to sale (if any)
+      if (hasReservations && dto.stockReservationIds && dto.stockReservationIds.length > 0) {
+        await tx.stockReservation.updateMany({
+          where: {
+            id: { in: dto.stockReservationIds },
+          },
+          data: {
+            saleId: sale.id,
+          },
+        });
+      }
 
       // Audit log
       const metadata = this.getRequestMetadata();
