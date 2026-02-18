@@ -8,13 +8,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDate } from '@/lib/utils/lead-utils';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { getStatusColor, getStatusLabel } from '@/lib/utils/sales-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import { usePermissions } from '@/lib/auth/use-permissions';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
-import { ShoppingCart, Plus, Search } from 'lucide-react';
+import { ShoppingCart, Plus, Search, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
 import type { SaleStatus } from '@/types/sales';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 export default function SalesPage() {
   const router = useRouter();
@@ -23,10 +40,11 @@ export default function SalesPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<SaleStatus | undefined>(undefined);
+  const [recordsPerPage, setRecordsPerPage] = useState(30);
 
   const { data, isLoading, error, refetch } = useSales({
     page,
-    limit: 20,
+    limit: recordsPerPage,
     q: search || undefined,
     status: statusFilter,
     enabled: !!user,
@@ -73,21 +91,26 @@ export default function SalesPage() {
           />
         </div>
       </div>
-      <select
-        className="h-9 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        value={statusFilter || ''}
-        onChange={(e) => {
-          setStatusFilter(e.target.value as SaleStatus | undefined);
+      <Select
+        value={statusFilter || 'all'}
+        onValueChange={(value) => {
+          setStatusFilter(value === 'all' ? undefined : (value as SaleStatus));
           setPage(1);
         }}
       >
-        <option value="">Todos los estados</option>
-        <option value="DRAFT">Borrador</option>
-        <option value="PENDING">Pendiente</option>
-        <option value="PAID">Pagado</option>
-        <option value="DELIVERED">Entregado</option>
-        <option value="CANCELLED">Cancelado</option>
-      </select>
+        <SelectTrigger className="w-[180px] h-9">
+          <SelectValue placeholder="Todos los estados" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Todos los estados</SelectItem>
+          <SelectItem value="DRAFT">Borrador</SelectItem>
+          <SelectItem value="RESERVED">Reservado</SelectItem>
+          <SelectItem value="PAID">Pagado</SelectItem>
+          <SelectItem value="SHIPPED">Enviado</SelectItem>
+          <SelectItem value="DELIVERED">Entregado</SelectItem>
+          <SelectItem value="CANCELLED">Cancelado</SelectItem>
+        </SelectContent>
+      </Select>
       {(search || statusFilter) && (
         <Button
           variant="ghost"
@@ -105,6 +128,22 @@ export default function SalesPage() {
     </div>
   );
 
+  // Calculate balance (total if not paid, 0 if paid)
+  const calculateBalance = (sale: any) => {
+    if (sale.status === 'PAID' || sale.status === 'SHIPPED' || sale.status === 'DELIVERED') {
+      return 0;
+    }
+    return parseFloat(sale.total);
+  };
+
+  // Calculate due date (30 days from creation for unpaid sales)
+  const calculateDueDate = (sale: any) => {
+    const createdDate = new Date(sale.createdAt);
+    const dueDate = new Date(createdDate);
+    dueDate.setDate(dueDate.getDate() + 30);
+    return dueDate;
+  };
+
   return (
     <PageShell
       title="Ventas"
@@ -113,7 +152,7 @@ export default function SalesPage() {
       actions={actions}
       toolbar={toolbar}
     >
-      <div className="zoho-card">
+      <div className="bg-white rounded-lg border shadow-sm">
         {isLoading && (
           <div className="p-4 space-y-3">
             <Skeleton className="h-10 w-full" />
@@ -160,60 +199,156 @@ export default function SalesPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <table className="zoho-table">
-                    <thead>
-                      <tr>
-                        <th>Número</th>
-                        <th>Cliente</th>
-                        <th>Total</th>
-                        <th>Estado</th>
-                        <th>Fecha</th>
-                        <th>Asignado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.data.map((sale) => (
-                        <tr
-                          key={sale.id}
-                          className="cursor-pointer"
-                          onClick={() => router.push(`/sales/${sale.id}`)}
-                        >
-                          <td>
-                            <div className="text-sm font-medium text-gray-900">
-                              {sale.saleNumber || sale.id.slice(0, 8)}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="text-sm text-gray-900">{sale.customerName || '—'}</div>
-                            {sale.customerEmail && (
-                              <div className="text-xs text-gray-500">{sale.customerEmail}</div>
-                            )}
-                          </td>
-                          <td className="text-sm font-medium text-gray-900">
-                            ${parseFloat(sale.total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                          </td>
-                          <td>
-                            <span
-                              className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(
-                                sale.status
-                              )}`}
-                            >
-                              {getStatusLabel(sale.status)}
-                            </span>
-                          </td>
-                          <td className="text-sm text-gray-600">{formatDate(sale.createdAt)}</td>
-                          <td className="text-sm text-gray-600">{sale.assignedTo?.name || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50/50">
+                        <TableHead className="w-[100px]">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300"
+                              onChange={(e) => {
+                                // TODO: Implement select all
+                              }}
+                            />
+                            Invoice Date
+                          </div>
+                        </TableHead>
+                        <TableHead className="min-w-[140px]">
+                          <div className="flex items-center gap-2">
+                            Invoice Number
+                            <span className="text-xs text-gray-400">All</span>
+                          </div>
+                        </TableHead>
+                        <TableHead className="min-w-[140px]">Order Number</TableHead>
+                        <TableHead className="min-w-[150px]">Account Name</TableHead>
+                        <TableHead className="min-w-[150px]">Contact Name</TableHead>
+                        <TableHead className="w-[120px]">Status</TableHead>
+                        <TableHead className="min-w-[120px]">Due Date</TableHead>
+                        <TableHead className="min-w-[140px] text-right">Grand Total</TableHead>
+                        <TableHead className="min-w-[140px] text-right">Balance</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.data.map((sale) => {
+                        const balance = calculateBalance(sale);
+                        const dueDate = calculateDueDate(sale);
+                        const isOverdue = balance > 0 && dueDate < new Date();
+                        
+                        return (
+                          <TableRow
+                            key={sale.id}
+                            className="cursor-pointer hover:bg-gray-50/50"
+                            onClick={() => router.push(`/sales/${sale.id}`)}
+                          >
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                className="rounded border-gray-300"
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                  // TODO: Implement individual selection
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {format(new Date(sale.createdAt), 'MMM dd, yyyy', { locale: es })}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-gray-900">
+                                {sale.saleNumber || sale.id.slice(0, 8)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-gray-600">
+                                {sale.saleNumber || `SO-${sale.id.slice(0, 8)}`}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-gray-900">{sale.customerName || '—'}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm text-gray-900">
+                                {sale.customerName || sale.customerEmail || '—'}
+                              </div>
+                              {sale.customerEmail && (
+                                <div className="text-xs text-gray-500">{sale.customerEmail}</div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={`${getStatusColor(sale.status)} border-0`}
+                              >
+                                {getStatusLabel(sale.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                                {format(dueDate, 'MMM dd, yyyy', { locale: es })}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {sale.currency || 'USD'} {parseFloat(sale.total).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                            <TableCell className={`text-right font-medium ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {balance > 0 ? (
+                                <>
+                                  {sale.currency || 'USD'} {balance.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </>
+                              ) : (
+                                <>
+                                  {sale.currency || 'USD'} 0.00
+                                </>
+                              )}
+                            </TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // TODO: Implement dropdown menu
+                                }}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
                 </div>
 
                 {/* Pagination */}
-                {data?.meta?.totalPages && data.meta.totalPages > 1 && (
+                {data?.meta && (
                   <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
-                    <div className="text-sm text-gray-600">
-                      Mostrando {data?.data?.length ?? 0} de {data?.meta?.total ?? 0} ventas
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">Records Per Page</span>
+                      <Select
+                        value={recordsPerPage.toString()}
+                        onValueChange={(value) => {
+                          setRecordsPerPage(Number(value));
+                          setPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[120px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="30">30</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-gray-600">
+                        {((page - 1) * recordsPerPage) + 1} - {Math.min(page * recordsPerPage, data.meta.total)} of {data.meta.total}
+                      </span>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -221,16 +356,18 @@ export default function SalesPage() {
                         size="sm"
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page === 1}
+                        className="h-8"
                       >
-                        Anterior
+                        <ChevronLeft className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setPage((p) => Math.min(data.meta.totalPages, p + 1))}
                         disabled={page === data.meta.totalPages}
+                        className="h-8"
                       >
-                        Siguiente
+                        <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
