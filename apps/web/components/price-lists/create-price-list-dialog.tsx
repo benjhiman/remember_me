@@ -361,13 +361,13 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                       <CommandEmpty>No se encontraron modelos.</CommandEmpty>
                       <CommandGroup>
                         {filteredGroups.map((group) => (
-                          <div
+                          <CommandItem
                             key={group.groupKey}
-                            className="flex items-center px-2 py-1.5 hover:bg-accent cursor-pointer"
-                            onClick={(e) => {
-                              e.preventDefault();
+                            value={group.groupKey}
+                            onSelect={() => {
                               toggleItemGroup(group.groupKey);
                             }}
+                            className="cursor-pointer"
                           >
                             <Checkbox
                               checked={selectedItemGroupKeys.includes(group.groupKey)}
@@ -384,7 +384,6 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggleItemGroup(group.groupKey);
                               }}
                               className="mr-2 pointer-events-auto"
                             />
@@ -394,7 +393,7 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                                 {group.items.length} {group.items.length === 1 ? 'variante' : 'variantes'} (sin color)
                               </div>
                             </div>
-                          </div>
+                          </CommandItem>
                         ))}
                       </CommandGroup>
                     </CommandList>
