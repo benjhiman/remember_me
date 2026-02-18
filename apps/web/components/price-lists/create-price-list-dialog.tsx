@@ -359,7 +359,6 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
                   align="start" 
                   side="bottom" 
                   sideOffset={8}
-                  collisionPadding={10}
                   onInteractOutside={(e) => {
                     // Don't close when clicking inside
                     e.preventDefault();

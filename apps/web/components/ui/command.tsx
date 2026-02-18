@@ -55,21 +55,36 @@ CommandInput.displayName = CommandPrimitive.Input.displayName;
 const CommandList = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
->(({ className, ...props }, ref) => (
-  <CommandPrimitive.List
-    ref={ref}
-    className={cn(
-      'max-h-[300px] overflow-y-auto overflow-x-hidden',
-      className
-    )}
-    style={{
-      WebkitOverflowScrolling: 'touch',
-      overscrollBehavior: 'contain',
-      touchAction: 'pan-y',
-    }}
-    {...props}
-  />
-));
+>(({ className, ...props }, ref) => {
+  const listRef = React.useRef<HTMLDivElement>(null);
+  
+  // Combine refs
+  React.useImperativeHandle(ref, () => listRef.current as any);
+
+  // Wheel fix for trackpad scrolling
+  const handleWheelCapture = React.useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    // Stop propagation to prevent page scroll, but allow scroll within the list
+    e.stopPropagation();
+    // Don't preventDefault - let the native scroll happen
+  }, []);
+
+  return (
+    <CommandPrimitive.List
+      ref={listRef}
+      className={cn(
+        'max-h-[300px] overflow-y-auto overflow-x-hidden',
+        className
+      )}
+      style={{
+        WebkitOverflowScrolling: 'touch',
+        overscrollBehavior: 'contain',
+        touchAction: 'pan-y',
+      }}
+      onWheelCapture={handleWheelCapture}
+      {...props}
+    />
+  );
+});
 
 CommandList.displayName = CommandPrimitive.List.displayName;
 
