@@ -3,12 +3,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageShell } from '@/components/layout/page-shell';
-import { usePriceList } from '@/lib/api/hooks/use-price-lists';
-import { useUpdatePriceListItem } from '@/lib/api/hooks/use-price-lists';
+import { usePriceList, useUpdatePriceListItem, useDeletePriceList } from '@/lib/api/hooks/use-price-lists';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Plus, FileText } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ArrowLeft, Plus, FileText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { PriceListItem } from '@/lib/api/hooks/use-price-lists';
 import { GenerateWhatsAppListDialog } from '@/components/price-lists/generate-whatsapp-list-dialog';
@@ -32,9 +41,11 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
   
   const { data: priceList, isLoading } = usePriceList(priceListId);
   const updatePriceListItem = useUpdatePriceListItem();
+  const deletePriceList = useDeletePriceList();
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<string>('');
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory' },
@@ -71,6 +82,17 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
   const handleCancelEdit = () => {
     setEditingItemId(null);
     setEditPrice('');
+  };
+
+  const handleDelete = async () => {
+    if (!priceListId) return;
+    
+    try {
+      await deletePriceList.mutateAsync(priceListId);
+      router.push('/inventory/pricelist');
+    } catch (error) {
+      // Error handled by hook
+    }
   };
 
   // Group items by condition
@@ -248,6 +270,27 @@ export default function PriceListDetailPage({ params }: { params: Promise<{ id: 
         priceListName={priceList.name}
         items={priceList.items}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar lista de precios?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará la lista &quot;{priceList.name}&quot; y todos sus precios asociados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletePriceList.isPending}
+            >
+              {deletePriceList.isPending ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

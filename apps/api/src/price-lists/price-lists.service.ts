@@ -443,4 +443,31 @@ export class PriceListsService {
       })),
     };
   }
+
+  async deletePriceList(organizationId: string, userId: string, priceListId: string) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can delete price lists');
+    }
+
+    // Verify price list exists and belongs to organization
+    const priceList = await this.prisma.priceList.findFirst({
+      where: {
+        id: priceListId,
+        organizationId,
+      },
+    });
+
+    if (!priceList) {
+      throw new NotFoundException('Price list not found');
+    }
+
+    // Delete price list (cascade will delete items and overrides)
+    await this.prisma.priceList.delete({
+      where: { id: priceListId },
+    });
+
+    return { success: true };
+  }
 }

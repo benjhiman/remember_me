@@ -160,3 +160,28 @@ export function useBulkUpdatePriceListItems() {
     },
   });
 }
+
+export function useDeletePriceList() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (priceListId: string) => api.delete(`/price-lists/${priceListId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['price-lists'] });
+      toast({
+        title: 'Lista eliminada',
+        description: 'La lista de precios se ha eliminado correctamente.',
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message || 'Error al eliminar la lista de precios. Por favor, intentá nuevamente.';
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
+    },
+  });
+}
