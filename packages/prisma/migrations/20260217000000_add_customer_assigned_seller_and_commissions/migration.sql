@@ -86,12 +86,16 @@ END $$;
 DO $$
 BEGIN
     IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'Customer'
+    ) AND EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'Customer' 
         AND column_name = 'email'
     ) AND NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'Customer_organizationId_email_key'
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'Customer_organizationId_email_key'
+        AND table_name = 'Customer'
     ) THEN
         -- Only add constraint if there are no duplicate emails
         IF NOT EXISTS (
