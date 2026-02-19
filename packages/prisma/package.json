@@ -7,7 +7,7 @@
   "scripts": {
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:deploy": "tsx scripts/pre-migrate-cleanup.ts && prisma migrate deploy",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx seed.ts",
@@ -17,7 +17,9 @@
     "migrate:resolve:rolled-back:add_folder_prefix": "prisma migrate resolve --rolled-back 20250130000000_add_folder_prefix",
     "migrate:resolve:applied:add_folder_prefix": "prisma migrate resolve --applied 20250130000000_add_folder_prefix",
     "migrate:resolve:rolled-back:add_price_lists": "prisma migrate resolve --rolled-back 20250131000002_add_price_lists",
-    "migrate:resolve:applied:add_price_lists": "prisma migrate resolve --applied 20250131000002_add_price_lists"
+    "migrate:resolve:applied:add_price_lists": "prisma migrate resolve --applied 20250131000002_add_price_lists",
+    "migrate:resolve:failed:customer": "tsx scripts/resolve-failed-migration.ts 20260217000000_add_customer_assigned_seller_and_commissions",
+    "migrate:resolve:failed": "tsx scripts/resolve-failed-migration.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

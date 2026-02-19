@@ -72,7 +72,6 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
   const [itemsSearch, setItemsSearch] = useState('');
 
   const folders = foldersData?.data || [];
-  const items = itemsData?.data || [];
 
   useEffect(() => {
     if (!open) {
@@ -139,6 +138,7 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
 
   // Group items by itemGroupKey (model + condition, no color)
   const groupedItems = useMemo(() => {
+    const items = itemsData?.data || [];
     const groups = new Map<
       string,
       {
@@ -173,7 +173,7 @@ export function CreatePriceListDialog({ open, onOpenChange, onSuccess }: CreateP
     });
 
     return Array.from(groups.values());
-  }, [items]);
+  }, [itemsData?.data]);
 
   const toggleItemGroup = (groupKey: string) => {
     setSelectedItemGroupKeys((prev) =>
