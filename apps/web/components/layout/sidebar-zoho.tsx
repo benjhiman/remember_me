@@ -166,7 +166,14 @@ function isHrefActive(href: string | undefined, pathname: string | null): boolea
   if (normalized === href) return true;
   
   // Starts with check (for nested routes)
-  if (normalized.startsWith(href + '/')) return true;
+  // But exclude if there's a more specific child route
+  if (normalized.startsWith(href + '/')) {
+    // Special case: /sales should not be active when on /sales/customers or /sales/clients
+    if (href === '/sales' && (normalized.startsWith('/sales/customers') || normalized.startsWith('/sales/clients') || normalized.startsWith('/sales/sellers'))) {
+      return false;
+    }
+    return true;
+  }
   
   return false;
 }
