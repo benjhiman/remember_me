@@ -88,9 +88,9 @@ export default function CustomersPage() {
       </div>
       {isAdmin && sellersData?.data && (
         <Select
-          value={sellerIdFilter || ''}
+          value={sellerIdFilter || 'all'}
           onValueChange={(value) => {
-            setSellerIdFilter(value === '' ? undefined : value);
+            setSellerIdFilter(value === 'all' ? undefined : value);
             setPage(1);
           }}
         >
@@ -98,7 +98,7 @@ export default function CustomersPage() {
             <SelectValue placeholder="Todos los vendedores" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos los vendedores</SelectItem>
+            <SelectItem value="all">Todos los vendedores</SelectItem>
             {sellersData.data.map((seller) => (
               <SelectItem key={seller.id} value={seller.id}>
                 {seller.name || seller.email}
@@ -121,9 +121,9 @@ export default function CustomersPage() {
         </label>
       </div>
       <Select
-        value={statusFilter || ''}
+        value={statusFilter || 'all'}
         onValueChange={(value) => {
-          setStatusFilter(value === '' ? undefined : value);
+          setStatusFilter(value === 'all' ? undefined : value);
           setPage(1);
         }}
       >
@@ -131,7 +131,7 @@ export default function CustomersPage() {
           <SelectValue placeholder="Todos los estados" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Todos los estados</SelectItem>
+          <SelectItem value="all">Todos los estados</SelectItem>
           <SelectItem value="ACTIVE">Activo</SelectItem>
           <SelectItem value="INACTIVE">Inactivo</SelectItem>
         </SelectContent>
