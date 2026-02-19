@@ -60,6 +60,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_STOCK,
     Permission.VIEW_SALES,
     Permission.EDIT_SALES,
+    Permission.VIEW_CUSTOMERS,
+    Permission.EDIT_CUSTOMERS,
     Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
     Permission.MANAGE_INTEGRATIONS,
@@ -73,6 +75,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_STOCK,
     Permission.VIEW_SALES,
     Permission.EDIT_SALES,
+    Permission.VIEW_CUSTOMERS,
+    Permission.EDIT_CUSTOMERS,
     Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
     Permission.MANAGE_INTEGRATIONS,
@@ -86,6 +90,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_STOCK,
     Permission.VIEW_SALES,
     Permission.EDIT_SALES,
+    Permission.VIEW_CUSTOMERS,
+    Permission.EDIT_CUSTOMERS,
     Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
     Permission.MANAGE_MEMBERS, // Managers can assign conversations
@@ -99,6 +105,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     // No EDIT_STOCK
     Permission.VIEW_SALES,
     Permission.EDIT_SALES,
+    Permission.VIEW_CUSTOMERS,
+    Permission.EDIT_CUSTOMERS,
     Permission.VIEW_INBOX,
     // No VIEW_INTEGRATIONS
     // No MANAGE_INTEGRATIONS

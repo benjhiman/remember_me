@@ -95,7 +95,7 @@ const navItems: NavItem[] = [
     permission: Permission.VIEW_SALES,
     children: [
       { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
-      { href: '/sales/customers', label: 'Clientes', icon: Users, permission: Permission.VIEW_CUSTOMERS },
+      { href: '/sales/clients', label: 'Clientes', icon: Users, permission: Permission.VIEW_CUSTOMERS },
       { href: '/sales/sellers', label: 'Vendedores', icon: Users, permission: Permission.VIEW_SALES, ownerOnly: true }, // Owner-only (checked in page)
     ],
   },
