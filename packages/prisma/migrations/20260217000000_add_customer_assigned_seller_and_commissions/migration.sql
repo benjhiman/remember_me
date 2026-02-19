@@ -1,7 +1,55 @@
--- Add assignedToId and taxId to Customer table (idempotent)
+-- Create Customer table if it doesn't exist (idempotent)
 DO $$
 BEGIN
     IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'Customer'
+    ) THEN
+        CREATE TABLE "Customer" (
+            "id" TEXT NOT NULL,
+            "organizationId" TEXT NOT NULL,
+            "createdById" TEXT,
+            "assignedToId" TEXT,
+            "name" TEXT NOT NULL,
+            "email" TEXT,
+            "phone" TEXT,
+            "taxId" TEXT,
+            "city" TEXT,
+            "address" TEXT,
+            "instagram" TEXT,
+            "web" TEXT,
+            "notes" TEXT,
+            "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "Customer_pkey" PRIMARY KEY ("id")
+        );
+        
+        -- Add foreign keys for Customer table
+        ALTER TABLE "Customer" ADD CONSTRAINT "Customer_organizationId_fkey" 
+        FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+        
+        ALTER TABLE "Customer" ADD CONSTRAINT "Customer_createdById_fkey" 
+        FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+        
+        ALTER TABLE "Customer" ADD CONSTRAINT "Customer_assignedToId_fkey" 
+        FOREIGN KEY ("assignedToId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+        
+        -- Create indexes for Customer table
+        CREATE INDEX "Customer_organizationId_createdAt_idx" ON "Customer"("organizationId", "createdAt");
+        CREATE INDEX "Customer_organizationId_name_idx" ON "Customer"("organizationId", "name");
+        CREATE INDEX "Customer_organizationId_status_idx" ON "Customer"("organizationId", "status");
+        CREATE INDEX "Customer_organizationId_assignedToId_idx" ON "Customer"("organizationId", "assignedToId");
+    END IF;
+END $$;
+
+-- Add assignedToId to Customer table if it doesn't exist (idempotent)
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'Customer'
+    ) AND NOT EXISTS (
         SELECT 1 FROM information_schema.columns 
         WHERE table_name = 'Customer' 
         AND column_name = 'assignedToId'
@@ -60,10 +108,17 @@ END $$;
 -- AddForeignKey (idempotent) for assignedToId
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'Customer_assignedToId_fkey' 
-        AND conrelid = 'Customer'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'Customer'
+    ) AND EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'Customer' 
+        AND column_name = 'assignedToId'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'Customer_assignedToId_fkey'
+        AND table_name = 'Customer'
     ) THEN
         ALTER TABLE "Customer" ADD CONSTRAINT "Customer_assignedToId_fkey" 
         FOREIGN KEY ("assignedToId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -170,10 +225,13 @@ END $$;
 -- AddForeignKey (idempotent) for CommissionConfig
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'CommissionConfig_organizationId_fkey' 
-        AND conrelid = 'CommissionConfig'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'CommissionConfig'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'CommissionConfig_organizationId_fkey'
+        AND table_name = 'CommissionConfig'
     ) THEN
         ALTER TABLE "CommissionConfig" ADD CONSTRAINT "CommissionConfig_organizationId_fkey" 
         FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -182,10 +240,13 @@ END $$;
 
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'CommissionConfig_sellerId_fkey' 
-        AND conrelid = 'CommissionConfig'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'CommissionConfig'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'CommissionConfig_sellerId_fkey'
+        AND table_name = 'CommissionConfig'
     ) THEN
         ALTER TABLE "CommissionConfig" ADD CONSTRAINT "CommissionConfig_sellerId_fkey" 
         FOREIGN KEY ("sellerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -195,10 +256,13 @@ END $$;
 -- AddForeignKey (idempotent) for CommissionPerModel
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'CommissionPerModel_organizationId_fkey' 
-        AND conrelid = 'CommissionPerModel'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'CommissionPerModel'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'CommissionPerModel_organizationId_fkey'
+        AND table_name = 'CommissionPerModel'
     ) THEN
         ALTER TABLE "CommissionPerModel" ADD CONSTRAINT "CommissionPerModel_organizationId_fkey" 
         FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -207,10 +271,13 @@ END $$;
 
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'CommissionPerModel_sellerId_fkey' 
-        AND conrelid = 'CommissionPerModel'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'CommissionPerModel'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'CommissionPerModel_sellerId_fkey'
+        AND table_name = 'CommissionPerModel'
     ) THEN
         ALTER TABLE "CommissionPerModel" ADD CONSTRAINT "CommissionPerModel_sellerId_fkey" 
         FOREIGN KEY ("sellerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -220,10 +287,13 @@ END $$;
 -- AddUniqueConstraint (idempotent) for CommissionConfig
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'CommissionConfig_organizationId_sellerId_key' 
-        AND conrelid = 'CommissionConfig'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'CommissionConfig'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'CommissionConfig_organizationId_sellerId_key'
+        AND table_name = 'CommissionConfig'
     ) THEN
         ALTER TABLE "CommissionConfig" ADD CONSTRAINT "CommissionConfig_organizationId_sellerId_key" UNIQUE ("organizationId", "sellerId");
     END IF;
@@ -232,10 +302,13 @@ END $$;
 -- AddUniqueConstraint (idempotent) for CommissionPerModel
 DO $$
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint 
-        WHERE conname = 'CommissionPerModel_organizationId_sellerId_itemGroupKey_key' 
-        AND conrelid = 'CommissionPerModel'::regclass
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'CommissionPerModel'
+    ) AND NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'CommissionPerModel_organizationId_sellerId_itemGroupKey_key'
+        AND table_name = 'CommissionPerModel'
     ) THEN
         ALTER TABLE "CommissionPerModel" ADD CONSTRAINT "CommissionPerModel_organizationId_sellerId_itemGroupKey_key" UNIQUE ("organizationId", "sellerId", "itemGroupKey");
     END IF;
