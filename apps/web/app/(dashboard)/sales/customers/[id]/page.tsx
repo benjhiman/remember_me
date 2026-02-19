@@ -24,7 +24,7 @@ export default function CustomerDetailPage() {
   const { data: invoices, isLoading: invoicesLoading } = useCustomerInvoices(customerId);
 
   const breadcrumbs = [
-    { label: 'Ventas', href: '/sales' },
+    { label: 'Sales', href: '/sales' },
     { label: 'Clientes', href: '/sales/customers' },
     { label: customer?.name || 'Cliente', href: `/sales/customers/${customerId}` },
   ];

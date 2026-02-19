@@ -55,7 +55,7 @@ export default function CustomersPage() {
   }, [data, isLoading]);
 
   const breadcrumbs = [
-    { label: 'Ventas', href: '/sales' },
+    { label: 'Sales', href: '/sales' },
     { label: 'Clientes', href: '/sales/customers' },
   ];
 
@@ -71,8 +71,8 @@ export default function CustomersPage() {
   );
 
   const toolbar = (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 max-w-sm">
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex-1 max-w-sm min-w-[200px]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -107,19 +107,6 @@ export default function CustomersPage() {
           </SelectContent>
         </Select>
       )}
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="mine"
-          checked={mineFilter}
-          onCheckedChange={(checked) => {
-            setMineFilter(checked === true);
-            setPage(1);
-          }}
-        />
-        <label htmlFor="mine" className="text-sm text-gray-700 cursor-pointer">
-          Mis clientes
-        </label>
-      </div>
       <Select
         value={statusFilter || 'all'}
         onValueChange={(value) => {
@@ -136,6 +123,19 @@ export default function CustomersPage() {
           <SelectItem value="INACTIVE">Inactivo</SelectItem>
         </SelectContent>
       </Select>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="mine"
+          checked={mineFilter}
+          onCheckedChange={(checked) => {
+            setMineFilter(checked === true);
+            setPage(1);
+          }}
+        />
+        <label htmlFor="mine" className="text-sm text-gray-700 cursor-pointer whitespace-nowrap">
+          Mis clientes
+        </label>
+      </div>
     </div>
   );
 

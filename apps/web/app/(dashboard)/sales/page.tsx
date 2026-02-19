@@ -61,6 +61,7 @@ export default function SalesPage() {
   }, [data, isLoading]);
 
   const breadcrumbs = [
+    { label: 'Sales', href: '/sales' },
     { label: 'Ventas', href: '/sales' },
   ];
 
