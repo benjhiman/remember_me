@@ -179,15 +179,15 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               <div className="space-y-2">
                 <Label htmlFor="assignedToId">Vendedor Asignado</Label>
                 <Select
-                  value={formData.assignedToId || ''}
-                  onValueChange={(value) => setFormData({ ...formData, assignedToId: value === '' ? undefined : value })}
+                  value={formData.assignedToId || 'none'}
+                  onValueChange={(value) => setFormData({ ...formData, assignedToId: value === 'none' ? undefined : value })}
                   disabled={isLoading}
                 >
                   <SelectTrigger id="assignedToId">
                     <SelectValue placeholder="Sin asignar" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin asignar</SelectItem>
+                    <SelectItem value="none">Sin asignar</SelectItem>
                     {sellersData.data.map((seller) => (
                       <SelectItem key={seller.id} value={seller.id}>
                         {seller.name || seller.email}
