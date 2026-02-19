@@ -15,6 +15,7 @@ import { Role } from '@remember-me/prisma';
 import { CurrentOrganization } from '../common/decorators/current-organization.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { InviteSellerDto } from './dto/invite-seller.dto';
+import { CreateSellerDto } from './dto/create-seller.dto';
 import { UpdateCommissionDto } from './dto/update-commission.dto';
 
 @Controller('sellers')
@@ -68,6 +69,16 @@ export class SellersController {
     @Body() dto: InviteSellerDto,
   ) {
     return this.sellersService.inviteSeller(organizationId, user.userId, dto);
+  }
+
+  @Post()
+  @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
+  async createSeller(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreateSellerDto,
+  ) {
+    return this.sellersService.createSeller(organizationId, user.userId, dto);
   }
 
   @Get(':id/commission')

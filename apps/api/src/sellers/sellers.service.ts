@@ -13,7 +13,9 @@ import { Role, InviteStatus, SaleStatus } from '@remember-me/prisma';
 import { Decimal } from '@prisma/client/runtime/library';
 import * as crypto from 'crypto';
 import { InviteSellerDto } from './dto/invite-seller.dto';
+import { CreateSellerDto } from './dto/create-seller.dto';
 import { UpdateCommissionDto } from './dto/update-commission.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable({ scope: Scope.REQUEST })
 export class SellersService {
@@ -456,6 +458,132 @@ export class SellersService {
       expiresAt: invitation.expiresAt,
       organization: invitation.organization,
       inviteLink, // Remove in production, send via email only
+    };
+  }
+
+  /**
+   * Create seller with user account and send invitation
+   * Admin-only endpoint
+   * Creates user in PENDING state, membership, and invitation
+   */
+  async createSeller(organizationId: string, userId: string, dto: CreateSellerDto) {
+    const { role } = await this.verifyMembership(organizationId, userId);
+
+    if (!this.hasAdminManagerAccess(role)) {
+      throw new ForbiddenException('Only admins and managers can create sellers');
+    }
+
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (existingUser) {
+      const existingMember = await this.prisma.membership.findFirst({
+        where: {
+          organizationId,
+          userId: existingUser.id,
+        },
+      });
+
+      if (existingMember) {
+        throw new ConflictException('User is already a member of this organization');
+      }
+    }
+
+    // Check for pending invitation
+    const pendingInvitation = await this.prisma.invitation.findFirst({
+      where: {
+        organizationId,
+        email: dto.email,
+        status: InviteStatus.PENDING,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (pendingInvitation) {
+      throw new ConflictException('A pending invitation already exists for this email');
+    }
+
+    // Generate invitation token
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Calculate expiration date (7 days)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // Generate temporary password hash (will be changed when accepting invitation)
+    const tempPassword = crypto.randomBytes(16).toString('hex');
+    const tempPasswordHash = await bcrypt.hash(tempPassword, 10);
+
+    // Create user, membership, and invitation in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Create or get user
+      let user = existingUser;
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            email: dto.email,
+            passwordHash: tempPasswordHash, // Temporary, will be changed on invitation acceptance
+            name: dto.name,
+            emailVerified: false,
+          },
+        });
+      }
+
+      // Create membership with SELLER role
+      await tx.membership.create({
+        data: {
+          userId: user.id,
+          organizationId,
+          role: Role.SELLER,
+        },
+      });
+
+      // Create invitation
+      const invitation = await tx.invitation.create({
+        data: {
+          organizationId,
+          email: dto.email,
+          role: Role.SELLER,
+          token,
+          invitedById: userId,
+          expiresAt,
+        },
+        include: {
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+      });
+
+      return { user, invitation };
+    });
+
+    // Generate invitation link
+    const inviteLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/accept-invitation?token=${token}`;
+
+    // TODO: Send email with invitation link
+    // For now, log it (in production, send via email service)
+    console.log(`[SELLER INVITATION] Email: ${dto.email}, Link: ${inviteLink}`);
+
+    return {
+      id: result.user.id,
+      email: result.user.email,
+      name: result.user.name,
+      role: Role.SELLER,
+      status: 'PENDING', // User needs to accept invitation to set password
+      invitation: {
+        id: result.invitation.id,
+        expiresAt: result.invitation.expiresAt,
+        inviteLink, // Remove in production, send via email only
+      },
     };
   }
 

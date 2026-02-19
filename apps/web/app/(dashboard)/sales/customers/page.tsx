@@ -71,8 +71,8 @@ export default function CustomersPage() {
   );
 
   const toolbar = (
-    <div className="flex items-center gap-3 flex-wrap">
-      <div className="flex-1 max-w-sm min-w-[200px]">
+    <div className="flex items-center gap-3 flex-nowrap overflow-x-auto">
+      <div className="flex-1 max-w-sm min-w-[200px] flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -94,7 +94,7 @@ export default function CustomersPage() {
             setPage(1);
           }}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[220px] flex-shrink-0 whitespace-nowrap">
             <SelectValue placeholder="Todos los vendedores" />
           </SelectTrigger>
           <SelectContent>
@@ -114,7 +114,7 @@ export default function CustomersPage() {
           setPage(1);
         }}
       >
-        <SelectTrigger className="w-[150px]">
+        <SelectTrigger className="w-[180px] flex-shrink-0 whitespace-nowrap">
           <SelectValue placeholder="Todos los estados" />
         </SelectTrigger>
         <SelectContent>
@@ -123,7 +123,7 @@ export default function CustomersPage() {
           <SelectItem value="INACTIVE">Inactivo</SelectItem>
         </SelectContent>
       </Select>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-shrink-0">
         <Checkbox
           id="mine"
           checked={mineFilter}

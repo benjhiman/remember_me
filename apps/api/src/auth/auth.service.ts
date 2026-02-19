@@ -145,25 +145,62 @@ export class AuthService {
       throw new BadRequestException('Email does not match the invitation');
     }
 
-    // Create user and accept invitation in a transaction
+    // Create or update user and accept invitation in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create user
-      const user = await tx.user.create({
-        data: {
-          email: dto.email,
-          passwordHash,
-          name: dto.name,
-        },
+      // Check if user already exists (from "Alta vendedor")
+      let user = await tx.user.findUnique({
+        where: { email: dto.email },
       });
 
-      // Create membership with the role from invitation
-      await tx.membership.create({
-        data: {
-          userId: user.id,
-          organizationId: invitation.organizationId,
-          role: invitation.role,
-        },
-      });
+      if (user) {
+        // User exists: update password and name if provided
+        user = await tx.user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash,
+            name: dto.name || user.name,
+            emailVerified: true,
+          },
+        });
+
+        // Check if membership already exists
+        const existingMembership = await tx.membership.findFirst({
+          where: {
+            userId: user.id,
+            organizationId: invitation.organizationId,
+          },
+        });
+
+        if (!existingMembership) {
+          // Create membership if it doesn't exist
+          await tx.membership.create({
+            data: {
+              userId: user.id,
+              organizationId: invitation.organizationId,
+              role: invitation.role,
+            },
+          });
+        }
+      } else {
+        // Create new user
+        user = await tx.user.create({
+          data: {
+            email: dto.email,
+            passwordHash,
+            name: dto.name,
+            emailVerified: true,
+          },
+        });
+
+        // Create membership with the role from invitation
+        await tx.membership.create({
+          data: {
+            userId: user.id,
+            organizationId: invitation.organizationId,
+            role: invitation.role,
+          },
+        });
+      }
 
       // Mark invitation as accepted
       await tx.invitation.update({

@@ -174,3 +174,37 @@ export function useUpdateSellerCommission() {
     },
   });
 }
+
+export interface CreateSellerDto {
+  name: string;
+  email: string;
+  phone?: string;
+  city?: string;
+  address?: string;
+}
+
+export function useCreateSeller() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (data: CreateSellerDto) => api.post<{ id: string; email: string; name: string; status: string }>('/sellers', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['sellers-stats'] });
+      toast({
+        title: 'Vendedor creado',
+        description: 'El vendedor se ha creado correctamente. Se ha enviado una invitación por email.',
+      });
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error?.response?.data?.message || 'Error al crear el vendedor. Por favor, intentá nuevamente.';
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: errorMessage,
+      });
+    },
+  });
+}

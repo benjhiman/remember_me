@@ -233,16 +233,33 @@ export class CustomersService {
   async createCustomer(organizationId: string, userId: string, dto: CreateCustomerDto) {
     const { role } = await this.verifyMembership(organizationId, userId);
 
-    // SELLER: auto-assign to themselves if not specified
     let assignedToId = dto.assignedToId;
-    if (role === Role.SELLER && !assignedToId) {
-      assignedToId = userId;
-    }
 
-    // ADMIN/MANAGER: can assign to any user or leave null
-    // SELLER: can only assign to themselves
-    if (assignedToId && role === Role.SELLER && assignedToId !== userId) {
-      throw new ForbiddenException('Sellers can only assign customers to themselves');
+    // SELLER: auto-assign to themselves, cannot assign to others
+    if (role === Role.SELLER) {
+      if (assignedToId && assignedToId !== userId) {
+        throw new ForbiddenException('Sellers can only assign customers to themselves');
+      }
+      // Force assignment to seller
+      assignedToId = userId;
+    } else if (this.hasAdminManagerAccess(role)) {
+      // ADMIN/MANAGER/OWNER: can assign to any user
+      // If not assigned, default to the admin/manager creating it
+      if (!assignedToId) {
+        assignedToId = userId;
+      }
+      // Verify assigned user belongs to the organization
+      if (assignedToId) {
+        const assignedUser = await this.prisma.membership.findFirst({
+          where: {
+            organizationId,
+            userId: assignedToId,
+          },
+        });
+        if (!assignedUser) {
+          throw new ForbiddenException('Assigned user must belong to the organization');
+        }
+      }
     }
 
     const customer = await this.prisma.customer.create({

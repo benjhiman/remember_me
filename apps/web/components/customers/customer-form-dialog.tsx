@@ -35,6 +35,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'OWNER';
+  const isSeller = user?.role === 'SELLER';
   const { data: sellersData } = useSellers(isAdmin);
 
   const [formData, setFormData] = useState<CreateCustomerDto>({
@@ -67,6 +68,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         status: customer.status,
       });
     } else {
+      // For new customers: SELLER auto-assigns to themselves
       setFormData({
         name: '',
         email: '',
@@ -76,12 +78,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         address: '',
         instagram: '',
         web: '',
-        assignedToId: undefined,
+        assignedToId: isSeller ? user?.id : undefined,
         notes: '',
         status: 'ACTIVE',
       });
     }
-  }, [customer, open]);
+  }, [customer, open, isSeller, user?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,7 +189,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
                 />
               </div>
             </div>
-            {isAdmin && sellersData?.data && (
+            {isAdmin && sellersData?.data && !isSeller && (
               <div className="space-y-2">
                 <Label htmlFor="assignedToId">Vendedor Asignado</Label>
                 <Select
@@ -207,6 +209,18 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+            {isSeller && (
+              <div className="space-y-2">
+                <Label htmlFor="assignedToId">Vendedor Asignado</Label>
+                <Input
+                  id="assignedToId"
+                  value={user?.name || user?.email || 'Tú'}
+                  disabled
+                  className="bg-gray-50"
+                />
+                <p className="text-xs text-gray-500">Los vendedores se asignan automáticamente a sí mismos</p>
               </div>
             )}
             <div className="space-y-2">

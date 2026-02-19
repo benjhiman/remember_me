@@ -144,6 +144,7 @@ function normalizePathname(pathname: string | null): string | null {
     '/inventory/reservations': '/inventory/reservas',
     '/inventory/price-lists': '/inventory/pricelist',
     '/sales/purchases': '/purchases',
+    '/sales/clients': '/sales/customers', // Map /sales/clients to /sales/customers for active state
   };
   
   // Check if pathname matches a legacy route exactly or starts with it

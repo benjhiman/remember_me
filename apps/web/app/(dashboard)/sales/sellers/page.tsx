@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useMe } from '@/lib/api/hooks/use-me';
-import { useSellersStats, useInviteSeller } from '@/lib/api/hooks/use-sellers';
+import { useSellersStats, useInviteSeller, useCreateSeller } from '@/lib/api/hooks/use-sellers';
 import { PageShell } from '@/components/layout/page-shell';
 import { OwnerOnlyDenied } from '@/components/ui/owner-only-denied';
 import { Button } from '@/components/ui/button';
@@ -22,16 +22,25 @@ export default function SellersPage() {
   const { data: meData } = useMe();
   const { toast } = useToast();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [createSellerData, setCreateSellerData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    city: '',
+    address: '',
+  });
 
   const isAdmin = meData?.role === 'OWNER' || meData?.role === 'ADMIN' || meData?.role === 'MANAGER' || user?.role === 'OWNER' || user?.role === 'ADMIN' || user?.role === 'MANAGER';
 
   const { data: statsData, isLoading: statsLoading } = useSellersStats(isAdmin);
   const inviteSeller = useInviteSeller();
+  const createSeller = useCreateSeller();
 
   const breadcrumbs = [
-    { label: 'Ventas', href: '/sales' },
+    { label: 'Sales', href: '/sales' },
     { label: 'Vendedores', href: '/sales/sellers' },
   ];
 
@@ -62,6 +71,37 @@ export default function SellersPage() {
     }
   };
 
+  const handleCreateSeller = async () => {
+    if (!createSellerData.name.trim() || !createSellerData.email.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Por favor completá nombre y email.',
+      });
+      return;
+    }
+
+    try {
+      await createSeller.mutateAsync({
+        name: createSellerData.name.trim(),
+        email: createSellerData.email.trim(),
+        phone: createSellerData.phone.trim() || undefined,
+        city: createSellerData.city.trim() || undefined,
+        address: createSellerData.address.trim() || undefined,
+      });
+      setCreateSellerData({
+        name: '',
+        email: '',
+        phone: '',
+        city: '',
+        address: '',
+      });
+      setCreateDialogOpen(false);
+    } catch (error) {
+      // Error handled by hook
+    }
+  };
+
   const sortedStats = statsData?.data
     ? [...statsData.data].sort((a, b) => {
         return sortOrder === 'desc' ? b.totalInvoiced - a.totalInvoiced : a.totalInvoiced - b.totalInvoiced;
@@ -75,10 +115,16 @@ export default function SellersPage() {
         description="Gestiona los vendedores de tu organización"
         breadcrumbs={breadcrumbs}
         actions={
-          <Button size="sm" onClick={() => setInviteDialogOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-1.5" />
-            Invitar Vendedor
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => setInviteDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1.5" />
+              Invitar Vendedor
+            </Button>
+            <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
+              <UserPlus className="h-4 w-4 mr-1.5" />
+              Alta Vendedor
+            </Button>
+          </div>
         }
       >
         {statsLoading ? (
@@ -216,6 +262,85 @@ export default function SellersPage() {
             </Button>
             <Button onClick={handleInvite} disabled={inviteSeller.isPending || !inviteEmail.trim()}>
               {inviteSeller.isPending ? 'Enviando...' : 'Enviar Invitación'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Alta Vendedor</DialogTitle>
+            <DialogDescription>
+              Creá un nuevo vendedor con cuenta de usuario. Se enviará una invitación por email para que configure su contraseña.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-name">Nombre *</Label>
+              <Input
+                id="create-name"
+                value={createSellerData.name}
+                onChange={(e) => setCreateSellerData({ ...createSellerData, name: e.target.value })}
+                placeholder="Nombre completo"
+                required
+                disabled={createSeller.isPending}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email *</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={createSellerData.email}
+                onChange={(e) => setCreateSellerData({ ...createSellerData, email: e.target.value })}
+                placeholder="vendedor@ejemplo.com"
+                required
+                disabled={createSeller.isPending}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="create-phone">Teléfono</Label>
+                <Input
+                  id="create-phone"
+                  value={createSellerData.phone}
+                  onChange={(e) => setCreateSellerData({ ...createSellerData, phone: e.target.value })}
+                  placeholder="+54 11 1234-5678"
+                  disabled={createSeller.isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-city">Ciudad</Label>
+                <Input
+                  id="create-city"
+                  value={createSellerData.city}
+                  onChange={(e) => setCreateSellerData({ ...createSellerData, city: e.target.value })}
+                  placeholder="Ciudad"
+                  disabled={createSeller.isPending}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-address">Dirección</Label>
+              <Input
+                id="create-address"
+                value={createSellerData.address}
+                onChange={(e) => setCreateSellerData({ ...createSellerData, address: e.target.value })}
+                placeholder="Dirección completa"
+                disabled={createSeller.isPending}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={createSeller.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateSeller}
+              disabled={createSeller.isPending || !createSellerData.name.trim() || !createSellerData.email.trim()}
+            >
+              {createSeller.isPending ? 'Creando...' : 'Crear Vendedor'}
             </Button>
           </DialogFooter>
         </DialogContent>
