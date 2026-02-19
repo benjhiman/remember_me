@@ -11,8 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label';
-// import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -21,6 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCreateCustomer, useUpdateCustomer, type CreateCustomerDto, type UpdateCustomerDto } from '@/lib/api/hooks/use-customer-mutations';
+import { useSellers } from '@/lib/api/hooks/use-sellers';
+import { useAuthStore } from '@/lib/store/auth-store';
 import type { Customer } from '@/lib/api/hooks/use-customers';
 
 interface CustomerFormDialogProps {
@@ -30,12 +31,22 @@ interface CustomerFormDialogProps {
 }
 
 export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFormDialogProps) {
+  const { user } = useAuthStore();
   const createCustomer = useCreateCustomer();
   const updateCustomer = useUpdateCustomer();
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'OWNER';
+  const { data: sellersData } = useSellers(isAdmin);
+
   const [formData, setFormData] = useState<CreateCustomerDto>({
     name: '',
     email: '',
     phone: '',
+    taxId: '',
+    city: '',
+    address: '',
+    instagram: '',
+    web: '',
+    assignedToId: undefined,
     notes: '',
     status: 'ACTIVE',
   });
@@ -46,6 +57,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         name: customer.name,
         email: customer.email || '',
         phone: customer.phone || '',
+        taxId: customer.taxId || '',
+        city: customer.city || '',
+        address: customer.address || '',
+        instagram: customer.instagram || '',
+        web: customer.web || '',
+        assignedToId: customer.assignedToId || undefined,
         notes: customer.notes || '',
         status: customer.status,
       });
@@ -54,6 +71,12 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
         name: '',
         email: '',
         phone: '',
+        taxId: '',
+        city: '',
+        address: '',
+        instagram: '',
+        web: '',
+        assignedToId: undefined,
         notes: '',
         status: 'ACTIVE',
       });
@@ -117,9 +140,7 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="phone" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Teléfono
-              </label>
+              <Label htmlFor="phone">Teléfono</Label>
               <Input
                 id="phone"
                 value={formData.phone}
@@ -128,9 +149,56 @@ export function CustomerFormDialog({ open, onOpenChange, customer }: CustomerFor
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="status" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Estado
-              </label>
+              <Label htmlFor="taxId">CUIT/DNI</Label>
+              <Input
+                id="taxId"
+                value={formData.taxId}
+                onChange={(e) => setFormData({ ...formData, taxId: e.target.value })}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="city">Ciudad</Label>
+              <Input
+                id="city"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Dirección</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                disabled={isLoading}
+              />
+            </div>
+            {isAdmin && sellersData?.data && (
+              <div className="space-y-2">
+                <Label htmlFor="assignedToId">Vendedor Asignado</Label>
+                <Select
+                  value={formData.assignedToId || ''}
+                  onValueChange={(value) => setFormData({ ...formData, assignedToId: value === '' ? undefined : value })}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger id="assignedToId">
+                    <SelectValue placeholder="Sin asignar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin asignar</SelectItem>
+                    {sellersData.data.map((seller) => (
+                      <SelectItem key={seller.id} value={seller.id}>
+                        {seller.name || seller.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="status">Estado</Label>
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}

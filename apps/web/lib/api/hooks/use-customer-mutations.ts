@@ -7,10 +7,12 @@ export interface CreateCustomerDto {
   name: string;
   email?: string;
   phone?: string;
+  taxId?: string;
   city?: string;
   address?: string;
   instagram?: string;
   web?: string;
+  assignedToId?: string;
   notes?: string;
   status?: string;
 }
@@ -19,10 +21,12 @@ export interface UpdateCustomerDto {
   name?: string;
   email?: string;
   phone?: string;
+  taxId?: string;
   city?: string;
   address?: string;
   instagram?: string;
   web?: string;
+  assignedToId?: string;
   notes?: string;
   status?: string;
 }

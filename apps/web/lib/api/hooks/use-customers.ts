@@ -6,11 +6,22 @@ export interface Customer {
   name: string;
   email: string | null;
   phone: string | null;
+  taxId?: string | null;
+  city?: string | null;
+  address?: string | null;
+  instagram?: string | null;
+  web?: string | null;
   notes: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
   createdById: string | null;
+  assignedToId?: string | null;
+  assignedTo?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
 }
 
 export interface CustomerListResponse {
@@ -25,6 +36,8 @@ interface UseCustomersParams {
   limit?: number;
   q?: string;
   status?: string;
+  sellerId?: string;
+  mine?: boolean;
   enabled?: boolean;
 }
 
@@ -38,6 +51,8 @@ export function useCustomers(params: UseCustomersParams = {}) {
 
   if (filters.q) queryParams.set('q', filters.q);
   if (filters.status) queryParams.set('status', filters.status);
+  if (filters.sellerId) queryParams.set('sellerId', filters.sellerId);
+  if (filters.mine !== undefined) queryParams.set('mine', filters.mine.toString());
 
   return useQuery({
     queryKey: ['customers', params],
@@ -48,5 +63,40 @@ export function useCustomers(params: UseCustomersParams = {}) {
   });
 }
 
+export function useCustomer(id: string | undefined) {
+  return useQuery({
+    queryKey: ['customer', id],
+    queryFn: () => api.get<Customer>(`/customers/${id}`),
+    enabled: !!id,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
+export interface CustomerInvoice {
+  id: string;
+  number: string;
+  issuedAt: string;
+  amountTotal: number;
+  paymentStatus: 'PAID' | 'UNPAID';
+  deliveryStatus: 'DELIVERED' | 'SHIPPED' | 'NOT_DELIVERED';
+  workflowStatus: 'ACTIVE' | 'CANCELLED' | 'STANDBY';
+  seller?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+}
+
+export function useCustomerInvoices(customerId: string | undefined) {
+  return useQuery({
+    queryKey: ['customer-invoices', customerId],
+    queryFn: () => api.get<CustomerInvoice[]>(`/customers/${customerId}/invoices`),
+    enabled: !!customerId,
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+}
+
 // Re-export for convenience
-export { useCreateCustomer } from './use-customer-mutations';
+export { useCreateCustomer, useUpdateCustomer } from './use-customer-mutations';

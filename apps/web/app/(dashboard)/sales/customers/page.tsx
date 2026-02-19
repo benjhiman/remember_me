@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useCustomers } from '@/lib/api/hooks/use-customers';
+import { useSellers } from '@/lib/api/hooks/use-sellers';
 import { usePermissions } from '@/lib/auth/use-permissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { perfMark, perfMeasureToNow } from '@/lib/utils/perf';
 import { Plus, Search, Edit, Users } from 'lucide-react';
@@ -15,19 +19,28 @@ import { CustomerFormDialog } from '@/components/customers/customer-form-dialog'
 import type { Customer } from '@/lib/api/hooks/use-customers';
 
 export default function CustomersPage() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const { can } = usePermissions();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [sellerIdFilter, setSellerIdFilter] = useState<string | undefined>(undefined);
+  const [mineFilter, setMineFilter] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'OWNER';
+
+  const { data: sellersData } = useSellers(isAdmin);
 
   const { data, isLoading, error, refetch } = useCustomers({
     page,
     limit: 20,
     q: search || undefined,
     status: statusFilter,
+    sellerId: sellerIdFilter,
+    mine: mineFilter || undefined,
     enabled: !!user,
   });
 
@@ -63,7 +76,7 @@ export default function CustomersPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Buscar por nombre o email..."
+            placeholder="Buscar por nombre, email o teléfono..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -73,18 +86,56 @@ export default function CustomersPage() {
           />
         </div>
       </div>
-      <select
+      {isAdmin && sellersData?.data && (
+        <Select
+          value={sellerIdFilter || ''}
+          onValueChange={(value) => {
+            setSellerIdFilter(value === '' ? undefined : value);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Todos los vendedores" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todos los vendedores</SelectItem>
+            {sellersData.data.map((seller) => (
+              <SelectItem key={seller.id} value={seller.id}>
+                {seller.name || seller.email}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="mine"
+          checked={mineFilter}
+          onCheckedChange={(checked) => {
+            setMineFilter(checked === true);
+            setPage(1);
+          }}
+        />
+        <label htmlFor="mine" className="text-sm text-gray-700 cursor-pointer">
+          Mis clientes
+        </label>
+      </div>
+      <Select
         value={statusFilter || ''}
-        onChange={(e) => {
-          setStatusFilter(e.target.value || undefined);
+        onValueChange={(value) => {
+          setStatusFilter(value === '' ? undefined : value);
           setPage(1);
         }}
-        className="px-3 py-1.5 text-sm border rounded-md bg-white"
       >
-        <option value="">Todos los estados</option>
-        <option value="ACTIVE">Activo</option>
-        <option value="INACTIVE">Inactivo</option>
-      </select>
+        <SelectTrigger className="w-[150px]">
+          <SelectValue placeholder="Todos los estados" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="">Todos los estados</SelectItem>
+          <SelectItem value="ACTIVE">Activo</SelectItem>
+          <SelectItem value="INACTIVE">Inactivo</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   );
 
@@ -156,6 +207,11 @@ export default function CustomersPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Teléfono
                         </th>
+                        {isAdmin && (
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Vendedor
+                          </th>
+                        )}
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Estado
                         </th>
@@ -169,7 +225,11 @@ export default function CustomersPage() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {data.items.map((customer) => (
-                        <tr key={customer.id} className="hover:bg-gray-50">
+                        <tr
+                          key={customer.id}
+                          className="hover:bg-gray-50 cursor-pointer"
+                          onClick={() => router.push(`/sales/customers/${customer.id}`)}
+                        >
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">{customer.name}</div>
                           </td>
@@ -179,6 +239,13 @@ export default function CustomersPage() {
                           <td className="px-4 py-3 whitespace-nowrap">
                             <div className="text-sm text-gray-600">{customer.phone || '-'}</div>
                           </td>
+                          {isAdmin && (
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-gray-600">
+                                {customer.assignedTo?.name || customer.assignedTo?.email || '-'}
+                              </div>
+                            </td>
+                          )}
                           <td className="px-4 py-3 whitespace-nowrap">
                             <span
                               className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -196,7 +263,10 @@ export default function CustomersPage() {
                           <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                             {can('customers.write') && (
                               <button
-                                onClick={() => setEditingCustomer(customer)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCustomer(customer);
+                                }}
                                 className="text-blue-600 hover:text-blue-900"
                               >
                                 <Edit className="h-4 w-4" />

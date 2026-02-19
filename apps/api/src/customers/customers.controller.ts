@@ -40,9 +40,21 @@ export class CustomersController {
   @RequirePermissions(Permission['customers.read'])
   async getCustomer(
     @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
     @Param('id') id: string,
   ) {
-    return this.customersService.getCustomer(organizationId, id);
+    return this.customersService.getCustomer(organizationId, user.userId, id);
+  }
+
+  @Get(':id/invoices')
+  @UseGuards(PermissionsGuard)
+  @RequirePermissions(Permission['customers.read'])
+  async getCustomerInvoices(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.customersService.getCustomerInvoices(organizationId, user.userId, id);
   }
 
   @Post()

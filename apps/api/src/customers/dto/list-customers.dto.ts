@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ListCustomersDto {
@@ -16,9 +16,18 @@ export class ListCustomersDto {
 
   @IsString()
   @IsOptional()
-  q?: string; // Search by name or email
+  q?: string; // Search by name, email, or phone
 
   @IsString()
   @IsOptional()
   status?: string; // ACTIVE, INACTIVE
+
+  @IsString()
+  @IsOptional()
+  sellerId?: string; // Filter by assigned seller (admin only)
+
+  @Type(() => Boolean)
+  @IsBoolean()
+  @IsOptional()
+  mine?: boolean; // true -> assignedToUserId = currentUserId
 }

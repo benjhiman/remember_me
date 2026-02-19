@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useEffect } from 'react';
 import { SaleFormZoho } from '@/components/sales/sale-form-zoho';
@@ -8,8 +8,10 @@ import { useCreateSale } from '@/lib/api/hooks/use-sale-mutations';
 
 export default function NewSalePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const createSale = useCreateSale();
+  const customerId = searchParams?.get('customerId') || undefined;
 
   useEffect(() => {
     if (!user) {
@@ -54,6 +56,7 @@ export default function NewSalePage() {
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             isLoading={createSale.isPending}
+            initialCustomerId={customerId}
           />
         </div>
       </div>

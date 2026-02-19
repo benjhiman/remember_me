@@ -25,6 +25,7 @@ import { LoggerService } from './common/logger/logger.service';
 import { AuditLogModule } from './common/audit/audit-log.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { IdempotencyInterceptor } from './common/idempotency/idempotency.interceptor';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { MetricsModule } from './common/metrics/metrics.module';
@@ -148,6 +149,10 @@ const envFilePath = (() => {
     {
       provide: APP_INTERCEPTOR,
       useClass: OrganizationInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditLogInterceptor,
     },
     {
       provide: APP_FILTER,

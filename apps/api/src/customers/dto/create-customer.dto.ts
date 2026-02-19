@@ -33,6 +33,14 @@ export class CreateCustomerDto {
 
   @IsString()
   @IsOptional()
+  taxId?: string; // CUIT, DNI, etc.
+
+  @IsString()
+  @IsOptional()
+  assignedToId?: string; // Vendedor asignado (admin only)
+
+  @IsString()
+  @IsOptional()
   notes?: string;
 
   @IsString()

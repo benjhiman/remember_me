@@ -37,10 +37,13 @@ model User {
   idempotencyKeys           IdempotencyKey[]
   assignedConversations     Conversation[]
   createdCustomers          Customer[]                 @relation("CustomerCreator")
+  assignedCustomers         Customer[]                 @relation("CustomerAssignedTo")
   createdVendors            Vendor[]                   @relation("VendorCreator")
   createdPurchases          Purchase[]                 @relation("PurchaseCreator")
   purchaseStockApplications PurchaseStockApplication[] @relation("PurchaseStockApplier")
   createdJournalEntries     JournalEntry[]             @relation("JournalEntryCreator")
+  commissionConfigs         CommissionConfig[]         @relation("CommissionSeller")
+  commissionPerModels        CommissionPerModel[]      @relation("CommissionPerModelSeller")
 
   @@index([email])
 }
@@ -91,6 +94,8 @@ model Organization {
   PurchaseStockApplication PurchaseStockApplication[]
   PriceListItem            PriceListItem[]
   PriceListItemOverride    PriceListItemOverride[]
+  commissionConfigs        CommissionConfig[]
+  commissionPerModels      CommissionPerModel[]
 
   @@index([slug])
 }
@@ -617,10 +622,12 @@ model Customer {
   id             String  @id @default(cuid())
   organizationId String
   createdById    String?
+  assignedToId   String? // Vendedor asignado
 
   name       String
   email      String?
   phone      String?
+  taxId      String? // CUIT, DNI, etc.
   city       String?
   address    String?
   instagram  String?
@@ -633,11 +640,51 @@ model Customer {
 
   organization     Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy        User?                     @relation("CustomerCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignedTo       User?                     @relation("CustomerAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   balanceSnapshots CustomerBalanceSnapshot[]
 
   @@index([organizationId, createdAt])
   @@index([organizationId, name])
   @@index([organizationId, status])
+  @@index([organizationId, assignedToId])
+  @@unique([organizationId, email])
+}
+
+// ===== COMMISSIONS =====
+
+model CommissionConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  sellerId       String   // User ID del vendedor
+  mode           String   // PER_UNIT, PERCENT_GROSS_PROFIT, PER_MODEL, PERCENT_SALE
+  value          Decimal  @db.Decimal(10, 2) // Valor según el modo
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  seller       User         @relation("CommissionSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sellerId])
+  @@index([organizationId])
+  @@index([sellerId])
+}
+
+model CommissionPerModel {
+  id             String   @id @default(cuid())
+  organizationId String
+  sellerId       String
+  itemGroupKey   String   // Key del grupo de items (sin color)
+  value          Decimal  @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  seller       User         @relation("CommissionPerModelSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, sellerId, itemGroupKey])
+  @@index([organizationId])
+  @@index([sellerId])
+  @@index([itemGroupKey])
 }
 
 model Vendor {

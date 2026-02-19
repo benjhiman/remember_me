@@ -60,9 +60,10 @@ interface SaleFormZohoProps {
   onSubmit: (data: CreateSaleFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  initialCustomerId?: string;
 }
 
-export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading }: SaleFormZohoProps) {
+export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading, initialCustomerId }: SaleFormZohoProps) {
   const { user } = useAuthStore();
   const { data: customersData } = useCustomers({ limit: 100, enabled: true });
   const { data: priceListsData } = usePriceLists();
@@ -80,7 +81,7 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading }: SaleFormZo
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialCustomerId || null);
   const [isConsumidorFinal, setIsConsumidorFinal] = useState(false);
   const [createCustomerDialogOpen, setCreateCustomerDialogOpen] = useState(false);
   const [reservationSelectOpen, setReservationSelectOpen] = useState(false);
@@ -183,11 +184,26 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading }: SaleFormZo
         setValue('customerName', customer.name);
         setValue('customerEmail', customer.email || '');
         setValue('customerPhone', customer.phone || '');
+        setValue('customerCity', customer.city || '');
+        setValue('customerAddress', customer.address || '');
+        setValue('customerInstagram', customer.instagram || '');
+        setValue('customerWeb', customer.web || '');
         setCustomerSearchOpen(false);
         setCustomerSearch('');
       }
     }
   };
+
+  // Preselect customer from initialCustomerId
+  useEffect(() => {
+    if (initialCustomerId && customersData?.items && !selectedCustomerId && !isConsumidorFinal) {
+      const customer = customersData.items.find((c) => c.id === initialCustomerId);
+      if (customer) {
+        handleCustomerSelect(initialCustomerId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCustomerId, customersData?.items]);
 
   // Handle price list change - apply prices to items
   useEffect(() => {
