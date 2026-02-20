@@ -35,7 +35,6 @@ model User {
   StockMovement             StockMovement[]
   StockReservation          StockReservation[]
   idempotencyKeys           IdempotencyKey[]
-  assignedConversations     Conversation[]
   createdCustomers          Customer[]                 @relation("CustomerCreator")
   assignedCustomers         Customer[]                 @relation("CustomerAssignedTo")
   createdVendors            Vendor[]                   @relation("VendorCreator")
@@ -61,10 +60,8 @@ model Organization {
   members                  Membership[]
   invitations              Invitation[]
   refreshTokens            RefreshToken[]
-  pipelines                Pipeline[]
   leads                    Lead[]
   stockItems               StockItem[]
-  whatsappTemplates        WhatsAppTemplate[]
   stockReservations        StockReservation[]
   stockMovements           StockMovement[]
   pricingRules             PricingRule[]
@@ -75,11 +72,6 @@ model Organization {
   idempotencyKeys          IdempotencyKey[]
   connectedAccounts        ConnectedAccount[]
   integrationJobs          IntegrationJob[]
-  whatsappAutomationRules  WhatsAppAutomationRule[]
-  conversations            Conversation[]
-  conversationTags         ConversationTag[]
-  metaAttributionSnapshots MetaAttributionSnapshot[]
-  MetaSpendDaily           MetaSpendDaily[]
   items                    Item[]
   folderPrefixes           FolderPrefix[]
   folders                  Folder[]
@@ -170,45 +162,9 @@ enum InviteStatus {
 
 // ===== CRM LEADS =====
 
-model Pipeline {
-  id             String    @id @default(cuid())
-  organizationId String
-  name           String
-  color          String?   @default("#6366f1")
-  order          Int       @default(0) // Para ordenar pipelines
-  isDefault      Boolean   @default(false)
-  deletedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  stages       Stage[]
-  leads        Lead[]
-
-  @@index([organizationId, order])
-}
-
-model Stage {
-  id         String    @id @default(cuid())
-  pipelineId String
-  name       String
-  order      Int       @default(0)
-  color      String?   @default("#94a3b8")
-  deletedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  leads    Lead[]
-
-  @@index([pipelineId, order])
-}
-
 model Lead {
   id             String  @id @default(cuid())
   organizationId String
-  pipelineId     String
-  stageId        String
   assignedToId   String?
   createdById    String
 
@@ -232,18 +188,13 @@ model Lead {
   updatedAt   DateTime   @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  pipeline     Pipeline     @relation(fields: [pipelineId], references: [id])
-  stage        Stage        @relation(fields: [stageId], references: [id])
   assignedTo   User?        @relation("LeadAssignee", fields: [assignedToId], references: [id])
   creator      User         @relation("LeadCreator", fields: [createdById], references: [id])
 
   notes                    Note[]
   tasks                    Task[]
   sales                    Sale[]
-  Conversation             Conversation[]
-  metaAttributionSnapshots MetaAttributionSnapshot[]
 
-  @@index([organizationId, pipelineId, stageId])
   @@index([organizationId, assignedToId])
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
@@ -581,7 +532,6 @@ model Sale {
   items                   SaleItem[]
   stockReservations       StockReservation[]
   stockMovements          StockMovement[]
-  metaAttributionSnapshot MetaAttributionSnapshot?
 
   @@index([organizationId, status])
   @@index([organizationId, assignedToId])
@@ -959,8 +909,6 @@ enum AuditEntityType {
   StockItem
   Sale
   PricingRule
-  Pipeline
-  Stage
   StockReservation
   SaleItem
   Note
@@ -1023,8 +971,6 @@ model IdempotencyKey {
 // ============================================
 
 enum IntegrationProvider {
-  WHATSAPP
-  INSTAGRAM
   FACEBOOK
 }
 
@@ -1040,32 +986,6 @@ enum WebhookEventStatus {
   FAILED
 }
 
-enum MessageDirection {
-  INBOUND
-  OUTBOUND
-}
-
-enum MessageStatus {
-  QUEUED
-  SENT
-  DELIVERED
-  READ
-  FAILED
-}
-
-enum WhatsAppTemplateCategory {
-  MARKETING
-  UTILITY
-  AUTHENTICATION
-}
-
-enum WhatsAppTemplateStatus {
-  APPROVED
-  PENDING
-  REJECTED
-  DISABLED
-}
-
 enum IntegrationJobType {
   SEND_MESSAGE
   SEND_MESSAGE_TEMPLATE
@@ -1073,20 +993,6 @@ enum IntegrationJobType {
   SYNC_ACCOUNT
   RETRY
   AUTOMATION_ACTION
-  FETCH_META_SPEND
-  REFRESH_META_TOKEN
-}
-
-enum WhatsAppAutomationTrigger {
-  LEAD_CREATED
-  SALE_RESERVED
-  SALE_PAID
-  NO_REPLY_24H
-}
-
-enum WhatsAppAutomationAction {
-  SEND_TEMPLATE
-  SEND_TEXT
 }
 
 enum IntegrationJobStatus {
@@ -1145,136 +1051,6 @@ model WebhookEvent {
   @@index([status, receivedAt])
 }
 
-model MessageLog {
-  id                String              @id @default(uuid())
-  provider          IntegrationProvider
-  direction         MessageDirection
-  to                String
-  from              String
-  text              String
-  status            MessageStatus?      @default(QUEUED)
-  externalMessageId String?             @unique
-  errorCode         String?
-  errorMessage      String?
-  statusUpdatedAt   DateTime?
-  metaJson          Json?
-  conversationId    String?
-  createdAt         DateTime            @default(now())
-
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-
-  @@index([provider, createdAt])
-  @@index([to])
-  @@index([from])
-  @@index([externalMessageId])
-  @@index([conversationId])
-}
-
-enum ConversationStatus {
-  OPEN
-  PENDING
-  CLOSED
-}
-
-model Conversation {
-  id               String              @id @default(cuid())
-  organizationId   String
-  provider         IntegrationProvider
-  externalThreadId String?
-  phone            String?
-  handle           String? // IG username
-  leadId           String?
-  assignedToId     String?
-  status           ConversationStatus  @default(OPEN)
-  lastMessageAt    DateTime            @default(now())
-  lastInboundAt    DateTime?
-  lastOutboundAt   DateTime?
-  lastReadAt       DateTime?
-  unreadCount      Int                 @default(0)
-  deletedAt        DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-
-  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lead         Lead?                 @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  assignedTo   User?                 @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  messages     MessageLog[]
-  tags         ConversationTagLink[]
-
-  @@unique([organizationId, provider, phone])
-  @@index([organizationId, provider, lastMessageAt])
-  @@index([organizationId, assignedToId])
-  @@index([organizationId, status])
-  @@index([organizationId, provider, status])
-}
-
-model ConversationTag {
-  id             String    @id @default(cuid())
-  organizationId String
-  name           String
-  color          String? // Hex color
-  deletedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  organization  Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  conversations ConversationTagLink[]
-
-  @@unique([organizationId, name])
-  @@index([organizationId, deletedAt])
-}
-
-model ConversationTagLink {
-  id             String   @id @default(cuid())
-  conversationId String
-  tagId          String
-  createdAt      DateTime @default(now())
-
-  conversation Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  tag          ConversationTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
-
-  @@unique([conversationId, tagId])
-  @@index([conversationId])
-  @@index([tagId])
-}
-
-model WhatsAppTemplate {
-  id             String                   @id @default(cuid())
-  organizationId String
-  name           String
-  language       String                   @default("es_AR")
-  category       WhatsAppTemplateCategory
-  componentsJson Json // body/header/buttons with placeholders
-  status         WhatsAppTemplateStatus   @default(PENDING)
-  deletedAt      DateTime?
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, name, language])
-  @@index([organizationId, status])
-  @@index([organizationId, category])
-}
-
-model WhatsAppAutomationRule {
-  id             String                    @id @default(cuid())
-  organizationId String
-  name           String
-  trigger        WhatsAppAutomationTrigger
-  action         WhatsAppAutomationAction
-  payloadJson    Json // templateId/text + variables mapping
-  enabled        Boolean                   @default(true)
-  cooldownHours  Int                       @default(24)
-  deletedAt      DateTime?
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@index([organizationId, trigger, enabled])
-  @@index([organizationId, enabled])
-}
 
 model IntegrationJob {
   id                 String               @id @default(uuid())
@@ -1323,65 +1099,3 @@ model JobRunnerState {
   @@map("job_runner_state")
 }
 
-// ===== ATTRIBUTION =====
-
-enum AttributionSource {
-  META_LEAD_ADS
-}
-
-model MetaAttributionSnapshot {
-  id             String            @id @default(cuid())
-  organizationId String
-  saleId         String            @unique
-  leadId         String?
-  source         AttributionSource @default(META_LEAD_ADS)
-  campaignId     String?
-  adsetId        String?
-  adId           String?
-  formId         String?
-  pageId         String?
-  leadgenId      String?
-  createdAt      DateTime          @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
-
-  @@index([organizationId, campaignId])
-  @@index([organizationId, adId])
-  @@index([organizationId, createdAt])
-  @@index([organizationId, source])
-}
-
-// ===== SPEND TRACKING =====
-
-enum MetaSpendLevel {
-  CAMPAIGN
-  ADSET
-  AD
-}
-
-model MetaSpendDaily {
-  id             String              @id @default(cuid())
-  organizationId String
-  provider       IntegrationProvider @default(INSTAGRAM) // META via INSTAGRAM provider
-  date           DateTime            @db.Date
-  level          MetaSpendLevel
-  campaignId     String?
-  adsetId        String?
-  adId           String?
-  currency       String              @default("USD")
-  spend          Decimal             @db.Decimal(18, 2)
-  impressions    Int?
-  clicks         Int?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, date, level, campaignId, adsetId, adId])
-  @@index([organizationId, date])
-  @@index([organizationId, campaignId])
-  @@index([organizationId, adId])
-  @@index([organizationId, provider, date])
-}

@@ -37,14 +37,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (!parts.length) return [];
 
     const pretty = (s: string) => {
-      if (s === 'leads') return 'Leads';
       if (s === 'stock') return 'Stock';
       if (s === 'sales') return 'Ventas';
-      if (s === 'inbox') return 'Inbox';
-      if (s === 'ads') return 'Meta Ads';
       if (s === 'settings') return 'Settings';
       if (s === 'integrations') return 'Integraciones';
-      if (s === 'board') return 'Board';
       return s;
     };
 
@@ -183,10 +179,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
             {/* Content area - pages can opt out of padding by using full height */}
             <div className={cn(
-              'flex-1 overflow-auto',
-              // No padding for inbox pages (they use full viewport)
-              // No padding for pages using PageShell (they handle their own layout)
-              !pathname?.startsWith('/inbox') && 'h-full'
+              'flex-1 overflow-auto h-full'
             )}>
               {children}
             </div>

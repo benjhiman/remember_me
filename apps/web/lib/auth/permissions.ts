@@ -39,9 +39,6 @@ export enum Permission {
   VIEW_PURCHASES = 'VIEW_PURCHASES',
   EDIT_PURCHASES = 'EDIT_PURCHASES',
   
-  // Inbox
-  VIEW_INBOX = 'VIEW_INBOX',
-  
   // Integrations
   VIEW_INTEGRATIONS = 'VIEW_INTEGRATIONS',
   MANAGE_INTEGRATIONS = 'MANAGE_INTEGRATIONS',
@@ -62,7 +59,6 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_SALES,
     Permission.VIEW_CUSTOMERS,
     Permission.EDIT_CUSTOMERS,
-    Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
     Permission.MANAGE_INTEGRATIONS,
     Permission.MANAGE_MEMBERS,
@@ -77,7 +73,6 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_SALES,
     Permission.VIEW_CUSTOMERS,
     Permission.EDIT_CUSTOMERS,
-    Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
     Permission.MANAGE_INTEGRATIONS,
     Permission.MANAGE_MEMBERS,
@@ -92,9 +87,8 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_SALES,
     Permission.VIEW_CUSTOMERS,
     Permission.EDIT_CUSTOMERS,
-    Permission.VIEW_INBOX,
     Permission.VIEW_INTEGRATIONS,
-    Permission.MANAGE_MEMBERS, // Managers can assign conversations
+    Permission.MANAGE_MEMBERS,
     // No MANAGE_INTEGRATIONS
   ],
   [Role.SELLER]: [
@@ -107,7 +101,6 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     Permission.EDIT_SALES,
     Permission.VIEW_CUSTOMERS,
     Permission.EDIT_CUSTOMERS,
-    Permission.VIEW_INBOX,
     // No VIEW_INTEGRATIONS
     // No MANAGE_INTEGRATIONS
     // No MANAGE_MEMBERS

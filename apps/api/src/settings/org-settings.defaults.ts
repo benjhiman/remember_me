@@ -2,8 +2,6 @@ export type UiDensity = 'comfortable' | 'compact';
 export type UiTheme = 'light' | 'dark';
 export type UiAccentColor = 'blue' | 'violet' | 'green';
 
-export type ConversationStatus = 'OPEN' | 'PENDING' | 'CLOSED';
-
 export interface OrgCrmSettings {
   branding: {
     name: string;
@@ -13,16 +11,8 @@ export interface OrgCrmSettings {
     density: UiDensity;
   };
   permissions: {
-    sellerCanChangeConversationStatus: boolean;
-    sellerCanReassignConversation: boolean;
     sellerCanEditSales: boolean;
     sellerCanEditLeads: boolean;
-    sellerCanMoveKanban: boolean;
-  };
-  inbox: {
-    sellerSeesOnlyAssigned: boolean;
-    autoAssignOnReply: boolean;
-    defaultConversationStatus: ConversationStatus;
   };
   ui: {
     density: UiDensity;
@@ -45,16 +35,8 @@ export const ORG_SETTINGS_DEFAULTS: OrgSettings = {
       density: 'comfortable',
     },
     permissions: {
-      sellerCanChangeConversationStatus: true,
-      sellerCanReassignConversation: true,
       sellerCanEditSales: true,
       sellerCanEditLeads: true,
-      sellerCanMoveKanban: true,
-    },
-    inbox: {
-      sellerSeesOnlyAssigned: true,
-      autoAssignOnReply: true,
-      defaultConversationStatus: 'OPEN',
     },
     ui: {
       density: 'comfortable',

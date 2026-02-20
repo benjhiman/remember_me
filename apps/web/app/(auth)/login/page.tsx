@@ -31,7 +31,7 @@ function LoginPageContent() {
   // Get API base URL (single source of truth)
   const apiBaseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : 'https://api.iphonealcosto.com/api';
   
-  const redirectTo = searchParams.get('redirectTo') || '/inbox';
+  const redirectTo = searchParams.get('redirectTo') || '/dashboard';
 
   useEffect(() => {
     try {

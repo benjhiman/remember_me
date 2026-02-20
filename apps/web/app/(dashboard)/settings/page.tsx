@@ -94,7 +94,6 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="permisos">Permisos</TabsTrigger>
-          <TabsTrigger value="inbox">Inbox</TabsTrigger>
           <TabsTrigger value="apariencia">Apariencia</TabsTrigger>
           {userCan(user, Permission.MANAGE_MEMBERS) && (
             <TabsTrigger value="audit">Audit Log</TabsTrigger>
@@ -132,7 +131,7 @@ export default function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-gray-600 mb-4">
-                    Estado real, tests y activity (Meta / Instagram / WhatsApp).
+                    Estado real, tests y activity.
                   </p>
                   <Link href="/settings/integrations">
                     <Button variant="outline" className="w-full">
@@ -186,16 +185,6 @@ export default function SettingsPage() {
                 <div className="space-y-4">
                   {[
                     {
-                      key: 'sellerCanChangeConversationStatus',
-                      label: 'Permitir que vendedores cambien el estado del chat',
-                      desc: 'Solo en chats asignados a ellos (si Inbox lo restringe).',
-                    },
-                    {
-                      key: 'sellerCanReassignConversation',
-                      label: 'Permitir que vendedores reasignen chats',
-                      desc: 'Recomendado: solo reasignación a sí mismos.',
-                    },
-                    {
                       key: 'sellerCanEditSales',
                       label: 'Permitir que vendedores creen/editen ventas',
                       desc: 'Aplica a crear y editar ventas.',
@@ -204,11 +193,6 @@ export default function SettingsPage() {
                       key: 'sellerCanEditLeads',
                       label: 'Permitir que vendedores creen/editen leads',
                       desc: 'Aplica a create/update lead.',
-                    },
-                    {
-                      key: 'sellerCanMoveKanban',
-                      label: 'Permitir que vendedores muevan el Kanban',
-                      desc: 'Controla cambios de stage/pipeline en leads.',
                     },
                   ].map((item) => (
                     <div key={item.key} className="flex items-start justify-between gap-4 rounded-lg border bg-white p-4">
@@ -232,84 +216,6 @@ export default function SettingsPage() {
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="inbox">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inbox</CardTitle>
-              <CardDescription>Reglas operativas del centro de conversaciones.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {local && (
-                <>
-                  <div className="flex items-start justify-between gap-4 rounded-lg border bg-white p-4">
-                    <div className="flex-1">
-                      <div className="font-medium">Auto-assign al responder</div>
-                      <div className="text-sm text-gray-600">
-                        Si un usuario responde, asignar el chat automáticamente.
-                      </div>
-                    </div>
-                    <Switch
-                      checked={!!local.crm.inbox.autoAssignOnReply}
-                      onCheckedChange={(v) =>
-                        setLocal((prev: any) => ({
-                          ...prev,
-                          crm: { ...prev.crm, inbox: { ...prev.crm.inbox, autoAssignOnReply: v } },
-                        }))
-                      }
-                      disabled={!canEdit}
-                    />
-                  </div>
-
-                  <div className="flex items-start justify-between gap-4 rounded-lg border bg-white p-4">
-                    <div className="flex-1">
-                      <div className="font-medium">Restringir SELLER a sus chats</div>
-                      <div className="text-sm text-gray-600">
-                        Si está activo, vendedores solo ven conversaciones asignadas a ellos.
-                      </div>
-                    </div>
-                    <Switch
-                      checked={!!local.crm.inbox.sellerSeesOnlyAssigned}
-                      onCheckedChange={(v) =>
-                        setLocal((prev: any) => ({
-                          ...prev,
-                          crm: { ...prev.crm, inbox: { ...prev.crm.inbox, sellerSeesOnlyAssigned: v } },
-                        }))
-                      }
-                      disabled={!canEdit}
-                    />
-                  </div>
-
-                  <div className="rounded-lg border bg-white p-4">
-                    <div className="font-medium mb-1">Estado default de conversación</div>
-                    <div className="text-sm text-gray-600 mb-3">
-                      Se aplica al crear una conversación nueva (primer mensaje).
-                    </div>
-                    <Select
-                      value={local.crm.inbox.defaultConversationStatus}
-                      onValueChange={(v) =>
-                        setLocal((prev: any) => ({
-                          ...prev,
-                          crm: { ...prev.crm, inbox: { ...prev.crm.inbox, defaultConversationStatus: v } },
-                        }))
-                      }
-                      disabled={!canEdit}
-                    >
-                      <SelectTrigger className="w-[240px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="OPEN">OPEN</SelectItem>
-                        <SelectItem value="PENDING">PENDING</SelectItem>
-                        <SelectItem value="CLOSED">CLOSED</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
               )}
             </CardContent>
           </Card>

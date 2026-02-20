@@ -7,8 +7,6 @@ interface UseLeadsParams {
   limit?: number;
   search?: string;
   q?: string;
-  pipelineId?: string;
-  stageId?: string;
   assignedToId?: string;
   status?: LeadStatus;
   createdFrom?: string;
@@ -29,8 +27,6 @@ export function useLeads(params: UseLeadsParams = {}) {
   // Use 'q' or 'search' for search query
   if (filters.q) queryParams.set('q', filters.q);
   if (filters.search) queryParams.set('search', filters.search);
-  if (filters.pipelineId) queryParams.set('pipelineId', filters.pipelineId);
-  if (filters.stageId) queryParams.set('stageId', filters.stageId);
   if (filters.assignedToId) queryParams.set('assignedToId', filters.assignedToId);
   if (filters.status) queryParams.set('status', filters.status);
   if (filters.createdFrom) queryParams.set('createdFrom', filters.createdFrom);

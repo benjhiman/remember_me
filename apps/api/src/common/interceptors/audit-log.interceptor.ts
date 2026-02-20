@@ -170,26 +170,21 @@ export class AuditLogInterceptor implements NestInterceptor {
     // Map common paths to entity types
     const pathLower = path.toLowerCase();
     
-    if (pathLower.includes('/leads')) return AuditEntityType.Lead;
     if (pathLower.includes('/stock') && pathLower.includes('/items')) return AuditEntityType.StockItem;
     if (pathLower.includes('/sales')) return AuditEntityType.Sale;
     if (pathLower.includes('/pricing') && pathLower.includes('/rules')) return AuditEntityType.PricingRule;
-    if (pathLower.includes('/pipelines')) return AuditEntityType.Pipeline;
-    if (pathLower.includes('/stages')) return AuditEntityType.Stage;
     if (pathLower.includes('/reservations')) return AuditEntityType.StockReservation;
-    if (pathLower.includes('/notes')) return AuditEntityType.Note;
-    if (pathLower.includes('/tasks')) return AuditEntityType.Task;
 
     return null;
   }
 
   private extractEntityId(path: string, request: Request): string | null {
-    // Try to extract ID from path params (e.g., /leads/:id)
+    // Try to extract ID from path params
     const pathParts = path.split('/').filter(Boolean);
     const idIndex = pathParts.findIndex((part, index) => {
       // Look for ID-like patterns after entity name
       const prevPart = pathParts[index - 1];
-      if (prevPart && ['leads', 'sales', 'stock', 'pricing', 'pipelines', 'stages'].includes(prevPart.toLowerCase())) {
+      if (prevPart && ['sales', 'stock', 'pricing'].includes(prevPart.toLowerCase())) {
         return true;
       }
       return false;

@@ -29,31 +29,12 @@ import { Type } from 'class-transformer';
 
 class PermissionsDto {
   @IsOptional() @IsBoolean()
-  sellerCanChangeConversationStatus?: boolean;
-
-  @IsOptional() @IsBoolean()
-  sellerCanReassignConversation?: boolean;
-
-  @IsOptional() @IsBoolean()
   sellerCanEditSales?: boolean;
 
   @IsOptional() @IsBoolean()
   sellerCanEditLeads?: boolean;
-
-  @IsOptional() @IsBoolean()
-  sellerCanMoveKanban?: boolean;
 }
 
-class InboxDto {
-  @IsOptional() @IsBoolean()
-  sellerSeesOnlyAssigned?: boolean;
-
-  @IsOptional() @IsIn(['OPEN', 'PENDING', 'CLOSED'])
-  defaultConversationStatus?: 'OPEN' | 'PENDING' | 'CLOSED';
-
-  @IsOptional() @IsBoolean()
-  autoAssignOnReply?: boolean;
-}
 
 class UiDto {
   @IsOptional() @IsIn(['comfortable', 'compact'])
@@ -105,10 +86,6 @@ class CrmDto {
   @Type(() => PermissionsDto)
   permissions?: PermissionsDto;
 
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => InboxDto)
-  inbox?: InboxDto;
 
   @IsOptional()
   @ValidateNested()

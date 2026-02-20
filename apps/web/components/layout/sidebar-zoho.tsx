@@ -12,18 +12,11 @@ import {
   Users,
   Package,
   ShoppingCart,
-  Inbox,
   Settings,
-  KanbanSquare,
   PackageCheck,
-  MessageSquare,
-  Instagram,
-  MessageCircle,
-  Phone,
   ChevronRight,
   ChevronDown,
   DollarSign,
-  Megaphone,
   BarChart3,
   FileText,
   Clock,
@@ -38,7 +31,6 @@ import {
   Gift,
   ClipboardList,
   Hash,
-  Monitor,
 } from 'lucide-react';
 import { useOrgSettings } from '@/lib/api/hooks/use-org-settings';
 
@@ -46,7 +38,7 @@ interface NavItem {
   href?: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  iconSrc?: string; // Optional: path to SVG/PNG icon (for custom icons like WhatsApp mono)
+  iconSrc?: string; // Optional: path to SVG/PNG icon
   permission: Permission;
   children?: NavItem[];
   ownerOnly?: boolean; // If true, show owner badge/icon
@@ -54,28 +46,6 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
-  {
-    href: '/board',
-    label: 'Kanban',
-    icon: KanbanSquare,
-    permission: Permission.VIEW_LEADS,
-    children: [
-      { href: '/board/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
-      { href: '/board/pipelines', label: 'Pipelines', icon: KanbanSquare, permission: Permission.VIEW_LEADS },
-    ],
-  },
-  {
-    href: '/inbox/unified',
-    label: 'Inbox',
-    icon: Inbox,
-    permission: Permission.VIEW_INBOX,
-    children: [
-      { href: '/inbox/unified', label: 'General', icon: Monitor, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/whatsapp', label: 'WhatsApp', icon: Phone, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/instagram', label: 'Instagram', icon: Instagram, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/unificado', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
-    ],
-  },
   {
     href: '/inventory/stock',
     label: 'Inventory',
@@ -116,7 +86,6 @@ const navItems: NavItem[] = [
     ],
   },
   { href: '/pricing', label: 'Pricing', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
-  { href: '/ads', label: 'Meta Ads', icon: Megaphone, permission: Permission.VIEW_INTEGRATIONS },
   { href: '/reports', label: 'Reports', icon: BarChart3, permission: Permission.VIEW_DASHBOARD },
   {
     href: '/settings',
@@ -384,8 +353,6 @@ function NavItemComponent({
 function getSectionIdFromPathname(pathname: string | null): string | null {
   if (!pathname) return null;
   
-  if (pathname.startsWith('/board')) return 'kanban';
-  if (pathname.startsWith('/inbox')) return 'inbox';
   if (pathname.startsWith('/inventory')) return 'inventory';
   if (pathname.startsWith('/sales')) return 'sales';
   if (pathname.startsWith('/purchases')) return 'purchases';
@@ -397,8 +364,6 @@ function getSectionIdFromPathname(pathname: string | null): string | null {
 // Helper to get section ID from nav item
 function getSectionIdFromNavItem(item: NavItem): string | null {
   const label = item.label.toLowerCase();
-  if (label === 'kanban') return 'kanban';
-  if (label === 'inbox') return 'inbox';
   if (label === 'inventory') return 'inventory';
   if (label === 'sales') return 'sales';
   if (label === 'purchases') return 'purchases';

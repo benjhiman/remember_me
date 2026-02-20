@@ -35,10 +35,6 @@ export class OrgSettingsService {
 
     const current = (org.settings as any) || {};
     const rawCrm = current.crm || {};
-    // Backwards-compat: old key showOnlyAssignedToSeller -> new sellerSeesOnlyAssigned
-    if (rawCrm?.inbox && rawCrm.inbox.showOnlyAssignedToSeller !== undefined && rawCrm.inbox.sellerSeesOnlyAssigned === undefined) {
-      rawCrm.inbox.sellerSeesOnlyAssigned = rawCrm.inbox.showOnlyAssignedToSeller;
-    }
     const mergedCrm = deepMerge(ORG_SETTINGS_DEFAULTS.crm, rawCrm);
 
     // Org-specific branding defaults (white-label)
@@ -66,15 +62,8 @@ export class OrgSettingsService {
 
     const current = (org.settings as any) || {};
     const currentCrm = current.crm || {};
-    if (currentCrm?.inbox && currentCrm.inbox.showOnlyAssignedToSeller !== undefined && currentCrm.inbox.sellerSeesOnlyAssigned === undefined) {
-      currentCrm.inbox.sellerSeesOnlyAssigned = currentCrm.inbox.showOnlyAssignedToSeller;
-    }
 
     const patchCrm: any = patch.crm || {};
-    if (patchCrm?.inbox && patchCrm.inbox.showOnlyAssignedToSeller !== undefined && patchCrm.inbox.sellerSeesOnlyAssigned === undefined) {
-      patchCrm.inbox.sellerSeesOnlyAssigned = patchCrm.inbox.showOnlyAssignedToSeller;
-      delete patchCrm.inbox.showOnlyAssignedToSeller;
-    }
 
     const nextCrm = deepMerge(
       deepMerge(ORG_SETTINGS_DEFAULTS.crm, currentCrm),

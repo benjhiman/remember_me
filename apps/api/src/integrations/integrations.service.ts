@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { IntegrationProvider, ConnectedAccountStatus, MessageDirection } from '@remember-me/prisma';
+import { IntegrationProvider, ConnectedAccountStatus } from '@remember-me/prisma';
 import { IntegrationQueueService } from './jobs/queue/integration-queue.service';
 import { IntegrationJobType } from '@remember-me/prisma';
 
@@ -68,85 +68,4 @@ export class IntegrationsService {
     });
   }
 
-  async sendWhatsAppMessage(
-    organizationId: string,
-    toPhone: string,
-    text: string,
-    leadId?: string,
-  ) {
-    // Enqueue SEND_MESSAGE job
-    const job = await this.integrationQueueService.enqueue({
-      jobType: IntegrationJobType.SEND_MESSAGE,
-      provider: IntegrationProvider.WHATSAPP,
-      payload: {
-        toPhone,
-        text,
-        leadId,
-        organizationId,
-      },
-      organizationId,
-    });
-
-    return {
-      jobId: job.id,
-      status: job.status,
-      message: 'Message queued for sending',
-    };
-  }
-
-  async listMessages(
-    organizationId: string,
-    leadId?: string,
-    page: number = 1,
-    limit: number = 20,
-  ) {
-    const skip = (page - 1) * limit;
-
-    const where: any = {
-      provider: IntegrationProvider.WHATSAPP,
-    };
-
-    // If leadId provided, filter by lead's phone
-    if (leadId) {
-      const lead = await this.prisma.lead.findFirst({
-        where: {
-          id: leadId,
-          organizationId,
-          deletedAt: null,
-        },
-      });
-
-      if (lead && lead.phone) {
-        where.OR = [
-          { from: lead.phone },
-          { to: lead.phone },
-        ];
-      } else {
-        // Lead not found or no phone, return empty
-        return {
-          data: [],
-          total: 0,
-          page,
-          limit,
-        };
-      }
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.messageLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.messageLog.count({ where }),
-    ]);
-
-    return {
-      data,
-      total,
-      page,
-      limit,
-    };
-  }
 }

@@ -86,13 +86,7 @@ export default function SaleDetailPage() {
               {sale.customerPhone && <div>Teléfono: {sale.customerPhone}</div>}
               {sale.lead && (
                 <div>
-                  Lead:{' '}
-                  <button
-                    onClick={() => router.push(`/board/leads/${sale.leadId}`)}
-                    className="text-blue-600 hover:underline"
-                  >
-                    {sale.lead.name}
-                  </button>
+                  Lead: {sale.lead.name}
                 </div>
               )}
             </div>

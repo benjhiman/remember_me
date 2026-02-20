@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { IntegrationsModule } from './integrations/integrations.module';
-import { LeadsModule } from './leads/leads.module';
 import { RateLimitModule } from './common/rate-limit/rate-limit.module';
 import { MetricsModule } from './common/metrics/metrics.module';
 import { LoggerService } from './common/logger/logger.service';
@@ -18,7 +17,6 @@ import { StockModule } from './stock/stock.module';
       isGlobal: true,
     }),
     PrismaModule,
-    LeadsModule, // Needed for automations
     MetricsModule, // Needed by RateLimitModule
     RateLimitModule, // Needed by IntegrationsModule
     IntegrationsModule, // Includes JobRunnerService and all processors

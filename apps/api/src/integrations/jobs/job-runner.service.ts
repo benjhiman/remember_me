@@ -1,22 +1,16 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WhatsAppJobProcessorService } from './whatsapp-job-processor.service';
-import { InstagramJobProcessorService } from './instagram-job-processor.service';
-import { MetaSpendJobProcessorService } from './meta-spend-job-processor.service';
-import { MetaTokenRefreshJobProcessorService } from './meta-token-refresh-job-processor.service';
-import { WhatsAppAutomationsService } from '../whatsapp/whatsapp-automations.service';
 import { IntegrationJobsService } from './integration-jobs.service';
 import { JobRunnerLockService } from './job-runner-lock.service';
 import { JobRunnerStateService } from './job-runner-state.service';
 import { IntegrationQueueService } from './queue/integration-queue.service';
-import { WhatsAppAutomationTrigger, IntegrationProvider, IntegrationJobType, ConnectedAccountStatus } from '@remember-me/prisma';
+import { IntegrationProvider, IntegrationJobType } from '@remember-me/prisma';
 import { Worker } from 'bullmq';
 
 @Injectable()
 export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobRunnerService.name);
   private intervalId: NodeJS.Timeout | null = null;
-  private noReplyIntervalId: NodeJS.Timeout | null = null;
   private isProcessing = false;
   private readonly mutex = { locked: false }; // Local mutex (still needed for single-instance)
 
@@ -30,22 +24,11 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
   // Unified flag: only allow job processing in worker mode
   private readonly isJobRunnerEnabled = this.isWorkerMode && this.enabled;
   private readonly intervalMs = parseInt(process.env.JOB_RUNNER_INTERVAL_MS || '5000', 10);
-  private readonly noReplyScanEnabled = process.env.NO_REPLY_SCAN_ENABLED === 'true';
-  private readonly noReplyScanIntervalMs = parseInt(process.env.NO_REPLY_SCAN_INTERVAL_MS || '300000', 10); // Default 5 minutes
-  private readonly metaSpendEnabled = process.env.META_SPEND_ENABLED === 'true';
-  private metaSpendIntervalId: NodeJS.Timeout | null = null;
-  private readonly metaTokenRefreshEnabled = process.env.META_TOKEN_REFRESH_ENABLED === 'true';
-  private metaTokenRefreshIntervalId: NodeJS.Timeout | null = null;
   private readonly queueMode: 'db' | 'bullmq';
   private readonly workerConcurrency: number;
   private bullWorker: Worker | null = null;
 
   constructor(
-    private readonly whatsappJobProcessor: WhatsAppJobProcessorService,
-    private readonly instagramJobProcessor: InstagramJobProcessorService,
-    private readonly metaSpendJobProcessor: MetaSpendJobProcessorService,
-    private readonly metaTokenRefreshJobProcessor: MetaTokenRefreshJobProcessorService,
-    private readonly automationsService: WhatsAppAutomationsService,
     private readonly integrationJobsService: IntegrationJobsService,
     private readonly lockService: JobRunnerLockService,
     private readonly stateService: JobRunnerStateService,
@@ -74,65 +57,10 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       const mode = this.isWorkerMode ? 'WORKER' : 'API';
       this.logger.log(`Job runner disabled in ${mode} mode (WORKER_MODE=${process.env.WORKER_MODE}, JOB_RUNNER_ENABLED=${process.env.JOB_RUNNER_ENABLED})`);
     }
-
-    // NO_REPLY scan should ONLY run if job runner is enabled (worker mode + enabled)
-    if (this.noReplyScanEnabled && this.isJobRunnerEnabled) {
-      this.logger.log(`NO_REPLY_24H scanner enabled. Scanning every ${this.noReplyScanIntervalMs}ms.`);
-      this.noReplyIntervalId = setInterval(() => this.scanNoReply(), this.noReplyScanIntervalMs);
-      // Run once immediately on startup
-      this.scanNoReply();
-    } else if (this.noReplyScanEnabled && !this.isJobRunnerEnabled) {
-      const mode = this.isWorkerMode ? 'WORKER' : 'API';
-      this.logger.log(`NO_REPLY_24H scanner disabled in ${mode} mode (only runs when job runner is enabled in Worker mode).`);
-    } else {
-      this.logger.log('NO_REPLY_24H scanner disabled.');
-    }
-
-    // Meta Spend and Token Refresh schedulers should ONLY run if job runner is enabled
-    if (this.metaSpendEnabled && this.isJobRunnerEnabled) {
-      this.logger.log('Meta Spend fetch scheduler enabled. Scheduling daily jobs.');
-      this.scheduleMetaSpendJobs();
-      // Schedule daily at 6 AM (configurable via cron or interval)
-      const cronExpression = process.env.META_SPEND_CRON || '0 6 * * *'; // Default: 6 AM daily
-      this.scheduleMetaSpendCron(cronExpression);
-    } else if (this.metaSpendEnabled && !this.isJobRunnerEnabled) {
-      const mode = this.isWorkerMode ? 'WORKER' : 'API';
-      this.logger.log(`Meta Spend fetch scheduler disabled in ${mode} mode (only runs when job runner is enabled in Worker mode).`);
-    } else {
-      this.logger.log('Meta Spend fetch scheduler disabled.');
-    }
-
-    if (this.metaTokenRefreshEnabled && this.isJobRunnerEnabled) {
-      this.logger.log('Meta Token refresh scheduler enabled. Scheduling daily jobs.');
-      this.scheduleTokenRefreshJobs();
-      // Schedule daily at 4 AM (configurable via cron)
-      const cronExpression = process.env.META_TOKEN_REFRESH_CRON || '0 4 * * *'; // Default: 4 AM daily
-      this.scheduleTokenRefreshCron(cronExpression);
-    } else if (this.metaTokenRefreshEnabled && !this.isJobRunnerEnabled) {
-      const mode = this.isWorkerMode ? 'WORKER' : 'API';
-      this.logger.log(`Meta Token refresh scheduler disabled in ${mode} mode (only runs when job runner is enabled in Worker mode).`);
-    } else {
-      this.logger.log('Meta Token refresh scheduler disabled.');
-    }
   }
 
   onModuleDestroy() {
     this.stop();
-    if (this.noReplyIntervalId) {
-      clearInterval(this.noReplyIntervalId);
-      this.noReplyIntervalId = null;
-      this.logger.log('NO_REPLY_24H scanner stopped.');
-    }
-    if (this.metaSpendIntervalId) {
-      clearInterval(this.metaSpendIntervalId);
-      this.metaSpendIntervalId = null;
-      this.logger.log('Meta Spend scheduler stopped.');
-    }
-    if (this.metaTokenRefreshIntervalId) {
-      clearInterval(this.metaTokenRefreshIntervalId);
-      this.metaTokenRefreshIntervalId = null;
-      this.logger.log('Meta Token refresh scheduler stopped.');
-    }
   }
 
   private start() {
@@ -180,12 +108,8 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       await this.lockService.cleanupExpiredLock();
 
       // Process jobs for all providers
-      const results = await Promise.allSettled([
-        this.whatsappJobProcessor.processPendingJobs(10),
-        this.instagramJobProcessor.processPendingJobs(10),
-        this.metaSpendJobProcessor.processPendingJobs(10),
-        this.metaTokenRefreshJobProcessor.processPendingJobs(10),
-      ]);
+      // Note: WhatsApp/Instagram/Meta processors removed (Inbox/Meta Ads removed)
+      const results: PromiseSettledResult<number>[] = [];
 
       // Count processed jobs (simplified: count successful results)
       jobCount = results.filter((r) => r.status === 'fulfilled').length;
@@ -316,17 +240,7 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // Route to appropriate processor based on provider
-      if (provider === IntegrationProvider.WHATSAPP) {
-        await this.whatsappJobProcessor.processJobFromQueue(jobId, jobType, payload, organizationId);
-      } else if (provider === IntegrationProvider.INSTAGRAM) {
-        await this.instagramJobProcessor.processJobFromQueue(jobId, jobType, payload, organizationId);
-      } else if (jobType === IntegrationJobType.FETCH_META_SPEND) {
-        // Meta spend jobs (can come from any provider)
-        await this.metaSpendJobProcessor.processJobFromQueue(jobId, payload, organizationId);
-      } else if (jobType === IntegrationJobType.REFRESH_META_TOKEN) {
-        // Meta token refresh jobs (can come from any provider)
-        await this.metaTokenRefreshJobProcessor.processJobFromQueue(jobId, payload, organizationId);
-      }
+      // Note: WhatsApp/Instagram/Meta processors removed (Inbox/Meta Ads removed)
 
       // Mark as done in DB
       await this.integrationJobsService.markDone(jobId);
@@ -376,12 +290,8 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       await this.lockService.cleanupExpiredLock();
 
       // Process jobs for all providers
-      const results = await Promise.allSettled([
-        this.whatsappJobProcessor.processPendingJobs(10),
-        this.instagramJobProcessor.processPendingJobs(10),
-        this.metaSpendJobProcessor.processPendingJobs(10),
-        this.metaTokenRefreshJobProcessor.processPendingJobs(10),
-      ]);
+      // Note: WhatsApp/Instagram/Meta processors removed (Inbox/Meta Ads removed)
+      const results: PromiseSettledResult<number>[] = [];
 
       jobCount = results.filter((r) => r.status === 'fulfilled').length;
       const failed = results.find((r) => r.status === 'rejected');
@@ -402,262 +312,4 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Scan for leads with no reply in 24h and trigger NO_REPLY_24H automation
-   */
-  private async scanNoReply(): Promise<void> {
-    try {
-      this.logger.debug('Starting NO_REPLY_24H scan...');
-
-      // Get all organizations
-      const organizations = await this.automationsService['prisma'].organization.findMany({
-        select: { id: true },
-      });
-
-      for (const org of organizations) {
-        try {
-          // Find leads with last inbound message > 24h ago and no outbound after
-          const twentyFourHoursAgo = new Date();
-          twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-
-          // Get last inbound messages per phone
-          const lastInboundMessages = await this.automationsService['prisma'].messageLog.findMany({
-            where: {
-              provider: IntegrationProvider.WHATSAPP,
-              direction: 'INBOUND',
-              createdAt: {
-                lte: twentyFourHoursAgo,
-              },
-            },
-            orderBy: {
-              createdAt: 'desc',
-            },
-            distinct: ['to'], // One per phone
-          });
-
-          for (const inboundMsg of lastInboundMessages) {
-            const phone = inboundMsg.to;
-
-            // Check if there's an outbound message after this inbound
-            const outboundAfter = await this.automationsService['prisma'].messageLog.findFirst({
-              where: {
-                provider: IntegrationProvider.WHATSAPP,
-                direction: 'OUTBOUND',
-                to: phone,
-                createdAt: {
-                  gt: inboundMsg.createdAt,
-                },
-              },
-            });
-
-            if (outboundAfter) {
-              continue; // There was an outbound after, skip
-            }
-
-            // Find lead by phone
-            const lead = await this.automationsService['prisma'].lead.findFirst({
-              where: {
-                organizationId: org.id,
-                phone,
-                deletedAt: null,
-              },
-            });
-
-            if (lead) {
-              // Trigger NO_REPLY_24H automation
-              await this.automationsService.processTrigger(
-                org.id,
-                WhatsAppAutomationTrigger.NO_REPLY_24H,
-                {
-                  leadId: lead.id,
-                  phone,
-                  delayHours: 0, // Execute immediately (already 24h passed)
-                },
-              );
-            }
-          }
-        } catch (error) {
-          this.logger.error(`Error scanning NO_REPLY for org ${org.id}:`, error);
-        }
-      }
-
-      this.logger.debug('NO_REPLY_24H scan completed.');
-    } catch (error) {
-      this.logger.error('Error in NO_REPLY_24H scan:', error);
-    }
-  }
-
-  /**
-   * Schedule Meta Spend fetch jobs for all organizations with Meta accounts
-   */
-  private async scheduleMetaSpendJobs(): Promise<void> {
-    try {
-      const organizations = await this.automationsService['prisma'].organization.findMany({
-        include: {
-          connectedAccounts: {
-            where: {
-              provider: { in: [IntegrationProvider.INSTAGRAM, IntegrationProvider.FACEBOOK] },
-              status: 'CONNECTED',
-            },
-          },
-        },
-      });
-
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const dateStr = yesterday.toISOString().split('T')[0];
-
-      for (const org of organizations) {
-        if (org.connectedAccounts.length > 0) {
-          // Schedule job for yesterday's spend (default)
-          await this.integrationJobsService.enqueue(
-            IntegrationJobType.FETCH_META_SPEND,
-            IntegrationProvider.INSTAGRAM,
-            {
-              organizationId: org.id,
-              date: dateStr,
-              level: 'CAMPAIGN', // Default to campaign level
-            },
-            new Date(), // Run immediately
-            org.id,
-          );
-
-          this.logger.log(`Scheduled FETCH_META_SPEND job for org ${org.id}, date ${dateStr}`);
-        }
-      }
-    } catch (error) {
-      this.logger.error(`Error scheduling Meta Spend jobs: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Schedule Meta Spend fetch using cron-like expression (simplified)
-   * Supports: "0 6 * * *" (minute hour * * *)
-   */
-  private scheduleMetaSpendCron(cronExpression: string): void {
-    // Parse cron expression (simplified: only supports minute and hour)
-    const parts = cronExpression.split(' ');
-    if (parts.length < 2) {
-      this.logger.warn(`Invalid cron expression: ${cronExpression}. Using default 6 AM.`);
-      return;
-    }
-
-    const minute = parseInt(parts[0], 10);
-    const hour = parseInt(parts[1], 10);
-
-    if (isNaN(minute) || isNaN(hour)) {
-      this.logger.warn(`Invalid cron expression: ${cronExpression}. Using default 6 AM.`);
-      return;
-    }
-
-    // Calculate milliseconds until next scheduled time
-    const now = new Date();
-    const scheduled = new Date();
-    scheduled.setHours(hour, minute, 0, 0);
-
-    // If scheduled time has passed today, schedule for tomorrow
-    if (scheduled < now) {
-      scheduled.setDate(scheduled.getDate() + 1);
-    }
-
-    const msUntilScheduled = scheduled.getTime() - now.getTime();
-
-    // Schedule initial run
-    setTimeout(() => {
-      this.scheduleMetaSpendJobs();
-      // Then schedule daily interval (24 hours)
-      this.metaSpendIntervalId = setInterval(() => {
-        this.scheduleMetaSpendJobs();
-      }, 24 * 60 * 60 * 1000); // 24 hours
-    }, msUntilScheduled);
-
-    this.logger.log(`Meta Spend jobs scheduled to run daily at ${hour}:${minute.toString().padStart(2, '0')}`);
-  }
-
-  /**
-   * Schedule Meta Token refresh jobs for all organizations with Meta accounts
-   */
-  private async scheduleTokenRefreshJobs(): Promise<void> {
-    try {
-      const accounts = await this.automationsService['prisma'].connectedAccount.findMany({
-        where: {
-          provider: { in: [IntegrationProvider.INSTAGRAM, IntegrationProvider.FACEBOOK] },
-          status: ConnectedAccountStatus.CONNECTED,
-        },
-        include: {
-          oauthTokens: {
-            where: {
-              expiresAt: {
-                // Tokens expiring in less than 7 days
-                lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                gt: new Date(), // But not expired yet
-              },
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 1,
-          },
-        },
-      });
-
-      for (const account of accounts) {
-        if (account.oauthTokens.length > 0) {
-          // Schedule refresh job
-          await this.integrationQueueService.enqueue({
-            jobType: IntegrationJobType.REFRESH_META_TOKEN,
-            provider: IntegrationProvider.INSTAGRAM,
-            payload: {
-              organizationId: account.organizationId,
-              connectedAccountId: account.id,
-            },
-            runAt: new Date(), // Run immediately
-            organizationId: account.organizationId,
-            connectedAccountId: account.id,
-          });
-
-          this.logger.log(`Scheduled REFRESH_META_TOKEN job for account ${account.id}`);
-        }
-      }
-    } catch (error) {
-      this.logger.error(`Error scheduling Meta Token refresh jobs: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Schedule Meta Token refresh using cron-like expression
-   */
-  private scheduleTokenRefreshCron(cronExpression: string): void {
-    const parts = cronExpression.split(' ');
-    if (parts.length < 2) {
-      this.logger.warn(`Invalid cron expression: ${cronExpression}. Using default 4 AM.`);
-      return;
-    }
-
-    const minute = parseInt(parts[0], 10);
-    const hour = parseInt(parts[1], 10);
-
-    if (isNaN(minute) || isNaN(hour)) {
-      this.logger.warn(`Invalid cron expression: ${cronExpression}. Using default 4 AM.`);
-      return;
-    }
-
-    const now = new Date();
-    const scheduled = new Date();
-    scheduled.setHours(hour, minute, 0, 0);
-
-    if (scheduled < now) {
-      scheduled.setDate(scheduled.getDate() + 1);
-    }
-
-    const msUntilScheduled = scheduled.getTime() - now.getTime();
-
-    setTimeout(() => {
-      this.scheduleTokenRefreshJobs();
-      // Then schedule daily interval (24 hours)
-      this.metaTokenRefreshIntervalId = setInterval(() => {
-        this.scheduleTokenRefreshJobs();
-      }, 24 * 60 * 60 * 1000);
-    }, msUntilScheduled);
-
-    this.logger.log(`Meta Token refresh jobs scheduled to run daily at ${hour}:${minute.toString().padStart(2, '0')}`);
-  }
 }

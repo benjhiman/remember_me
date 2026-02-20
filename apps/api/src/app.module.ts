@@ -11,7 +11,6 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { UsersModule } from './users/users.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { ThrottlerBehindProxyGuard } from './common/guards/throttler-behind-proxy.guard';
-import { LeadsModule } from './leads/leads.module';
 import { StockModule } from './stock/stock.module';
 import { PricingModule } from './pricing/pricing.module';
 import { SalesModule } from './sales/sales.module';
@@ -104,7 +103,6 @@ const envFilePath = (() => {
     AuthModule,
     OrganizationsModule,
     UsersModule,
-    LeadsModule,
     StockModule,
     PricingModule,
     SalesModule,

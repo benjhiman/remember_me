@@ -6,8 +6,6 @@ import { getErrorMessage } from '@/lib/utils/error-handler';
 import type { Lead, LeadStatus } from '@/types/api';
 
 interface CreateLeadData {
-  pipelineId: string;
-  stageId: string;
   name: string;
   email?: string;
   phone?: string;
@@ -20,8 +18,6 @@ interface CreateLeadData {
 }
 
 interface UpdateLeadData {
-  pipelineId?: string;
-  stageId?: string;
   name?: string;
   email?: string;
   phone?: string;
@@ -67,7 +63,7 @@ export function useCreateLead() {
         title: 'Lead creado',
         description: 'El lead se creó exitosamente.',
       });
-      router.push(`/board/leads/${lead.id}`);
+      router.push(`/dashboard`);
     },
     onError: (error: any) => {
       // Debug logging (only in dev)
@@ -116,7 +112,7 @@ export function useUpdateLead(leadId: string) {
         title: 'Lead actualizado',
         description: 'Los cambios se guardaron exitosamente.',
       });
-      router.push(`/board/leads/${lead.id}`);
+      router.push(`/dashboard`);
     },
     onError: (error: any) => {
       // Debug logging (only in dev)

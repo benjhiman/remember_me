@@ -4,9 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { useDashboardOverview, useDashboardLeads, useDashboardSales, useDashboardStock } from '@/lib/api/hooks/use-dashboard';
+import { useDashboardOverview, useDashboardSales, useDashboardStock } from '@/lib/api/hooks/use-dashboard';
 import { useSales } from '@/lib/api/hooks/use-sales';
-import { useLeads } from '@/lib/api/hooks/use-leads';
 import { useStockReservations } from '@/lib/api/hooks/use-stock-reservations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -132,12 +131,6 @@ export default function DashboardPage() {
     refetch: refetchOverview,
   } = useDashboardOverview({ from: filters.from, to: filters.to, groupBy: filters.groupBy }, !!user);
 
-  const {
-    data: leadsData,
-    isLoading: leadsLoading,
-    error: leadsError,
-    refetch: refetchLeads,
-  } = useDashboardLeads({ from: filters.from, to: filters.to, groupBy: filters.groupBy }, !!user);
 
   const {
     data: salesData,
@@ -172,7 +165,6 @@ export default function DashboardPage() {
 
   // Recent data queries
   const { data: recentSales } = useSales({ limit: 10, sort: 'createdAt', order: 'desc', enabled: !!user });
-  const { data: recentLeads } = useLeads({ limit: 10, sort: 'createdAt', order: 'desc', enabled: !!user });
   const { data: activeReservations } = useStockReservations({ status: 'ACTIVE', limit: 10, enabled: !!user });
 
   // Refresh handler with loading state
@@ -185,18 +177,15 @@ export default function DashboardPage() {
       // Invalidate all dashboard-related queries
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] }),
-        queryClient.invalidateQueries({ queryKey: ['dashboard-leads'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard-stock'] }),
         queryClient.invalidateQueries({ queryKey: ['sales'] }),
-        queryClient.invalidateQueries({ queryKey: ['leads'] }),
         queryClient.invalidateQueries({ queryKey: ['stock-reservations'] }),
       ]);
       
       // Refetch main queries
       await Promise.all([
         refetchOverview(),
-        refetchLeads(),
         refetchSales(),
       ]);
       
@@ -214,7 +203,7 @@ export default function DashboardPage() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [queryClient, refetchOverview, refetchLeads, refetchSales, toast]);
+  }, [queryClient, refetchOverview, refetchSales, toast]);
 
   // Permission check
   if (user && !userCan(user, Permission.VIEW_DASHBOARD)) {
@@ -481,41 +470,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Leads by Stage */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Leads por Stage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {leadsError ? (
-              <SectionError message="No se pudo cargar el gráfico de leads" onRetry={() => refetchLeads()} />
-            ) : leadsLoading ? (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">Cargando...</div>
-            ) : leadsData?.breakdown && leadsData.breakdown.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={leadsData.breakdown}
-                    dataKey="count"
-                    nameKey="stageName"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label={(entry: any) => `${entry.stageName}: ${entry.count}`}
-                  >
-                    {leadsData.breakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.stageColor || COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">No hay datos de leads</div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Sales by Status */}
         <Card>
@@ -601,30 +555,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Assigned Leads */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Leads por Vendedor</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {leadsError ? (
-              <div className="text-sm text-muted-foreground">No se pudo cargar</div>
-            ) : leadsLoading ? (
-              <Skeleton className="h-32 w-full" />
-            ) : leadsData?.assignedLeadsCount && leadsData.assignedLeadsCount.length > 0 ? (
-              <div className="space-y-2">
-                {leadsData.assignedLeadsCount.slice(0, 5).map((assigned, idx) => (
-                  <div key={idx} className="p-2 border rounded">
-                    <div className="text-sm font-medium">{assigned.userName || assigned.userEmail}</div>
-                    <div className="text-xs text-muted-foreground">{assigned.count} leads</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">No hay leads asignados todavía.</div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Low Stock Alerts */}
         <Card>
@@ -655,7 +585,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tables Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Sales */}
         <Card>
           <CardHeader>
@@ -684,33 +614,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Leads */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Últimos Leads</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentLeads?.data && recentLeads.data.length > 0 ? (
-              <div className="space-y-2">
-                {recentLeads.data.slice(0, 10).map((lead) => (
-                  <div
-                    key={lead.id}
-                    className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/board/leads/${lead.id}`)}
-                  >
-                    <div className="text-sm font-medium">{lead.name}</div>
-                    <div className="text-xs text-gray-600">
-                      {lead.pipeline?.name} / {lead.stage?.name}
-                    </div>
-                    <div className="text-xs text-gray-500">{formatDate(lead.createdAt)}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">No hay leads recientes</div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Active Reservations */}
         <Card>

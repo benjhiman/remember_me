@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../client';
 
-export type ConversationStatus = 'OPEN' | 'PENDING' | 'CLOSED';
 export type UiDensity = 'comfortable' | 'compact';
 export type UiTheme = 'light' | 'dark';
 export type UiAccentColor = 'blue' | 'violet' | 'green';
@@ -16,16 +15,8 @@ export interface OrgSettingsResponse {
       density: UiDensity;
     };
     permissions: {
-      sellerCanChangeConversationStatus: boolean;
-      sellerCanReassignConversation: boolean;
       sellerCanEditSales: boolean;
       sellerCanEditLeads: boolean;
-      sellerCanMoveKanban: boolean;
-    };
-    inbox: {
-      autoAssignOnReply: boolean;
-      defaultConversationStatus: ConversationStatus;
-      sellerSeesOnlyAssigned: boolean;
     };
     ui: {
       density: UiDensity;
