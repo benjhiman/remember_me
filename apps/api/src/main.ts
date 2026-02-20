@@ -198,6 +198,49 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
+  // Log commit hash on startup for deployment verification
+  const commitSha = process.env.RAILWAY_GIT_COMMIT_SHA || 
+                    process.env.VERCEL_GIT_COMMIT_SHA || 
+                    process.env.GIT_COMMIT || 
+                    'unknown';
+  console.log(`📦 Deployed commit: ${commitSha.substring(0, 7)}`);
+
+  // Log registered routes (diagnostic - only in production for now)
+  if (process.env.NODE_ENV === 'production' || process.env.LOG_ROUTES === 'true') {
+    try {
+      const httpAdapter = app.getHttpAdapter();
+      const instance = httpAdapter.getInstance();
+      
+      // For Express - simple route logging
+      if (instance && typeof (instance as any)._router !== 'undefined') {
+        const routes: string[] = [];
+        const router = (instance as any)._router;
+        if (router && router.stack) {
+          router.stack.forEach((layer: any) => {
+            if (layer.route) {
+              const path = layer.route.path;
+              const methods = Object.keys(layer.route.methods).filter((m: string) => m !== '_all');
+              methods.forEach((method: string) => {
+                routes.push(`${method.toUpperCase()} ${path}`);
+              });
+            }
+          });
+        }
+        
+        // Filter and log stock routes
+        const stockRoutes = routes.filter((r: string) => r.includes('/stock'));
+        if (stockRoutes.length > 0) {
+          console.log('📋 Registered /api/stock routes:');
+          stockRoutes.forEach((route: string) => console.log(`   ${route}`));
+        } else {
+          console.warn('⚠️  No /api/stock routes found in registered routes!');
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not list routes (non-critical):', error instanceof Error ? error.message : String(error));
+    }
+  }
+
   // Seed OWNER on boot (si SEED_OWNER_ON_BOOT === 'true')
   const prismaService = app.get(PrismaService);
   await seedOwnerOnBoot(prismaService);

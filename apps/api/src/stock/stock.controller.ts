@@ -39,11 +39,20 @@ import { Role } from '@remember-me/prisma';
 export class StockController {
   private readonly logger = new Logger(StockController.name);
 
-  constructor(private readonly stockService: StockService) {}
+  constructor(private readonly stockService: StockService) {
+    // Log on controller instantiation to confirm it's being created
+    this.logger.log('StockController instantiated');
+  }
 
   @Get('health')
   health() {
     return this.stockService.health();
+  }
+
+  @Get('ping')
+  ping() {
+    this.logger.log('[ping] StockController is mounted and reachable');
+    return { ok: true, controller: 'StockController', timestamp: new Date().toISOString() };
   }
 
   // Stock summary and movements (MUST come before @Get(':id') to avoid route conflicts)
