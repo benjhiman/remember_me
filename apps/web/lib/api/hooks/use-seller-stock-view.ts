@@ -19,7 +19,9 @@ export function useSellerStockView(search?: string) {
       if (search) {
         params.set('search', search);
       }
-      return api.get<SellerStockViewSection[]>(`/stock/seller-view?${params.toString()}`);
+      const queryString = params.toString();
+      const url = queryString ? `/stock/seller-view?${queryString}` : '/stock/seller-view';
+      return api.get<SellerStockViewSection[]>(url);
     },
     staleTime: 30 * 1000, // 30 seconds
   });

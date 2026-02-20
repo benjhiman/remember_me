@@ -1212,6 +1212,13 @@ export class StockService {
   }
 
   async getSellerStockView(organizationId: string, userId: string, dto: { search?: string }) {
+    if (!organizationId) {
+      throw new ForbiddenException('Organization ID is required');
+    }
+    if (!userId) {
+      throw new ForbiddenException('User ID is required');
+    }
+
     await this.verifyMembership(organizationId, userId);
 
     // Get all stock items with quantity > 0
@@ -1394,7 +1401,7 @@ export class StockService {
       'OTROS',
     ];
 
-    // Build final response
+    // Build final response - always return an array, even if empty
     const result = sectionOrder
       .filter((sectionName) => sections[sectionName] && sections[sectionName].length > 0)
       .map((sectionName) => ({
@@ -1402,7 +1409,8 @@ export class StockService {
         rows: sections[sectionName],
       }));
 
-    return result;
+    // Always return an array (never null or undefined)
+    return result || [];
   }
 
   async getStockMovements(organizationId: string, userId: string, dto: any) {

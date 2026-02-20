@@ -11,6 +11,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StockService } from './stock.service';
@@ -57,7 +58,13 @@ export class StockController {
     @CurrentUser() user: any,
     @Query() query: SellerStockViewDto,
   ) {
-    return this.stockService.getSellerStockView(organizationId, user.userId, query);
+    if (!organizationId) {
+      throw new NotFoundException('Organization not found');
+    }
+    if (!user?.userId) {
+      throw new NotFoundException('User not found');
+    }
+    return this.stockService.getSellerStockView(organizationId, user.userId, query || {});
   }
 
   @Get('movements')
