@@ -12,7 +12,9 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
+import { StockItemIdPipe } from './pipes/stock-item-id.pipe';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StockService } from './stock.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -35,6 +37,8 @@ import { Role } from '@remember-me/prisma';
 @Controller('stock')
 @UseGuards(JwtAuthGuard)
 export class StockController {
+  private readonly logger = new Logger(StockController.name);
+
   constructor(private readonly stockService: StockService) {}
 
   @Get('health')
@@ -58,13 +62,25 @@ export class StockController {
     @CurrentUser() user: any,
     @Query() query: SellerStockViewDto,
   ) {
+    this.logger.log(`[seller-view] HIT - organizationId: ${organizationId}, userId: ${user?.userId}`);
+    
     if (!organizationId) {
+      this.logger.warn('[seller-view] Missing organizationId');
       throw new NotFoundException('Organization not found');
     }
     if (!user?.userId) {
+      this.logger.warn('[seller-view] Missing userId');
       throw new NotFoundException('User not found');
     }
-    return this.stockService.getSellerStockView(organizationId, user.userId, query || {});
+    
+    try {
+      const result = await this.stockService.getSellerStockView(organizationId, user.userId, query || {});
+      this.logger.debug(`[seller-view] Success - returning ${result?.length || 0} sections`);
+      return result;
+    } catch (error) {
+      this.logger.error(`[seller-view] Error: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      throw error;
+    }
   }
 
   @Get('movements')
@@ -123,8 +139,9 @@ export class StockController {
   async getStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', StockItemIdPipe) id: string,
   ) {
+    // StockItemIdPipe will reject reserved route names like "seller-view" before reaching here
     return this.stockService.getStockItem(organizationId, user.userId, id);
   }
 
