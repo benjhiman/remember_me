@@ -71,23 +71,24 @@ export class StockController {
     @CurrentUser() user: any,
     @Query() query: SellerStockViewDto,
   ) {
-    this.logger.log(`[seller-view] HIT - organizationId: ${organizationId}, userId: ${user?.userId}`);
+    // CRITICAL: This log MUST appear if the handler is reached
+    this.logger.log(`[seller-view] HIT - organizationId: ${organizationId || 'MISSING'}, userId: ${user?.userId || 'MISSING'}`);
     
     if (!organizationId) {
-      this.logger.warn('[seller-view] Missing organizationId');
+      this.logger.warn('[seller-view] Missing organizationId - returning 404');
       throw new NotFoundException('Organization not found');
     }
     if (!user?.userId) {
-      this.logger.warn('[seller-view] Missing userId');
+      this.logger.warn('[seller-view] Missing userId - returning 404');
       throw new NotFoundException('User not found');
     }
     
     try {
       const result = await this.stockService.getSellerStockView(organizationId, user.userId, query || {});
-      this.logger.debug(`[seller-view] Success - returning ${result?.length || 0} sections`);
+      this.logger.log(`[seller-view] Success - returning ${result?.length || 0} sections`);
       return result;
     } catch (error) {
-      this.logger.error(`[seller-view] Error: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
+      this.logger.error(`[seller-view] Service error: ${error instanceof Error ? error.message : String(error)}`, error instanceof Error ? error.stack : undefined);
       throw error;
     }
   }
