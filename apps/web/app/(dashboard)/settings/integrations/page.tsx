@@ -51,7 +51,7 @@ function IntegrationsPageContent() {
       router.push('/login');
       return;
     }
-    if (!userCan(user, Permission.VIEW_INTEGRATIONS)) {
+    if (!userCan(user, Permission.MANAGE_INTEGRATIONS)) {
       router.push('/forbidden');
     }
   }, [user, router]);
@@ -311,7 +311,7 @@ function IntegrationsPageContent() {
 
 export default function IntegrationsPage() {
   return (
-    <PermissionGuard permission={Permission.VIEW_INTEGRATIONS}>
+    <PermissionGuard permission={Permission.MANAGE_INTEGRATIONS}>
       <Suspense fallback={<div className="min-h-screen bg-gray-50 p-6">Cargando...</div>}>
         <IntegrationsPageContent />
       </Suspense>

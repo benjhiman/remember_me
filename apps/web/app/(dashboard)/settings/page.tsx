@@ -121,28 +121,6 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {userCan(user, Permission.VIEW_INTEGRATIONS) && (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center gap-2">
-                    <Plug className="h-5 w-5" />
-                    <CardTitle>Integraciones</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Estado real, tests y activity.
-                  </p>
-                  <Link href="/settings/integrations">
-                    <Button variant="outline" className="w-full">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Abrir Integraciones
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">

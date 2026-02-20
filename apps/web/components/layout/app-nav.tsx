@@ -7,16 +7,10 @@ import { useAuthStore } from '@/lib/store/auth-store';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import {
   LayoutDashboard,
-  Users,
   Package,
   ShoppingCart,
-  Inbox,
   Settings,
-  KanbanSquare,
   PackageCheck,
-  MessageSquare,
-  Instagram,
-  MessageCircle,
   ChevronRight,
   ChevronDown,
   DollarSign,
@@ -33,26 +27,11 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
-  {
-    href: '/inbox',
-    label: 'Inbox',
-    icon: Inbox,
-    permission: Permission.VIEW_INBOX,
-    children: [
-      { href: '/inbox/whatsapp', label: 'WhatsApp', icon: MessageSquare, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/instagram', label: 'Instagram', icon: Instagram, permission: Permission.VIEW_INBOX },
-      { href: '/inbox/unified', label: 'Unificado', icon: MessageCircle, permission: Permission.VIEW_INBOX },
-    ],
-  },
-  { href: '/board', label: 'Board', icon: KanbanSquare, permission: Permission.VIEW_LEADS },
-  { href: '/board/leads', label: 'Leads', icon: Users, permission: Permission.VIEW_LEADS },
   { href: '/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
   { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
   { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
   { href: '/pricing', label: 'Pricing', icon: Package, permission: Permission.VIEW_DASHBOARD },
-  { href: '/ads', label: 'Meta Ads', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
   { href: '/settings', label: 'Configuración', icon: Settings, permission: Permission.VIEW_DASHBOARD },
-  { href: '/settings/integrations', label: 'Integraciones', icon: Settings, permission: Permission.VIEW_INTEGRATIONS },
 ];
 
 function NavItemComponent({

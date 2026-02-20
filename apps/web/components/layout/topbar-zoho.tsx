@@ -75,11 +75,6 @@ export function TopbarZoho() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            {userCan(user, Permission.EDIT_LEADS) && (
-              <DropdownMenuItem onClick={() => router.push('/board/leads/new')}>
-                New Lead
-              </DropdownMenuItem>
-            )}
             {userCan(user, Permission.EDIT_SALES) && (
               <DropdownMenuItem onClick={() => router.push('/sales/new')}>
                 New Sale
