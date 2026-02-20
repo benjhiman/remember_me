@@ -67,11 +67,14 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     if (!redisUrl) {
       const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
       if (nodeEnv === 'production') {
-        throw new Error('REDIS_URL is required for BullMQ in production. Set REDIS_URL environment variable.');
+        this.logger.warn('REDIS_URL not configured, BullMQ queue adapter will not initialize. Set REDIS_URL to enable BullMQ queue processing.');
+        this.enabled = false;
+        return; // Don't initialize queue if Redis is not configured in production
       }
-      // Only allow localhost in development
-      this.redisConnection = 'redis://localhost:6379';
-      this.logger.warn('No REDIS_URL found, using localhost:6379 (development only)');
+      // Don't use localhost fallback - just disable the adapter
+      this.logger.warn('No REDIS_URL found, BullMQ queue adapter will not initialize. Set REDIS_URL to enable queue processing.');
+      this.enabled = false;
+      return; // Don't initialize queue if Redis is not configured
     } else {
       this.redisConnection = redisUrl;
     }

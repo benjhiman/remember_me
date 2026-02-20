@@ -187,11 +187,12 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     if (!redisUrl) {
       const nodeEnv = configService.get<string>('NODE_ENV', 'development');
       if (nodeEnv === 'production') {
-        throw new Error('REDIS_URL is required for BullMQ worker in production. Set REDIS_URL environment variable.');
+        this.logger.warn('REDIS_URL not configured, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');
+        return; // Don't start worker if Redis is not configured in production
       }
-      // Only allow localhost in development
-      this.logger.warn('No REDIS_URL found, using localhost:6379 (development only)');
-      redisUrl = 'redis://localhost:6379';
+      // Only allow localhost in development, but log a warning
+      this.logger.warn('No REDIS_URL found, BullMQ worker will not start. Set REDIS_URL to enable queue processing.');
+      return; // Don't start worker if Redis is not configured
     }
     const queueName = configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
 
