@@ -10,7 +10,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (user) {
-      router.push('/inbox');
+      router.push('/dashboard');
     } else {
       router.push('/login');
     }

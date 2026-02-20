@@ -43,7 +43,7 @@ export default function SelectOrgPage() {
 
       if (response.accessToken && response.refreshToken && response.user) {
         setTokens(response.accessToken, response.refreshToken, response.user);
-        router.push('/inbox');
+        router.push('/dashboard');
       } else {
         setError('Respuesta inesperada del servidor');
       }

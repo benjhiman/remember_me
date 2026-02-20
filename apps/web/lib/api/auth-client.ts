@@ -19,9 +19,18 @@ import { fetchWithDiagnostics, RedirectError, OpaqueResponseError } from './fetc
 function buildEndpointUrl(endpoint: string): string {
   const baseUrl = getApiBaseUrlForRequest();
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  // If baseUrl is relative (e.g., '/api'), construct relative URL
+  if (baseUrl.startsWith('/')) {
+    // Remove leading slash from endpoint if baseUrl already has it
+    const endpointPath = cleanEndpoint.startsWith('/') ? cleanEndpoint.slice(1) : cleanEndpoint;
+    return `${baseUrl}/${endpointPath}`.replace(/\/+/g, '/'); // Normalize multiple slashes
+  }
+  
+  // If baseUrl is absolute (e.g., 'https://api.example.com/api'), construct absolute URL
   const fullUrl = `${baseUrl}${cleanEndpoint}`;
   
-  // Validate URL format
+  // Validate URL format for absolute URLs
   try {
     new URL(fullUrl);
   } catch (e) {

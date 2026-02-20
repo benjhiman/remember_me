@@ -13,7 +13,6 @@ import {
   Package,
   ShoppingCart,
   Settings,
-  PackageCheck,
   ChevronRight,
   ChevronDown,
   DollarSign,
@@ -53,7 +52,6 @@ const navItems: NavItem[] = [
     permission: Permission.VIEW_DASHBOARD, // Visible if logged in
     children: [
       { href: '/inventory/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
-      { href: '/inventory/reservas', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
       { href: '/inventory/items', label: 'Items', icon: Hash, permission: Permission.VIEW_DASHBOARD },
       { href: '/inventory/pricelist', label: 'Price List', icon: DollarSign, permission: Permission.VIEW_DASHBOARD },
     ],

@@ -139,38 +139,28 @@ export function getApiBaseUrl(): string {
     return envUrl || 'http://localhost:4000/api';
   }
 
-  // Client-side
-  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-  
-  // Detect production environment
-  const isProduction =
-    window.location.hostname !== 'localhost' &&
-    !window.location.hostname.includes('127.0.0.1') &&
-    !window.location.hostname.includes('192.168.') &&
-    !window.location.hostname.includes('10.0.') &&
-    !window.location.hostname.includes('.local');
+  // Client-side (browser): ALWAYS use same-origin /api proxy
+  // This ensures requests go through Next.js rewrites to the backend
+  // and avoids CORS issues while using the proxy we configured
+  const isLocalhost = 
+    window.location.hostname === 'localhost' ||
+    window.location.hostname.includes('127.0.0.1') ||
+    window.location.hostname.includes('192.168.') ||
+    window.location.hostname.includes('10.0.') ||
+    window.location.hostname.includes('.local');
 
-  if (isProduction) {
-    // Production: ALWAYS use hardcoded, ignore env var if different
-    // Normalize: ensure it ends with /api and no trailing slash
-    const hardcodedUrl = 'https://api.iphonealcosto.com/api';
-    
-    // Only warn if env var exists and is actually different (not just the same value)
-    if (envUrl && envUrl.trim() !== hardcodedUrl && envUrl.trim() !== hardcodedUrl.replace(/\/+$/, '')) {
-      console.warn(`[API_BASE] ⚠️ NEXT_PUBLIC_API_BASE_URL differs from hardcoded: ${envUrl}. Using hardcoded: ${hardcodedUrl}`);
-    }
-    
-    // Log once in production
-    if (!(window as any).__API_BASE_LOGGED) {
-      console.log(`[API_BASE] using ${hardcodedUrl}`);
-      (window as any).__API_BASE_LOGGED = true;
-    }
-    
-    // Ensure normalized (no trailing slash, always ends with /api)
-    return hardcodedUrl.replace(/\/+$/, '');
+  if (isLocalhost) {
+    // Development: use localhost backend directly (no proxy needed)
+    const devUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+    return devUrl.replace(/\/+$/, '');
   }
 
-  // Development/preview: use env var if exists, else localhost
-  const devUrl = envUrl || 'http://localhost:4000/api';
-  return devUrl.replace(/\/+$/, '');
+  // Production/preview: use same-origin /api proxy
+  // This will be rewritten by Next.js to the backend URL
+  if (!(window as any).__API_BASE_LOGGED) {
+    console.log('[API_BASE] using same-origin /api proxy');
+    (window as any).__API_BASE_LOGGED = true;
+  }
+  
+  return '/api';
 }
