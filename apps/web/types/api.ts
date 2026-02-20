@@ -29,22 +29,6 @@ export interface SelectOrgRequest {
   organizationId: string;
 }
 
-// ROAS/Attribution types
-export type AttributionGroupBy = 'campaign' | 'adset' | 'ad';
-
-export interface AttributionMetric {
-  campaignId?: string;
-  adsetId?: string;
-  adId?: string;
-  leadsCount: number;
-  salesCount: number;
-  revenue: number;
-  spend: number;
-  avgTicket: number;
-  conversionRate: number;
-  roas: number | null;
-}
-
 // User types
 export type Role = 'OWNER' | 'ADMIN' | 'MANAGER' | 'SELLER';
 

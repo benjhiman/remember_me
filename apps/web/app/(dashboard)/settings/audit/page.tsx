@@ -69,7 +69,6 @@ export default function AuditLogPage() {
                 <option value="LEAD">Lead</option>
                 <option value="SALE">Sale</option>
                 <option value="STOCK_ITEM">Stock Item</option>
-                <option value="CONVERSATION">Conversation</option>
               </select>
             </div>
             <div>

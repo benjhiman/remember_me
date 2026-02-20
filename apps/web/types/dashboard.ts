@@ -2,12 +2,6 @@
 
 export interface DashboardOverview {
   totalLeads: number;
-  leadsByStage: Array<{
-    stageId: string;
-    stageName: string;
-    stageColor?: string;
-    count: number;
-  }>;
   totalSales: number;
   salesByStatus: Array<{
     status: string;
@@ -24,24 +18,6 @@ export interface DashboardOverview {
   }>;
 }
 
-export interface LeadsDashboard {
-  series: Array<{
-    period: string;
-    count: number;
-  }>;
-  breakdown: Array<{
-    stageId: string;
-    stageName: string;
-    stageColor?: string;
-    count: number;
-  }>;
-  assignedLeadsCount: Array<{
-    userId: string;
-    userName: string;
-    userEmail?: string;
-    count: number;
-  }>;
-}
 
 export interface SalesDashboard {
   salesCreated: Array<{

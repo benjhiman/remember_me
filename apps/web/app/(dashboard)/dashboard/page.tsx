@@ -246,9 +246,6 @@ export default function DashboardPage() {
         <RefreshCw className={`h-4 w-4 mr-1.5 ${isRefreshing ? 'animate-spin' : ''}`} />
         {isRefreshing ? 'Refreshing...' : 'Refresh'}
       </Button>
-      <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/roas')}>
-        Ver ROAS
-      </Button>
     </div>
   );
 

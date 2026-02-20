@@ -92,8 +92,6 @@ function IntegrationsPageContent() {
   if (!user) return null;
 
   const meta = status?.providers.meta;
-  const ig = status?.providers.instagram;
-  const wa = status?.providers.whatsapp;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -111,7 +109,7 @@ function IntegrationsPageContent() {
           </Card>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Meta (OAuth + Ads)</CardTitle>
@@ -132,9 +130,6 @@ function IntegrationsPageContent() {
                   {meta?.guardrails?.map((g, idx) => (
                     <div key={idx} className="text-xs rounded border border-yellow-200 bg-yellow-50 p-2 text-yellow-800">
                       {g.message}{' '}
-                      <Button variant="link" className="h-auto p-0" onClick={() => router.push('/ads')}>
-                        Seleccionar Ad Account
-                      </Button>
                     </div>
                   ))}
 
@@ -179,98 +174,6 @@ function IntegrationsPageContent() {
                     </div>
                   )}
                 </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Instagram Inbox</CardTitle>
-              <CardDescription>
-                Connected: <strong>{ig?.connected ? 'true' : 'false'}</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p><strong>Last sync:</strong> {ig?.lastSyncAt ? new Date(ig.lastSyncAt).toLocaleString('es-AR') : '-'}</p>
-              <p><strong>Token:</strong> {renderToken(ig?.tokenStatus)}</p>
-              <p><strong>pageId:</strong> {ig?.configSummary?.pageId || '-'}</p>
-              <p><strong>igBusinessId:</strong> {ig?.configSummary?.igBusinessId || '-'}</p>
-              {ig?.guardrails?.map((g, idx) => (
-                <div key={idx} className="text-xs rounded border border-yellow-200 bg-yellow-50 p-2 text-yellow-800">
-                  {g.message}
-                </div>
-              ))}
-              {!!ig?.errors?.length && (
-                <div className="text-xs text-gray-600">
-                  <strong>Errors (últimos 5)</strong>
-                  <ul className="list-disc list-inside">
-                    {ig.errors.slice(0, 5).map((e, i) => <li key={i}>{e.message}</li>)}
-                  </ul>
-                </div>
-              )}
-              {canManage && (
-                <Button
-                  onClick={async () => {
-                    try {
-                      const r = await runTest.mutateAsync('instagram');
-                      toast({ title: r.ok ? 'OK' : 'FAIL', description: r.error || 'Token/Webhook OK' });
-                    } catch (e) {
-                      toast({ title: 'FAIL', description: getErrorMessage(e), variant: 'destructive' as any });
-                    }
-                  }}
-                  disabled={runTest.isPending}
-                  size="sm"
-                >
-                  Test Webhook
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>WhatsApp Inbox</CardTitle>
-              <CardDescription>
-                Connected: <strong>{wa?.connected ? 'true' : 'false'}</strong>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p><strong>Last sync:</strong> {wa?.lastSyncAt ? new Date(wa.lastSyncAt).toLocaleString('es-AR') : '-'}</p>
-              <p><strong>phoneNumberId:</strong> {wa?.configSummary?.phoneNumberId || '-'}</p>
-              <p><strong>wabaId:</strong> {wa?.configSummary?.wabaId || '-'}</p>
-              {wa?.guardrails?.map((g, idx) => (
-                <div key={idx} className="text-xs rounded border border-yellow-200 bg-yellow-50 p-2 text-yellow-800">
-                  {g.message}
-                </div>
-              ))}
-              {!!wa?.errors?.length && (
-                <div className="text-xs text-gray-600">
-                  <strong>Errors (últimos 5)</strong>
-                  <ul className="list-disc list-inside">
-                    {wa.errors.slice(0, 5).map((e, i) => <li key={i}>{e.message}</li>)}
-                  </ul>
-                </div>
-              )}
-              {canManage && (
-                <div className="space-y-2">
-                  <Button
-                    onClick={async () => {
-                      try {
-                        const r = await runTest.mutateAsync('whatsapp');
-                        toast({ title: r.ok ? 'OK' : 'FAIL', description: r.error || 'Test message queued' });
-                      } catch (e) {
-                        toast({ title: 'FAIL', description: getErrorMessage(e), variant: 'destructive' as any });
-                      }
-                    }}
-                    disabled={runTest.isPending}
-                    size="sm"
-                  >
-                    Send Test Message
-                  </Button>
-                  <p className="text-xs text-gray-500">
-                    Configurar en API: <code>WHATSAPP_TEST_TO</code> (y opcional <code>WHATSAPP_TEST_TEXT</code>)
-                  </p>
-                </div>
               )}
             </CardContent>
           </Card>

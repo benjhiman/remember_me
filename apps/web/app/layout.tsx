@@ -3,8 +3,8 @@ import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Remember Me - Inbox & ROAS',
-  description: 'Unified Inbox for WhatsApp + Instagram and ROAS Dashboard',
+  title: 'Remember Me - CRM Admin',
+  description: 'Sistema administrativo para gestión de ventas, inventario y clientes',
 };
 
 export default function RootLayout({
