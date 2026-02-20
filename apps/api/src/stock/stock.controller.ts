@@ -162,7 +162,7 @@ export class StockController {
   async updateStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', StockItemIdPipe) id: string,
     @Body() dto: UpdateStockItemDto,
   ) {
     return this.stockService.updateStockItem(organizationId, user.userId, id, dto);
@@ -175,7 +175,7 @@ export class StockController {
   async deleteStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', StockItemIdPipe) id: string,
   ) {
     await this.stockService.deleteStockItem(organizationId, user.userId, id);
   }
@@ -186,7 +186,7 @@ export class StockController {
   async restoreStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', StockItemIdPipe) id: string,
   ) {
     return this.stockService.restoreStockItem(organizationId, user.userId, id);
   }
@@ -198,7 +198,7 @@ export class StockController {
   async adjustStock(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', StockItemIdPipe) id: string,
     @Body() dto: AdjustStockDto,
   ) {
     return this.stockService.adjustStock(organizationId, user.userId, id, dto);
@@ -209,7 +209,7 @@ export class StockController {
   async listMovements(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id') id: string,
+    @Param('id', StockItemIdPipe) id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
