@@ -1,6 +1,6 @@
 // Sales Types
 
-export type SaleStatus = 'DRAFT' | 'RESERVED' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+export type SaleStatus = 'DRAFT' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 export interface SaleItem {
   id: string;
@@ -32,7 +32,6 @@ export interface Sale {
   discount: string;
   total: string;
   currency: string;
-  reservedAt?: string | null;
   paidAt?: string | null;
   shippedAt?: string | null;
   deliveredAt?: string | null;
@@ -58,19 +57,8 @@ export interface Sale {
     email?: string;
   };
   items?: SaleItem[];
-  stockReservations?: Array<{
-    id: string;
-    stockItemId: string;
-    quantity: number;
-    status: string;
-    stockItem?: {
-      id: string;
-      model: string;
-    };
-  }>;
   _count?: {
     items: number;
-    stockReservations: number;
   };
 }
 

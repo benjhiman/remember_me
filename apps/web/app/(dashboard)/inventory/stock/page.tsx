@@ -1,14 +1,16 @@
 'use client';
 
+import { useAuthStore } from '@/lib/store/auth-store';
+import { PageShell } from '@/components/layout/page-shell';
+import { SellerStockView } from '@/components/stock/seller-stock-view';
+import { Role } from '@/lib/auth/permissions';
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '@/lib/store/auth-store';
 import { useStockSummary } from '@/lib/api/hooks/use-stock-summary';
 import { useStockMovementsGlobal } from '@/lib/api/hooks/use-stock-movements-global';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PageShell } from '@/components/layout/page-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/use-toast';
 import { RefreshCw, Plus, Package, Eye } from 'lucide-react';
@@ -19,7 +21,7 @@ import { conditionLabel } from '@/lib/items/condition-label';
 
 type TabType = 'summary' | 'movements';
 
-export default function InventoryStockPage() {
+function AdminStockView() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -94,12 +96,6 @@ export default function InventoryStockPage() {
     setIsAddDialogOpen(true);
   }, []);
 
-  const handleViewReservations = useCallback(
-    (itemId: string) => {
-      router.push(`/inventory/reservas?itemId=${itemId}`);
-    },
-    [router],
-  );
 
   const breadcrumbs = [
     { label: 'Inventory', href: '/inventory' },
@@ -239,13 +235,7 @@ export default function InventoryStockPage() {
                             Item
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Disponible
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Reservado
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Total
+                            Cantidad
                           </th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Último ingreso
@@ -270,9 +260,7 @@ export default function InventoryStockPage() {
                                 {row.condition && ` • ${conditionLabel(row.condition)}`}
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-sm text-green-600 font-medium">{row.availableQty}</td>
-                            <td className="px-4 py-3 text-sm text-yellow-600">{row.reservedQty}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900">{row.totalQty}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">{row.totalQty}</td>
                             <td className="px-4 py-3 text-sm text-gray-600">
                               {row.lastInAt ? formatDate(row.lastInAt) : '-'}
                             </td>
@@ -285,14 +273,6 @@ export default function InventoryStockPage() {
                                 >
                                   <Plus className="h-4 w-4 mr-1" />
                                   Agregar
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleViewReservations(row.itemId)}
-                                >
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  Ver Reservas
                                 </Button>
                               </div>
                             </td>
@@ -399,4 +379,29 @@ export default function InventoryStockPage() {
       />
     </>
   );
+}
+
+export default function InventoryStockPage() {
+  const { user } = useAuthStore();
+
+  // If user is SELLER, show simplified seller view
+  if (user?.role === Role.SELLER) {
+    const breadcrumbs = [
+      { label: 'Inventory', href: '/inventory' },
+      { label: 'Stock', href: '/inventory/stock' },
+    ];
+
+    return (
+      <PageShell
+        title="Stock"
+        description="Vista de inventario"
+        breadcrumbs={breadcrumbs}
+      >
+        <SellerStockView />
+      </PageShell>
+    );
+  }
+
+  // For other roles, show admin view
+  return <AdminStockView />;
 }

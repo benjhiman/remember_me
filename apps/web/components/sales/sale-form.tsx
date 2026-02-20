@@ -8,12 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLeads } from '@/lib/api/hooks/use-leads';
-import { useStockReservations } from '@/lib/api/hooks/use-stock-reservations';
 import type { Sale } from '@/types/sales';
 
 const createSaleSchema = z.object({
   leadId: z.string().optional(),
-  stockReservationIds: z.array(z.string()).min(1, 'Debe seleccionar al menos una reserva'),
   customerName: z.string().min(1, 'El nombre del cliente es requerido'),
   customerEmail: z.string().email('Email inválido').optional().or(z.literal('')),
   customerPhone: z.string().optional(),
@@ -43,11 +41,6 @@ interface SaleFormProps {
 
 export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps) {
   const { data: leadsData } = useLeads({ limit: 50, enabled: true });
-  const { data: reservationsData } = useStockReservations({ status: 'ACTIVE', limit: 100 });
-
-  const [selectedReservations, setSelectedReservations] = useState<string[]>(
-    sale?.stockReservations?.map((r) => r.id) || []
-  );
   const [leadSearch, setLeadSearch] = useState('');
   const [selectedLeadId, setSelectedLeadId] = useState<string>(sale?.leadId || '');
 
@@ -61,7 +54,6 @@ export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps)
     resolver: zodResolver(sale ? updateSaleSchema : createSaleSchema),
     defaultValues: {
       leadId: sale?.leadId || '',
-      stockReservationIds: sale?.stockReservations?.map((r) => r.id) || [],
       customerName: sale?.customerName || '',
       customerEmail: sale?.customerEmail || '',
       customerPhone: sale?.customerPhone || '',
@@ -71,9 +63,6 @@ export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps)
     },
   });
 
-  useEffect(() => {
-    setValue('stockReservationIds', selectedReservations);
-  }, [selectedReservations, setValue]);
 
   useEffect(() => {
     setValue('leadId', selectedLeadId);
@@ -86,16 +75,9 @@ export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps)
       lead.phone?.includes(leadSearch)
   );
 
-  const toggleReservation = (reservationId: string) => {
-    setSelectedReservations((prev) =>
-      prev.includes(reservationId)
-        ? prev.filter((id) => id !== reservationId)
-        : [...prev, reservationId]
-    );
-  };
 
   const handleFormSubmit = (data: SaleFormData) => {
-    onSubmit({ ...data, stockReservationIds: selectedReservations, leadId: selectedLeadId || undefined });
+    onSubmit({ ...data, leadId: selectedLeadId || undefined });
   };
 
   return (
@@ -160,84 +142,6 @@ export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps)
           />
         </CardContent>
       </Card>
-
-      {/* Reservations Selection - Only for create */}
-      {!sale && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Reservas de Stock <span className="text-red-500">*</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {reservationsData?.data && reservationsData.data.length > 0 ? (
-              <div className="space-y-2 max-h-60 overflow-y-auto border rounded-lg p-2">
-                {reservationsData.data.map((reservation) => (
-                  <div
-                    key={reservation.id}
-                    className={`p-2 border rounded cursor-pointer ${
-                      selectedReservations.includes(reservation.id)
-                        ? 'bg-blue-50 border-blue-300'
-                        : 'hover:bg-gray-50'
-                    }`}
-                    onClick={() => toggleReservation(reservation.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedReservations.includes(reservation.id)}
-                        onChange={() => toggleReservation(reservation.id)}
-                        className="cursor-pointer"
-                      />
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">
-                          {reservation.stockItem?.model || 'N/A'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Cantidad: {reservation.quantity} | {reservation.stockItem?.sku || 'Sin SKU'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">
-                No hay reservas activas disponibles. Crea reservas desde{' '}
-                <a href="/stock/reservations" className="text-blue-600 hover:underline">
-                  /stock/reservations
-                </a>
-              </div>
-            )}
-            {!sale && selectedReservations.length === 0 && (
-              <p className="text-sm text-red-500">Debe seleccionar al menos una reserva</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Show existing reservations in edit mode */}
-      {sale && sale.stockReservations && sale.stockReservations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Reservas de Stock (No modificables)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {sale.stockReservations.map((reservation) => (
-                <div key={reservation.id} className="p-2 border rounded bg-gray-50">
-                  <div className="text-sm font-medium">
-                    {reservation.stockItem?.model || 'N/A'}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Cantidad: {reservation.quantity} | Estado: {reservation.status}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Customer Data */}
       <Card>
@@ -309,7 +213,7 @@ export function SaleForm({ sale, onSubmit, onCancel, isLoading }: SaleFormProps)
         </Button>
         <Button
           type="submit"
-          disabled={isLoading || (!sale && selectedReservations.length === 0)}
+          disabled={isLoading}
         >
           {isLoading ? 'Guardando...' : sale ? 'Actualizar' : 'Crear Venta'}
         </Button>

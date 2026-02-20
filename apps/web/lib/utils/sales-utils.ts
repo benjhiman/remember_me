@@ -4,8 +4,6 @@ export function getStatusColor(status: SaleStatus): string {
   switch (status) {
     case 'DRAFT':
       return 'bg-gray-100 text-gray-800';
-    case 'RESERVED':
-      return 'bg-yellow-100 text-yellow-800';
     case 'PAID':
       return 'bg-green-100 text-green-800';
     case 'SHIPPED':
@@ -23,8 +21,6 @@ export function getStatusLabel(status: SaleStatus): string {
   switch (status) {
     case 'DRAFT':
       return 'Borrador';
-    case 'RESERVED':
-      return 'Reservado';
     case 'PAID':
       return 'Pagado';
     case 'SHIPPED':

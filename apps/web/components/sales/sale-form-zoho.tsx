@@ -19,7 +19,6 @@ import { useCreateCustomer } from '@/lib/api/hooks/use-customer-mutations';
 import { usePriceLists, usePriceList } from '@/lib/api/hooks/use-price-lists';
 import { useItemSearchFlattened } from '@/lib/api/hooks/use-item-search';
 import { useStockItems } from '@/lib/api/hooks/use-stock-items';
-import { useStockReservations } from '@/lib/api/hooks/use-stock-reservations';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { Plus, X, Search, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -36,7 +35,6 @@ const saleItemSchema = z.object({
 });
 
 const createSaleSchema = z.object({
-  stockReservationIds: z.array(z.string()).optional(),
   customerName: z.string().min(1, 'El nombre del cliente es requerido'),
   customerEmail: z.string().email('Email inválido').optional().or(z.literal('')),
   customerPhone: z.string().optional(),
@@ -68,7 +66,6 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading, initialCusto
   const { data: customersData } = useCustomers({ limit: 100, enabled: true });
   const { data: priceListsData } = usePriceLists();
   const { data: stockData } = useStockItems({ limit: 10000, enabled: true });
-  const { data: reservationsData } = useStockReservations({ status: 'ACTIVE', limit: 100, enabled: true });
   const createCustomer = useCreateCustomer();
 
   // Local storage for location
@@ -84,8 +81,6 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading, initialCusto
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialCustomerId || null);
   const [isConsumidorFinal, setIsConsumidorFinal] = useState(false);
   const [createCustomerDialogOpen, setCreateCustomerDialogOpen] = useState(false);
-  const [reservationSelectOpen, setReservationSelectOpen] = useState(false);
-  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const [invoiceNumberMode, setInvoiceNumberMode] = useState<'auto' | 'manual'>('auto');
   const [manualInvoiceNumber, setManualInvoiceNumber] = useState('');
 
@@ -224,25 +219,6 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading, initialCusto
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [priceListId, selectedPriceList, items.length]);
 
-  // Handle reservation selection
-  const handleReservationSelect = (reservationId: string) => {
-    setSelectedReservationId(reservationId);
-    const reservation = reservationsData?.data.find((r) => r.id === reservationId);
-    if (reservation && reservation.stockItem) {
-      // Find full stock item to get price
-      const fullStockItem = stockData?.data.find((si) => si.id === reservation.stockItemId);
-      const unitPrice = fullStockItem?.basePrice ? parseFloat(fullStockItem.basePrice.toString()) : 0;
-      
-      // Add item from reservation
-      append({
-        stockItemId: reservation.stockItemId,
-        model: reservation.stockItem.model,
-        quantity: reservation.quantity,
-        unitPrice,
-      });
-      setReservationSelectOpen(false);
-    }
-  };
 
   // Item search for each row
   function ItemPicker({ index }: { index: number }) {
@@ -554,7 +530,6 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading, initialCusto
     const submitData = {
       ...data,
       saleNumber: invoiceNumberMode === 'manual' && manualInvoiceNumber ? manualInvoiceNumber : undefined,
-      stockReservationIds: selectedReservationId ? [selectedReservationId] : undefined,
     };
     onSubmit(submitData);
   };
@@ -562,46 +537,6 @@ export function SaleFormZoho({ sale, onSubmit, onCancel, isLoading, initialCusto
   return (
     <>
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-        {/* Reservation Selection (at the top) */}
-        {!sale && reservationsData?.data && reservationsData.data.length > 0 && (
-          <div className="border rounded-lg p-4 bg-blue-50/50">
-            <Label className="mb-2 block">Seleccionar Reserva de Stock (Opcional)</Label>
-            <Popover open={reservationSelectOpen} onOpenChange={setReservationSelectOpen} modal={false}>
-              <PopoverTrigger asChild>
-                <Button type="button" variant="outline" className="w-full justify-start">
-                  {selectedReservationId
-                    ? `Reserva seleccionada: ${reservationsData.data.find((r) => r.id === selectedReservationId)?.stockItem?.model || ''}`
-                    : 'Seleccionar reserva existente...'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0" align="start" side="bottom" sideOffset={8}>
-                <Command>
-                  <CommandInput placeholder="Buscar reserva..." />
-                  <CommandList className="max-h-[300px]">
-                    <CommandEmpty>No se encontraron reservas.</CommandEmpty>
-                    <CommandGroup>
-                      {reservationsData.data.map((reservation) => (
-                        <CommandItem
-                          key={reservation.id}
-                          value={reservation.id}
-                          onSelect={() => handleReservationSelect(reservation.id)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex-1">
-                            <div className="font-medium">{reservation.stockItem?.model || 'N/A'}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Cantidad: {reservation.quantity} | {reservation.stockItem?.sku || 'Sin SKU'}
-                            </div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
 
         {/* Header Section */}
         <div className="grid grid-cols-2 gap-4">

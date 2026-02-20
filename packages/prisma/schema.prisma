@@ -33,7 +33,6 @@ model User {
   assignedTasks             Task[]                     @relation("TaskAssignedTo")
   createdTasks              Task[]                     @relation("TaskCreator")
   StockMovement             StockMovement[]
-  StockReservation          StockReservation[]
   idempotencyKeys           IdempotencyKey[]
   createdCustomers          Customer[]                 @relation("CustomerCreator")
   assignedCustomers         Customer[]                 @relation("CustomerAssignedTo")
@@ -62,7 +61,6 @@ model Organization {
   refreshTokens            RefreshToken[]
   leads                    Lead[]
   stockItems               StockItem[]
-  stockReservations        StockReservation[]
   stockMovements           StockMovement[]
   pricingRules             PricingRule[]
   sales                    Sale[]
@@ -276,7 +274,6 @@ model StockItem {
   item              Item               @relation(fields: [itemId], references: [id], onDelete: Restrict)
   reservations      SaleItem[]
   movements         StockMovement[]
-  stockReservations StockReservation[]
   PurchaseLine      PurchaseLine[]
 
   @@unique([organizationId, imei]) // IMEI único por organización
@@ -313,7 +310,6 @@ model Item {
   organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   folder       Folder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
   stockItems   StockItem[]
-  reservations StockReservation[]
 
   @@index([organizationId, isActive])
   @@index([organizationId, deletedAt])
@@ -433,19 +429,10 @@ enum StockStatus {
 enum StockMovementType {
   IN
   OUT
-  RESERVE
-  RELEASE
   ADJUST
   SOLD
 }
 
-enum ReservationStatus {
-  ACTIVE
-  CONFIRMED
-  EXPIRED
-  CANCELLED
-  RELEASED
-}
 
 model PricingRule {
   id             String    @id @default(cuid())
@@ -530,7 +517,6 @@ model Sale {
   createdBy               User                     @relation("SaleCreator", fields: [createdById], references: [id])
   assignedTo              User                     @relation("SaleAssignedTo", fields: [assignedToId], references: [id])
   items                   SaleItem[]
-  stockReservations       StockReservation[]
   stockMovements          StockMovement[]
 
   @@index([organizationId, status])
@@ -835,7 +821,6 @@ model StockMovement {
   quantityBefore Int // Cantidad antes del movimiento
   quantityAfter  Int // Cantidad después del movimiento
   reason         String? // Motivo del movimiento
-  reservationId  String?
   saleId         String?
   createdById    String
   metadata       Json? // Info adicional
@@ -843,7 +828,6 @@ model StockMovement {
 
   organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   stockItem    StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-  reservation  StockReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   sale         Sale?             @relation(fields: [saleId], references: [id], onDelete: SetNull)
   createdBy    User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
@@ -851,40 +835,9 @@ model StockMovement {
   @@index([stockItemId])
   @@index([type])
   @@index([createdAt])
-  @@index([reservationId])
   @@index([saleId])
 }
 
-model StockReservation {
-  id             String            @id @default(cuid())
-  organizationId String
-  itemId         String? // FK to Item (product catalog) - for quantity-based reservations
-  stockItemId    String? // FK to StockItem - for legacy/specific item reservations
-  quantity       Int               @default(1)
-  status         ReservationStatus @default(ACTIVE)
-  expiresAt      DateTime?
-  releasedAt     DateTime? // When reservation was released
-  saleId         String?
-  createdById    String
-  customerName   String? // Customer name for the reservation
-  notes          String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  item         Item?           @relation(fields: [itemId], references: [id], onDelete: Restrict)
-  stockItem    StockItem?      @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
-  sale         Sale?           @relation(fields: [saleId], references: [id], onDelete: SetNull)
-  createdBy    User            @relation(fields: [createdById], references: [id], onDelete: Restrict)
-  movements    StockMovement[]
-
-  @@index([organizationId])
-  @@index([itemId])
-  @@index([stockItemId])
-  @@index([status])
-  @@index([saleId])
-  @@index([expiresAt])
-}
 
 // ===== AUDIT LOG =====
 
@@ -895,9 +848,6 @@ enum AuditAction {
   RESTORE
   PAY
   CANCEL
-  RESERVE
-  CONFIRM
-  RELEASE
   SHIP
   DELIVER
   ASSIGN
@@ -909,7 +859,6 @@ enum AuditEntityType {
   StockItem
   Sale
   PricingRule
-  StockReservation
   SaleItem
   Note
   Task

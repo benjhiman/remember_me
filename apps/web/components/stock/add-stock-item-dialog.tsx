@@ -256,7 +256,7 @@ export function AddStockItemDialog({ open, onOpenChange, initialItemId, variant 
   const [quantity, setQuantity] = useState<string>('');
   const [quantityError, setQuantityError] = useState<string>('');
   const [condition, setCondition] = useState<'NEW' | 'USED' | 'REFURBISHED'>('NEW');
-  const [status, setStatus] = useState<'AVAILABLE' | 'RESERVED' | 'SOLD' | 'DAMAGED' | 'RETURNED' | 'CANCELLED'>('AVAILABLE');
+  const [status, setStatus] = useState<'AVAILABLE' | 'SOLD' | 'DAMAGED' | 'RETURNED' | 'CANCELLED'>('AVAILABLE');
   const [cost, setCost] = useState<string>('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');

@@ -148,28 +148,6 @@ export default function SaleDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Reservations */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Reservas de Stock</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {sale.stockReservations && sale.stockReservations.length > 0 ? (
-                <div className="space-y-2">
-                  {sale.stockReservations.map((reservation) => (
-                    <div key={reservation.id} className="border rounded-lg p-2 text-sm">
-                      <div className="font-medium">{reservation.stockItem?.model || 'N/A'}</div>
-                      <div className="text-xs text-gray-600">
-                        Cantidad: {reservation.quantity} | Estado: {reservation.status}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">No hay reservas</div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         {/* Notes */}
@@ -195,12 +173,6 @@ export default function SaleDetailPage() {
                 <div className="text-gray-600">Creada:</div>
                 <div className="font-medium">{formatDate(sale.createdAt)}</div>
               </div>
-              {sale.reservedAt && (
-                <div>
-                  <div className="text-gray-600">Reservada:</div>
-                  <div className="font-medium">{formatDate(sale.reservedAt)}</div>
-                </div>
-              )}
               {sale.paidAt && (
                 <div>
                   <div className="text-gray-600">Pagada:</div>

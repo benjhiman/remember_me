@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useDashboardOverview, useDashboardSales, useDashboardStock } from '@/lib/api/hooks/use-dashboard';
 import { useSales } from '@/lib/api/hooks/use-sales';
-import { useStockReservations } from '@/lib/api/hooks/use-stock-reservations';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -165,7 +164,6 @@ export default function DashboardPage() {
 
   // Recent data queries
   const { data: recentSales } = useSales({ limit: 10, sort: 'createdAt', order: 'desc', enabled: !!user });
-  const { data: activeReservations } = useStockReservations({ status: 'ACTIVE', limit: 10, enabled: !!user });
 
   // Refresh handler with loading state
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -180,7 +178,6 @@ export default function DashboardPage() {
         queryClient.invalidateQueries({ queryKey: ['dashboard-sales'] }),
         queryClient.invalidateQueries({ queryKey: ['dashboard-stock'] }),
         queryClient.invalidateQueries({ queryKey: ['sales'] }),
-        queryClient.invalidateQueries({ queryKey: ['stock-reservations'] }),
       ]);
       
       // Refetch main queries
@@ -385,13 +382,6 @@ export default function DashboardPage() {
                   <div className="text-sm text-muted-foreground mb-1">Stock Disponible</div>
                   <div className="text-2xl font-bold">{formatNumber(overview.stockAvailableCount)}</div>
                   <div className="text-xs text-muted-foreground mt-1">Items disponibles</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-sm text-muted-foreground mb-1">Stock Reservado</div>
-                  <div className="text-2xl font-bold text-yellow-600">{formatNumber(overview.stockReservedCount)}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Items reservados</div>
                 </CardContent>
               </Card>
             </>
@@ -612,31 +602,6 @@ export default function DashboardPage() {
         </Card>
 
 
-        {/* Active Reservations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Reservas Activas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activeReservations?.data && activeReservations.data.length > 0 ? (
-              <div className="space-y-2">
-                {activeReservations.data.slice(0, 10).map((reservation) => (
-                  <div
-                    key={reservation.id}
-                    className="p-2 border rounded hover:bg-gray-50 cursor-pointer"
-                    onClick={() => router.push(`/stock/${reservation.stockItemId}`)}
-                  >
-                    <div className="text-sm font-medium">{reservation.stockItem?.model || 'N/A'}</div>
-                    <div className="text-xs text-gray-600">Cantidad: {reservation.quantity}</div>
-                    <div className="text-xs text-gray-500">{formatDate(reservation.createdAt)}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">No hay reservas activas</div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </PageShell>
   );

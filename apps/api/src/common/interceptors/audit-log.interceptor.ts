@@ -173,7 +173,6 @@ export class AuditLogInterceptor implements NestInterceptor {
     if (pathLower.includes('/stock') && pathLower.includes('/items')) return AuditEntityType.StockItem;
     if (pathLower.includes('/sales')) return AuditEntityType.Sale;
     if (pathLower.includes('/pricing') && pathLower.includes('/rules')) return AuditEntityType.PricingRule;
-    if (pathLower.includes('/reservations')) return AuditEntityType.StockReservation;
 
     return null;
   }
@@ -261,9 +260,6 @@ export class AuditLogInterceptor implements NestInterceptor {
       if (pathLower.includes('/restore')) return AuditAction.RESTORE;
       if (pathLower.includes('/pay')) return AuditAction.PAY;
       if (pathLower.includes('/cancel')) return AuditAction.CANCEL;
-      if (pathLower.includes('/reserve')) return AuditAction.RESERVE;
-      if (pathLower.includes('/confirm')) return AuditAction.CONFIRM;
-      if (pathLower.includes('/release')) return AuditAction.RELEASE;
       if (pathLower.includes('/ship')) return AuditAction.SHIP;
       if (pathLower.includes('/deliver')) return AuditAction.DELIVER;
       if (pathLower.includes('/assign')) return AuditAction.ASSIGN;

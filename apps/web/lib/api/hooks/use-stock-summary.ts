@@ -20,7 +20,6 @@ interface StockSummaryRow {
   color?: string;
   condition?: string;
   availableQty: number;
-  reservedQty: number;
   totalQty: number;
   lastInAt: string | null;
 }

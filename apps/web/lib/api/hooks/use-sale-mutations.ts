@@ -11,7 +11,6 @@ interface CreateSaleItem {
 }
 
 interface CreateSaleData {
-  stockReservationIds?: string[];
   items?: CreateSaleItem[];
   customerName: string;
   customerEmail?: string;

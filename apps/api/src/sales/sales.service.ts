@@ -21,7 +21,6 @@ import {
   SaleStatus,
   StockStatus,
   StockMovementType,
-  ReservationStatus,
 } from '@remember-me/prisma';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -163,204 +162,6 @@ export class SalesService {
     });
   }
 
-  // Helper: Confirm reservation internally (within transaction)
-  private async confirmReservationInternal(
-    tx: Prisma.TransactionClient,
-    organizationId: string,
-    reservationId: string,
-    userId: string,
-    saleId: string,
-  ) {
-    const reservation = await tx.stockReservation.findFirst({
-      where: {
-        id: reservationId,
-        organizationId,
-      },
-      include: {
-        stockItem: true,
-      },
-    });
-
-    if (!reservation) {
-      throw new NotFoundException(`Reservation ${reservationId} not found`);
-    }
-
-    if (reservation.status !== ReservationStatus.ACTIVE) {
-      throw new BadRequestException(
-        `Cannot confirm reservation ${reservationId}. Status is ${reservation.status}`,
-      );
-    }
-
-    // Handle item-based reservations differently from stockItem-based
-    if (reservation.itemId && !reservation.stockItemId) {
-      // Item-based reservation: reduce quantity from any available stock items
-      const stockItems = await tx.stockItem.findMany({
-        where: {
-          organizationId: reservation.organizationId,
-          itemId: reservation.itemId,
-          deletedAt: null,
-          status: StockStatus.AVAILABLE,
-        },
-        orderBy: { createdAt: 'asc' },
-      });
-
-      let remainingQty = reservation.quantity;
-
-      for (const stockItem of stockItems) {
-        if (remainingQty <= 0) break;
-
-        const qtyToDeduct = Math.min(remainingQty, stockItem.quantity);
-        const qtyAfter = stockItem.quantity - qtyToDeduct;
-
-        await tx.stockItem.update({
-          where: { id: stockItem.id },
-          data: {
-            quantity: qtyAfter,
-            ...(stockItem.imei && qtyAfter === 0 ? { status: StockStatus.SOLD } : {}),
-          },
-        });
-
-        // Create movement for each stock item
-        await this.createMovement(
-          tx,
-          organizationId,
-          stockItem.id,
-          StockMovementType.SOLD,
-          stockItem.quantity,
-          qtyAfter,
-          userId,
-          'Reservation confirmed - sale paid',
-          reservationId,
-          saleId,
-        );
-
-        remainingQty -= qtyToDeduct;
-      }
-
-      if (remainingQty > 0) {
-        throw new BadRequestException(
-          `Not enough stock available. Could only allocate ${reservation.quantity - remainingQty} of ${reservation.quantity} requested.`,
-        );
-      }
-    } else if (reservation.stockItemId && reservation.stockItem) {
-      // Legacy: stockItem-based reservation
-      const quantityBefore = reservation.stockItem.quantity;
-      const quantityAfter = quantityBefore - reservation.quantity;
-
-      if (quantityAfter < 0) {
-        throw new BadRequestException(
-          `Cannot confirm reservation ${reservationId}. Current quantity: ${quantityBefore}, reservation: ${reservation.quantity}. Result would be negative.`,
-        );
-      }
-
-      const updateData: any = {
-        quantity: quantityAfter,
-      };
-
-      if (reservation.stockItem.imei && quantityAfter === 0) {
-        updateData.status = StockStatus.SOLD;
-      }
-
-      await tx.stockItem.update({
-        where: { id: reservation.stockItemId },
-        data: updateData,
-      });
-
-      await this.createMovement(
-        tx,
-        organizationId,
-        reservation.stockItemId,
-        StockMovementType.SOLD,
-        quantityBefore,
-        quantityAfter,
-        userId,
-        'Reservation confirmed - sale paid',
-        reservationId,
-        saleId,
-      );
-    } else {
-      throw new BadRequestException('Reservation must have either itemId or stockItemId');
-    }
-
-    await tx.stockReservation.update({
-      where: { id: reservationId },
-      data: { status: ReservationStatus.CONFIRMED },
-    });
-  }
-
-  // Helper: Release reservation internally (within transaction)
-  private async releaseReservationInternal(
-    tx: Prisma.TransactionClient,
-    organizationId: string,
-    reservationId: string,
-    userId: string,
-    saleId: string,
-  ) {
-    const reservation = await tx.stockReservation.findFirst({
-      where: {
-        id: reservationId,
-        organizationId,
-      },
-      include: {
-        stockItem: true,
-      },
-    });
-
-    if (!reservation) {
-      throw new NotFoundException(`Reservation ${reservationId} not found`);
-    }
-
-    if (reservation.status !== ReservationStatus.ACTIVE) {
-      throw new BadRequestException(
-        `Cannot release reservation ${reservationId}. Status is ${reservation.status}`,
-      );
-    }
-
-    await tx.stockReservation.update({
-      where: { id: reservationId },
-      data: { status: ReservationStatus.RELEASED, releasedAt: new Date() },
-    });
-
-    // Create movement only if reservation has stockItemId (legacy reservations)
-    if (reservation.stockItemId && reservation.stockItem) {
-      await this.createMovement(
-        tx,
-        organizationId,
-        reservation.stockItemId,
-        StockMovementType.RELEASE,
-        reservation.stockItem.quantity,
-        reservation.stockItem.quantity,
-        userId,
-        'Reservation released - sale cancelled',
-        reservationId,
-        saleId,
-      );
-    } else if (reservation.itemId) {
-      // For item-based reservations, find a stock item to link the movement
-      const stockItem = await tx.stockItem.findFirst({
-        where: {
-          organizationId: reservation.organizationId,
-          itemId: reservation.itemId,
-          deletedAt: null,
-        },
-      });
-
-      if (stockItem) {
-        await this.createMovement(
-          tx,
-          organizationId,
-          stockItem.id,
-          StockMovementType.RELEASE,
-          stockItem.quantity,
-          stockItem.quantity,
-          userId,
-          'Reservation released - sale cancelled',
-          reservationId,
-          saleId,
-        );
-      }
-    }
-  }
 
   async createSale(organizationId: string, userId: string, dto: CreateSaleDto) {
     const { role } = await this.verifyMembership(organizationId, userId);
@@ -371,12 +172,11 @@ export class SalesService {
       throw new ForbiddenException('Seller cannot create sales (disabled by organization settings)');
     }
 
-    // Validate: must have either reservations or items
-    const hasReservations = dto.stockReservationIds && dto.stockReservationIds.length > 0;
+    // Validate: must have items
     const hasItems = dto.items && dto.items.length > 0;
 
-    if (!hasReservations && !hasItems) {
-      throw new BadRequestException('Sale must have at least one stock reservation or one item');
+    if (!hasItems) {
+      throw new BadRequestException('Sale must have at least one item');
     }
 
     // Verify lead belongs to organization if provided
@@ -393,86 +193,11 @@ export class SalesService {
       }
     }
 
-    let reservations: any[] = [];
     let itemsToCreate: any[] = [];
     let subtotal = 0;
 
-    // Process reservations if provided
-    if (hasReservations) {
-      // Verify all reservations exist, are ACTIVE, and belong to organization
-      reservations = await this.prisma.stockReservation.findMany({
-        where: {
-          id: { in: dto.stockReservationIds },
-          organizationId,
-        },
-        include: {
-          stockItem: true,
-          item: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-              brand: true,
-              model: true,
-            },
-          },
-        },
-      });
-
-      if (reservations.length !== dto.stockReservationIds!.length) {
-        throw new NotFoundException('One or more reservations not found');
-      }
-
-      // Verify all reservations are ACTIVE
-      const inactiveReservations = reservations.filter(
-        (r) => r.status !== ReservationStatus.ACTIVE,
-      );
-      if (inactiveReservations.length > 0) {
-        throw new BadRequestException(
-          `Reservations ${inactiveReservations.map((r) => r.id).join(', ')} are not ACTIVE`,
-        );
-      }
-
-      // Verify all reservations are not already linked to a sale
-      const linkedReservations = reservations.filter((r) => r.saleId !== null);
-      if (linkedReservations.length > 0) {
-        throw new BadRequestException(
-          `Reservations ${linkedReservations.map((r) => r.id).join(', ')} are already linked to a sale`,
-        );
-      }
-
-      // Calculate totals from reservations
-      const reservationPrices = await Promise.all(
-        reservations.map(async (reservation) => {
-          if (reservation.stockItem) {
-            return parseFloat(reservation.stockItem.basePrice.toString()) * reservation.quantity;
-          } else if (reservation.itemId) {
-            const stockItem = await this.prisma.stockItem.findFirst({
-              where: {
-                organizationId: reservation.organizationId,
-                itemId: reservation.itemId,
-                deletedAt: null,
-              },
-              orderBy: { createdAt: 'desc' },
-            });
-
-            if (stockItem) {
-              return parseFloat(stockItem.basePrice.toString()) * reservation.quantity;
-          } else {
-            this.logger.warn(
-              `No stock item found for itemId ${reservation.itemId} in reservation ${reservation.id}. Using price 0.`,
-            );
-            return 0;
-          }
-        }
-        return 0;
-      }),
-    );
-    subtotal = reservationPrices.reduce((sum, price) => sum + price, 0);
-  }
-
-  // Process direct items if provided
-  if (hasItems) {
+    // Process items
+    if (hasItems) {
     itemsToCreate = await Promise.all(
       dto.items!.map(async (item) => {
         let stockItemId: string | null = null;
@@ -536,7 +261,7 @@ export class SalesService {
           assignedToId: userId,
           leadId: dto.leadId,
           saleNumber,
-          status: hasReservations ? SaleStatus.RESERVED : SaleStatus.DRAFT,
+          status: SaleStatus.DRAFT,
           customerName: dto.customerName,
           customerEmail: dto.customerEmail,
           customerPhone: dto.customerPhone,
@@ -545,7 +270,6 @@ export class SalesService {
           discount: new Decimal(discount),
           total: new Decimal(total),
           currency: dto.currency || 'USD',
-          reservedAt: hasReservations ? new Date() : null,
           notes: dto.notes || dto.subject,
           metadata: {
             ...(dto.metadata || {}),
@@ -557,52 +281,7 @@ export class SalesService {
             customerWeb: dto.customerWeb,
           },
           items: {
-            create: [
-              // Items from reservations
-              ...(await Promise.all(
-                reservations.map(async (reservation) => {
-                  if (reservation.stockItemId && reservation.stockItem) {
-                    const basePrice = reservation.stockItem.basePrice || new Decimal(0);
-                    return {
-                      stockItemId: reservation.stockItemId,
-                      model: reservation.stockItem.model,
-                      quantity: reservation.quantity,
-                      unitPrice: basePrice,
-                      totalPrice: new Decimal(
-                        parseFloat(basePrice.toString()) * reservation.quantity,
-                      ),
-                    };
-                  } else if (reservation.itemId && reservation.item) {
-                    const stockItem = await tx.stockItem.findFirst({
-                      where: {
-                        organizationId: reservation.organizationId,
-                        itemId: reservation.itemId,
-                        deletedAt: null,
-                      },
-                      orderBy: { createdAt: 'desc' },
-                    });
-
-                    const modelName = reservation.item.model || reservation.item.name;
-                    const unitPrice = stockItem?.basePrice || new Decimal(0);
-                    const totalPrice = new Decimal(parseFloat(unitPrice.toString()) * reservation.quantity);
-
-                    return {
-                      stockItemId: stockItem?.id || null,
-                      model: modelName,
-                      quantity: reservation.quantity,
-                      unitPrice,
-                      totalPrice,
-                    };
-                  } else {
-                    throw new BadRequestException(
-                      `Reservation ${reservation.id} must have either stockItemId or itemId`,
-                    );
-                  }
-                }),
-              )),
-              // Direct items (without reservations)
-              ...itemsToCreate,
-            ],
+            create: itemsToCreate,
           },
         },
         include: {
@@ -635,18 +314,6 @@ export class SalesService {
         },
       });
 
-      // Link reservations to sale (if any)
-      if (hasReservations && dto.stockReservationIds && dto.stockReservationIds.length > 0) {
-        await tx.stockReservation.updateMany({
-          where: {
-            id: { in: dto.stockReservationIds },
-          },
-          data: {
-            saleId: sale.id,
-          },
-        });
-      }
-
       // Audit log
       const metadata = this.getRequestMetadata();
       await this.auditLogService.log({
@@ -666,35 +333,9 @@ export class SalesService {
         },
         metadata: {
           ...metadata,
-          stockReservationIds: dto.stockReservationIds,
           leadId: dto.leadId || null,
         },
       });
-
-      // Trigger automation: SALE_RESERVED (outside transaction to avoid blocking)
-      if (this.automationsService) {
-        try {
-          const phone = sale.customerPhone || (sale.leadId ? (await this.prisma.lead.findFirst({
-            where: { id: sale.leadId, organizationId },
-          }))?.phone : undefined);
-
-          if (phone) {
-            await this.automationsService.processTrigger(
-              organizationId,
-              WhatsAppAutomationTrigger.SALE_RESERVED,
-              {
-                saleId: sale.id,
-                leadId: sale.leadId || undefined,
-                phone,
-                delayHours: 0.5, // 30 minutes
-              },
-            );
-          }
-        } catch (error) {
-          // Log error but don't fail sale creation
-          console.error('Failed to trigger SALE_RESERVED automation:', error);
-        }
-      }
 
       return sale;
     });
@@ -794,7 +435,6 @@ export class SalesService {
           _count: {
             select: {
               items: true,
-              stockReservations: true,
             },
           },
         },
@@ -859,7 +499,6 @@ export class SalesService {
             },
           },
         },
-        stockReservations: {
           include: {
             stockItem: {
               select: {
@@ -980,7 +619,6 @@ export class SalesService {
             },
           },
         },
-        stockReservations: {
           include: {
             stockItem: {
               select: {
@@ -1029,7 +667,11 @@ export class SalesService {
         deletedAt: null, // Exclude soft-deleted sales
       },
       include: {
-        stockReservations: true,
+        items: {
+          include: {
+            stockItem: true,
+          },
+        },
       },
     });
 
@@ -1041,25 +683,55 @@ export class SalesService {
       throw new BadRequestException('Cannot pay a deleted sale');
     }
 
-    if (sale.status !== SaleStatus.RESERVED) {
-      throw new BadRequestException(`Sale must be RESERVED to pay. Current status: ${sale.status}`);
-    }
-
-    if (sale.stockReservations.length === 0) {
-      throw new BadRequestException('Sale has no reservations to confirm');
+    if (sale.status !== SaleStatus.DRAFT) {
+      throw new BadRequestException(`Sale must be DRAFT to pay. Current status: ${sale.status}`);
     }
 
     const before = {
       id: sale.id,
       status: sale.status,
-      reservationIds: sale.stockReservations.map((r) => r.id),
     };
 
     return this.prisma.$transaction(
       async (tx) => {
-        // Confirm all reservations
-        for (const reservation of sale.stockReservations) {
-          await this.confirmReservationInternal(tx, organizationId, reservation.id, userId, saleId);
+        // Process items: reduce stock quantities
+        for (const item of sale.items) {
+          if (item.stockItemId && item.stockItem) {
+            const quantityBefore = item.stockItem.quantity;
+            const quantityAfter = quantityBefore - item.quantity;
+
+            if (quantityAfter < 0) {
+              throw new BadRequestException(
+                `Cannot pay sale. Insufficient stock for ${item.model}. Current: ${quantityBefore}, Required: ${item.quantity}`,
+              );
+            }
+
+            const updateData: any = {
+              quantity: quantityAfter,
+            };
+
+            if (item.stockItem.imei && quantityAfter === 0) {
+              updateData.status = StockStatus.SOLD;
+            }
+
+            await tx.stockItem.update({
+              where: { id: item.stockItemId },
+              data: updateData,
+            });
+
+            await this.createMovement(
+              tx,
+              organizationId,
+              item.stockItemId,
+              StockMovementType.SOLD,
+              quantityBefore,
+              quantityAfter,
+              userId,
+              'Sale paid',
+              undefined,
+              saleId,
+            );
+          }
         }
 
         // Update sale status
@@ -1097,7 +769,6 @@ export class SalesService {
                 },
               },
             },
-            stockReservations: {
               include: {
                 stockItem: {
                   select: {
@@ -1144,7 +815,6 @@ export class SalesService {
           },
           metadata: {
             ...metadata,
-            reservationIds: sale.stockReservations.map((r) => r.id),
           },
         });
 
@@ -1164,9 +834,6 @@ export class SalesService {
         id: saleId,
         organizationId,
         deletedAt: null, // Exclude soft-deleted sales
-      },
-      include: {
-        stockReservations: true,
       },
     });
 
@@ -1190,17 +857,10 @@ export class SalesService {
     const before = {
       id: sale.id,
       status: sale.status,
-      reservationIds: sale.stockReservations.map((r) => r.id),
     };
 
     return this.prisma.$transaction(
       async (tx) => {
-        // Release all reservations
-        for (const reservation of sale.stockReservations) {
-          if (reservation.status === ReservationStatus.ACTIVE) {
-            await this.releaseReservationInternal(tx, organizationId, reservation.id, userId, saleId);
-          }
-        }
 
         // Update sale status
         const updatedSale = await tx.sale.update({
@@ -1236,7 +896,6 @@ export class SalesService {
                 },
               },
             },
-            stockReservations: {
               include: {
                 stockItem: {
                   select: {
@@ -1265,7 +924,6 @@ export class SalesService {
           },
           metadata: {
             ...metadata,
-            reservationIds: sale.stockReservations.map((r) => r.id),
           },
         });
 
@@ -1340,7 +998,6 @@ export class SalesService {
             },
           },
         },
-        stockReservations: {
           include: {
             stockItem: {
               select: {
@@ -1442,7 +1099,6 @@ export class SalesService {
             },
           },
         },
-        stockReservations: {
           include: {
             stockItem: {
               select: {
@@ -1490,7 +1146,6 @@ export class SalesService {
         deletedAt: null, // Only delete if not already deleted
       },
       include: {
-        stockReservations: true,
       },
     });
 
@@ -1504,9 +1159,6 @@ export class SalesService {
     }
 
     // Cannot delete if has linked reservations
-    if (sale.stockReservations.length > 0) {
-      throw new BadRequestException('Cannot delete sale with linked reservations');
-    }
 
     const before = {
       id: sale.id,
@@ -1552,7 +1204,6 @@ export class SalesService {
         deletedAt: { not: null }, // Only restore if deleted
       },
       include: {
-        stockReservations: true,
       },
     });
 
@@ -1595,7 +1246,6 @@ export class SalesService {
             },
           },
         },
-        stockReservations: {
           include: {
             stockItem: {
               select: {

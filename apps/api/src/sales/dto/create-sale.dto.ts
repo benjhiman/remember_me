@@ -8,11 +8,6 @@ export class CreateSaleDto {
   leadId?: string;
 
   @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  stockReservationIds?: string[]; // IDs de reservas de stock para linkear (opcional)
-
-  @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateSaleItemDto)
   @IsOptional()

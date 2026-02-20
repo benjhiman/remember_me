@@ -13,7 +13,7 @@ export interface CreateStockEntryDto {
   quantity?: number;
   imeis?: string[];
   condition?: 'NEW' | 'USED' | 'REFURBISHED';
-  status?: 'AVAILABLE' | 'RESERVED' | 'SOLD' | 'DAMAGED' | 'RETURNED' | 'CANCELLED';
+  status?: 'AVAILABLE' | 'SOLD' | 'DAMAGED' | 'RETURNED' | 'CANCELLED';
   cost?: number;
   location?: string;
   notes?: string;
@@ -72,7 +72,6 @@ export function useCreateStockEntry() {
       queryClient.invalidateQueries({ queryKey: ['stock-items-infinite'] });
       queryClient.invalidateQueries({ queryKey: ['stock-summary'] }); // Critical: refresh summary
       queryClient.invalidateQueries({ queryKey: ['stock-movements-global'] }); // Refresh movements
-      queryClient.invalidateQueries({ queryKey: ['stock-reservations'] });
       queryClient.invalidateQueries({ queryKey: ['items'] }); // In case items show stock counts
 
       // Also refetch active queries to ensure immediate UI update

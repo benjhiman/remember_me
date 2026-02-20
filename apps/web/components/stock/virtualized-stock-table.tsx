@@ -10,7 +10,6 @@ interface StockItem {
   sku?: string | null;
   condition: ItemCondition;
   quantity: number;
-  reservedQuantity?: number | null;
   availableQuantity?: number | null;
   status: StockStatus;
   updatedAt: string;
@@ -46,7 +45,6 @@ function VirtualizedStockTableComponent({
       { key: 'item', label: 'Item / SKU' },
       { key: 'condition', label: 'Condición' },
       { key: 'quantity', label: 'Cantidad Total' },
-      { key: 'reserved', label: 'Reservado' },
       { key: 'available', label: 'Disponible' },
       { key: 'status', label: 'Estado' },
       { key: 'updated', label: 'Última Actualización' },
@@ -57,8 +55,7 @@ function VirtualizedStockTableComponent({
   const renderRow = useMemo(
     // eslint-disable-next-line react/display-name
     () => (item: StockItem) => {
-      const reserved = item.reservedQuantity || 0;
-      const available = item.availableQuantity ?? (item.quantity - reserved);
+      const available = item.availableQuantity ?? item.quantity;
       return (
         <>
           <td className="px-6 py-4 whitespace-nowrap">
@@ -69,7 +66,6 @@ function VirtualizedStockTableComponent({
             {getConditionLabel(item.condition)}
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.quantity}</td>
-          <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600">{reserved}</td>
           <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
             {available}
           </td>

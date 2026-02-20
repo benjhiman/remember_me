@@ -28,7 +28,6 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
   { href: '/stock', label: 'Stock', icon: Package, permission: Permission.VIEW_STOCK },
-  { href: '/stock/reservations', label: 'Reservas', icon: PackageCheck, permission: Permission.VIEW_STOCK },
   { href: '/sales', label: 'Ventas', icon: ShoppingCart, permission: Permission.VIEW_SALES },
   { href: '/pricing', label: 'Pricing', icon: Package, permission: Permission.VIEW_DASHBOARD },
   { href: '/settings', label: 'Configuración', icon: Settings, permission: Permission.VIEW_DASHBOARD },

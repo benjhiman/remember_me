@@ -9,7 +9,6 @@ export interface DashboardOverview {
   }>;
   revenue: string;
   stockAvailableCount: number;
-  stockReservedCount: number;
   stockSoldCount: number;
   topProductsByVolume: Array<{
     model: string;
@@ -49,8 +48,6 @@ export interface StockDashboard {
     period: string;
     IN?: number;
     OUT?: number;
-    RESERVE?: number;
-    RELEASE?: number;
     SOLD?: number;
     ADJUST?: number;
   }>;

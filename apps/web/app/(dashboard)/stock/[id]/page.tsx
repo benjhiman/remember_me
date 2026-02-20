@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStockItem } from '@/lib/api/hooks/use-stock-item';
 import { useStockMovements, useAdjustStock } from '@/lib/api/hooks/use-stock-movements';
-import { useStockReservations, useReleaseReservation } from '@/lib/api/hooks/use-stock-reservations';
 import { formatDate } from '@/lib/utils/lead-utils';
 import { Permission, userCan } from '@/lib/auth/permissions';
 import type { StockStatus, ItemCondition, MovementType } from '@/types/stock';
@@ -17,8 +16,6 @@ function getStatusColor(status: StockStatus) {
   switch (status) {
     case 'AVAILABLE':
       return 'bg-green-100 text-green-800';
-    case 'RESERVED':
-      return 'bg-yellow-100 text-yellow-800';
     case 'SOLD':
       return 'bg-blue-100 text-blue-800';
     case 'DAMAGED':
@@ -36,8 +33,6 @@ function getStatusLabel(status: StockStatus) {
   switch (status) {
     case 'AVAILABLE':
       return 'Disponible';
-    case 'RESERVED':
-      return 'Reservado';
     case 'SOLD':
       return 'Vendido';
     case 'DAMAGED':
@@ -72,10 +67,6 @@ function getMovementTypeLabel(type: MovementType) {
       return 'Salida';
     case 'ADJUST':
       return 'Ajuste';
-    case 'RESERVE':
-      return 'Reserva';
-    case 'RELEASE':
-      return 'Liberación';
     case 'SOLD':
       return 'Vendido';
     default:
@@ -94,13 +85,7 @@ export default function StockItemDetailPage() {
     itemId,
     limit: 100,
   });
-  const { data: reservationsData, isLoading: reservationsLoading } = useStockReservations({
-    itemId,
-    status: 'ACTIVE',
-  });
-
   const adjustStock = useAdjustStock(itemId);
-  const releaseReservation = useReleaseReservation();
 
   const [adjustQuantity, setAdjustQuantity] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
@@ -146,8 +131,7 @@ export default function StockItemDetailPage() {
     );
   }
 
-  const reserved = item.reservedQuantity || 0;
-  const available = item.availableQuantity ?? (item.quantity - reserved);
+  const available = item.availableQuantity ?? item.quantity;
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,17 +152,6 @@ export default function StockItemDetailPage() {
     }
   };
 
-  const handleReleaseReservation = async (reservationId: string) => {
-    if (!confirm('¿Estás seguro de que quieres liberar esta reserva?')) {
-      return;
-    }
-
-    try {
-      await releaseReservation.mutateAsync(reservationId);
-    } catch (error) {
-      console.error('Error releasing reservation:', error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -208,17 +181,11 @@ export default function StockItemDetailPage() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <Card>
             <CardContent className="p-4">
               <div className="text-sm text-gray-600 mb-1">Cantidad Total</div>
               <div className="text-2xl font-bold">{item.quantity}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-sm text-gray-600 mb-1">Reservado</div>
-              <div className="text-2xl font-bold text-yellow-600">{reserved}</div>
             </CardContent>
           </Card>
           <Card>
@@ -229,8 +196,8 @@ export default function StockItemDetailPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column - Movements */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Movements */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -306,62 +273,6 @@ export default function StockItemDetailPage() {
                   </div>
                 ) : (
                   <div className="text-sm text-gray-500">No hay movimientos aún</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column - Reservations */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Reservas Activas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {reservationsLoading ? (
-                  <div className="text-sm text-gray-500">Cargando reservas...</div>
-                ) : reservationsData && reservationsData.data.length > 0 ? (
-                  <div className="space-y-3">
-                    {reservationsData.data.map((reservation) => (
-                      <div
-                        key={reservation.id}
-                        className="border rounded-lg p-3 hover:bg-gray-50"
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="font-medium text-sm">
-                              Cantidad: {reservation.quantity}
-                            </div>
-                            {reservation.notes && (
-                              <div className="text-xs text-gray-600 mt-1">
-                                {reservation.notes}
-                              </div>
-                            )}
-                            <div className="text-xs text-gray-500 mt-1">
-                              Creada: {formatDate(reservation.createdAt)}
-                            </div>
-                            {reservation.expiresAt && (
-                              <div className="text-xs text-gray-500">
-                                Expira: {formatDate(reservation.expiresAt)}
-                              </div>
-                            )}
-                          </div>
-                          {userCan(user, Permission.EDIT_STOCK) && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleReleaseReservation(reservation.id)}
-                              disabled={releaseReservation.isPending}
-                            >
-                              {releaseReservation.isPending ? 'Liberando...' : 'Liberar'}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">No hay reservas activas</div>
                 )}
               </CardContent>
             </Card>

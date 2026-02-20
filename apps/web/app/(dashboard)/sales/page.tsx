@@ -105,7 +105,6 @@ export default function SalesPage() {
         <SelectContent>
           <SelectItem value="all">Todos los estados</SelectItem>
           <SelectItem value="DRAFT">Borrador</SelectItem>
-          <SelectItem value="RESERVED">Reservado</SelectItem>
           <SelectItem value="PAID">Pagado</SelectItem>
           <SelectItem value="SHIPPED">Enviado</SelectItem>
           <SelectItem value="DELIVERED">Entregado</SelectItem>

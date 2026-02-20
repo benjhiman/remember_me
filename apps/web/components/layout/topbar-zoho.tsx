@@ -80,11 +80,6 @@ export function TopbarZoho() {
                 New Sale
               </DropdownMenuItem>
             )}
-            {userCan(user, Permission.EDIT_STOCK) && (
-              <DropdownMenuItem onClick={() => router.push('/stock/reservations')}>
-                New Stock Reservation
-              </DropdownMenuItem>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

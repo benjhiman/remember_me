@@ -168,7 +168,6 @@ export class DashboardService {
     });
 
     const stockAvailableCount = stockByStatus.find((s) => s.status === StockStatus.AVAILABLE)?._count.id || 0;
-    const stockReservedCount = stockByStatus.find((s) => s.status === StockStatus.RESERVED)?._count.id || 0;
     const stockSoldCount = stockByStatus.find((s) => s.status === StockStatus.SOLD)?._count.id || 0;
 
     // Top products by volume (count of sales)
@@ -210,7 +209,6 @@ export class DashboardService {
       })),
       revenue: revenue.toString(),
       stockAvailableCount,
-      stockReservedCount,
       stockSoldCount,
       topProductsByVolume,
     };

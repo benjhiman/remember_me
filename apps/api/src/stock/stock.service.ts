@@ -17,14 +17,12 @@ import { CreateStockItemDto } from './dto/create-stock-item.dto';
 import { UpdateStockItemDto } from './dto/update-stock-item.dto';
 import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
-import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateStockEntryDto, StockEntryMode } from './dto/create-stock-entry.dto';
 import { BulkStockAddDto } from './dto/bulk-stock-add.dto';
 import {
   Role,
   StockStatus,
   StockMovementType,
-  ReservationStatus,
 } from '@remember-me/prisma';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
@@ -83,28 +81,11 @@ export class StockService {
     quantityAfter: number,
     createdById: string,
     reason?: string,
-    reservationId?: string,
     saleId?: string,
     metadata?: any,
   ) {
-    // For RESERVE and RELEASE movements, quantity should be the actual reserved/released amount
-    // For other movements, quantity is the difference (quantityAfter - quantityBefore)
-    let movementQuantity: number;
-    if (type === StockMovementType.RESERVE || type === StockMovementType.RELEASE) {
-      // For RESERVE/RELEASE, use the quantity from metadata if available, otherwise use the difference
-      // But if difference is 0, we need to get the actual quantity from the reservation
-      if (metadata?.reservationQuantity !== undefined) {
-        movementQuantity = metadata.reservationQuantity;
-      } else if (metadata?.releaseQuantity !== undefined) {
-        movementQuantity = metadata.releaseQuantity;
-      } else {
-        // Fallback: use difference, but this should not be 0 for RESERVE/RELEASE
-        movementQuantity = quantityAfter - quantityBefore;
-      }
-    } else {
-      // For other movements, quantity is the difference
-      movementQuantity = quantityAfter - quantityBefore;
-    }
+    // For movements, quantity is the difference (quantityAfter - quantityBefore)
+    const movementQuantity = quantityAfter - quantityBefore;
 
     return tx.stockMovement.create({
       data: {
@@ -115,7 +96,6 @@ export class StockService {
         quantityBefore,
         quantityAfter,
         reason,
-        reservationId,
         saleId,
         createdById,
         metadata,
@@ -268,7 +248,6 @@ export class StockService {
         userId,
         'Initial stock entry',
         undefined,
-        undefined,
         dto.metadata,
       );
 
@@ -417,11 +396,6 @@ export class StockService {
         deletedAt: null, // Only delete if not already deleted
       },
       include: {
-        stockReservations: {
-          where: {
-            status: ReservationStatus.ACTIVE,
-          },
-        },
       },
     });
 
@@ -430,9 +404,6 @@ export class StockService {
     }
 
     // Prevent deletion if item has active reservations
-    if (item.stockReservations.length > 0) {
-      throw new BadRequestException('Cannot delete stock item with active reservations');
-    }
 
     // Soft delete: set deletedAt instead of actual delete
     const before = {
@@ -549,7 +520,6 @@ export class StockService {
         userId,
         dto.reason,
         undefined,
-        undefined,
         dto.metadata,
       );
 
@@ -579,607 +549,13 @@ export class StockService {
     });
   }
 
-  async reserveStock(organizationId: string, userId: string, dto: CreateReservationDto) {
-    await this.verifyMembership(organizationId, userId);
-
-    // Validate: must provide either itemId or stockItemId, but not both
-    if (!dto.itemId && !dto.stockItemId) {
-      throw new BadRequestException('Either itemId or stockItemId must be provided');
-    }
-    if (dto.itemId && dto.stockItemId) {
-      throw new BadRequestException('Cannot provide both itemId and stockItemId');
-    }
-
-    // Verify sale belongs to organization if provided
-    if (dto.saleId) {
-      const sale = await this.prisma.sale.findFirst({
-        where: {
-          id: dto.saleId,
-          organizationId,
-        },
-      });
-
-      if (!sale) {
-        throw new NotFoundException('Sale not found');
-      }
-    }
-
-    // Default expiration: 24 hours from now
-    const defaultExpiresAt = new Date();
-    defaultExpiresAt.setHours(defaultExpiresAt.getHours() + 24);
-    const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : defaultExpiresAt;
-
-    // Use transaction for concurrency control
-    return this.prisma.$transaction(async (tx) => {
-      if (dto.itemId) {
-        // Reservation by itemId (product catalog) - quantity-based
-        // Validate item exists
-        const item = await tx.item.findFirst({
-          where: {
-            id: dto.itemId,
-            organizationId,
-            deletedAt: null,
-            isActive: true,
-          },
-        });
-
-        if (!item) {
-          throw new NotFoundException('Item not found or inactive');
-        }
-
-        // Get all stock items for this item
-        const stockItems = await tx.stockItem.findMany({
-          where: {
-            organizationId,
-            itemId: dto.itemId,
-            deletedAt: null,
-            status: StockStatus.AVAILABLE,
-          },
-        });
-
-        // Calculate total available quantity
-        const totalQty = stockItems.reduce((sum, si) => sum + si.quantity, 0);
-
-        // Get active reservations for this item (not expired, not released, not cancelled)
-        const activeReservations = await tx.stockReservation.findMany({
-          where: {
-            organizationId,
-            itemId: dto.itemId,
-            status: {
-              in: [ReservationStatus.ACTIVE, ReservationStatus.CONFIRMED],
-            },
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
-            ],
-          },
-        });
-
-        const reservedQty = activeReservations.reduce((sum, r) => sum + r.quantity, 0);
-        
-        // Calculate physical available quantity (clamp negative stock to 0 for calculation)
-        // This represents actual physical stock available, not accounting for deficit
-        const physicalAvailable = Math.max(0, totalQty) - reservedQty;
-        const physicalAvailableClamped = Math.max(0, physicalAvailable);
-        
-        // Calculate shortage: how much more we need beyond physical available
-        const shortage = Math.max(0, dto.quantity - physicalAvailableClamped);
-        
-        // Calculate availableQty for display (if totalQty < 0, it already represents deficit)
-        const availableQty = totalQty < 0 ? totalQty : totalQty - reservedQty;
-
-        // Get or create stock item for movement tracking
-        let stockItemForMovement = stockItems.length > 0 ? stockItems[0] : null;
-        let finalTotalQty = totalQty;
-
-        // If there's a shortage, we need to create/adjust stock deficit
-        if (shortage > 0) {
-          if (stockItems.length === 0) {
-            // No stock exists: create new stock item with negative quantity
-            const costPrice = new Decimal(0);
-            const basePrice = new Decimal(0);
-
-            stockItemForMovement = await tx.stockItem.create({
-              data: {
-                organizationId,
-                itemId: dto.itemId,
-                model: item.model || item.name || 'N/A',
-                storage: item.storageGb ? String(item.storageGb) : null,
-                color: item.color || null,
-                condition: item.condition || 'NEW',
-                imei: null, // No IMEI for quantity-based stock
-                quantity: -shortage, // Negative quantity = amount to purchase
-                costPrice,
-                basePrice,
-                status: StockStatus.AVAILABLE,
-                location: null,
-                notes: `Stock creado automáticamente por reserva (pendiente de compra)`,
-                metadata: {
-                  autoCreated: true,
-                  reservationQuantity: dto.quantity,
-                  shortage: shortage,
-                },
-              } as any,
-            });
-
-            // Create movement (IN type) with negative quantity for the shortage
-            await this.createMovement(
-              tx,
-              organizationId,
-              stockItemForMovement.id,
-              StockMovementType.IN,
-              0,
-              -shortage, // Negative quantity
-              userId,
-              `Stock creado automáticamente por reserva sin stock disponible (pendiente de compra: ${shortage} unidades)`,
-              undefined, // reservationId will be set after creating reservation
-              undefined,
-              { autoCreated: true, reservationQuantity: dto.quantity, shortage: shortage },
-            );
-
-            finalTotalQty = -shortage;
-          } else {
-            // Stock exists: adjust the first stock item to accumulate deficit
-            const firstStockItem = stockItems[0];
-            const newQuantity = firstStockItem.quantity - shortage; // Subtract shortage (makes more negative or reduces positive)
-
-            stockItemForMovement = await tx.stockItem.update({
-              where: { id: firstStockItem.id },
-              data: { quantity: newQuantity },
-            });
-
-            // Create movement (ADJUST type) to reflect the deficit accumulation
-            await this.createMovement(
-              tx,
-              organizationId,
-              stockItemForMovement.id,
-              StockMovementType.ADJUST,
-              firstStockItem.quantity,
-              newQuantity,
-              userId,
-              `Ajuste automático por reserva sin stock suficiente (déficit acumulado: ${shortage} unidades, pendiente de compra)`,
-              undefined, // reservationId will be set after creating reservation
-              undefined,
-              { autoAdjusted: true, reservationQuantity: dto.quantity, shortage: shortage },
-            );
-
-            finalTotalQty = newQuantity;
-          }
-        }
-
-        // Create reservation (always allow, even if stock is negative)
-        const reservation = await tx.stockReservation.create({
-          data: {
-            organizationId,
-            itemId: dto.itemId,
-            quantity: dto.quantity,
-            status: ReservationStatus.ACTIVE,
-            expiresAt,
-            saleId: dto.saleId,
-            createdById: userId,
-            customerName: dto.customerName,
-            notes: dto.notes,
-          },
-        });
-
-        // Create movement record for the reservation (ALWAYS with real quantity)
-        // This movement tracks the reservation itself, separate from the deficit adjustment
-        if (stockItemForMovement) {
-          await this.createMovement(
-            tx,
-            organizationId,
-            stockItemForMovement.id,
-            StockMovementType.RESERVE,
-            finalTotalQty,
-            finalTotalQty, // quantity doesn't change on reserve
-            userId,
-            `Stock reserved for item ${item.name}`,
-            reservation.id,
-            dto.saleId,
-            { reservationQuantity: dto.quantity }, // Pass actual quantity in metadata
-          );
-        }
-
-        // If we created/adjusted stock for shortage, link the reservation to the IN/ADJUST movement
-        if (shortage > 0 && stockItemForMovement) {
-          // Find the most recent IN or ADJUST movement for this stock item (the one we just created)
-          const recentDeficitMovement = await tx.stockMovement.findFirst({
-            where: {
-              organizationId,
-              stockItemId: stockItemForMovement.id,
-              type: stockItems.length === 0 ? StockMovementType.IN : StockMovementType.ADJUST,
-              reservationId: null, // Only update if not already linked
-            },
-            orderBy: { createdAt: 'desc' },
-          });
-
-          if (recentDeficitMovement) {
-            // Update the deficit movement to include the reservation ID
-            await tx.stockMovement.update({
-              where: { id: recentDeficitMovement.id },
-              data: {
-                reservationId: reservation.id,
-              },
-            });
-          }
-        }
-
-        return reservation;
-      } else {
-        // Legacy: Reservation by stockItemId (specific stock item)
-        const stockItem = await tx.stockItem.findFirst({
-          where: {
-            id: dto.stockItemId,
-            organizationId,
-          },
-        });
-
-        if (!stockItem) {
-          throw new NotFoundException('Stock item not found');
-        }
-
-        if (stockItem.deletedAt) {
-          throw new BadRequestException('Cannot reserve a deleted stock item');
-        }
-
-        if (stockItem.status !== StockStatus.AVAILABLE) {
-          throw new BadRequestException(`Stock item is not available. Status: ${stockItem.status}`);
-        }
-
-        // Get active reservations for this stock item
-        const activeReservations = await tx.stockReservation.aggregate({
-          where: {
-            stockItemId: dto.stockItemId,
-            status: ReservationStatus.ACTIVE,
-            organizationId,
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
-            ],
-          },
-          _sum: {
-            quantity: true,
-          },
-        });
-
-        const reservedQuantity = activeReservations._sum.quantity || 0;
-        const availableQuantity = stockItem.quantity - reservedQuantity;
-
-        if (availableQuantity < dto.quantity) {
-          throw new ConflictException(
-            `Not enough stock available. Available: ${availableQuantity}, Requested: ${dto.quantity}`,
-          );
-        }
-
-        // Create reservation
-        const reservation = await tx.stockReservation.create({
-          data: {
-            organizationId,
-            stockItemId: dto.stockItemId,
-            quantity: dto.quantity,
-            status: ReservationStatus.ACTIVE,
-            expiresAt,
-            saleId: dto.saleId,
-            createdById: userId,
-            customerName: dto.customerName,
-            notes: dto.notes,
-          },
-        });
-
-        // Create movement (RESERVE type, quantity doesn't change)
-        if (dto.stockItemId) {
-          await this.createMovement(
-            tx,
-            organizationId,
-            dto.stockItemId,
-            StockMovementType.RESERVE,
-            stockItem.quantity,
-            stockItem.quantity,
-            userId,
-            'Stock reserved',
-            reservation.id,
-            dto.saleId,
-            { reservationQuantity: dto.quantity }, // Pass actual quantity in metadata
-          );
-        }
-
-        return reservation;
-      }
-    });
-  }
-
-  async releaseReservation(organizationId: string, userId: string, reservationId: string) {
-    await this.verifyMembership(organizationId, userId);
-
-    return this.prisma.$transaction(async (tx) => {
-      const reservation = await tx.stockReservation.findFirst({
-        where: {
-          id: reservationId,
-          organizationId,
-        },
-        include: {
-          stockItem: true,
-        },
-      });
-
-      if (!reservation) {
-        throw new NotFoundException('Reservation not found');
-      }
-
-      if (reservation.status !== ReservationStatus.ACTIVE) {
-        throw new BadRequestException(
-          `Cannot release reservation. Status is ${reservation.status}`,
-        );
-      }
-
-      // Update reservation status to RELEASED
-      const updatedReservation = await tx.stockReservation.update({
-        where: { id: reservationId },
-        data: {
-          status: ReservationStatus.RELEASED,
-          releasedAt: new Date(),
-        },
-      });
-
-      // Find stock item(s) for this itemId to adjust deficit if needed
-      let stockItemForMovement = null;
-      if (reservation.itemId) {
-        const stockItems = await tx.stockItem.findMany({
-          where: {
-            organizationId: reservation.organizationId,
-            itemId: reservation.itemId,
-            deletedAt: null,
-          },
-          orderBy: { createdAt: 'desc' }, // Use most recent stock item
-        });
-
-        if (stockItems.length > 0) {
-          stockItemForMovement = stockItems[0];
-          
-          // If stock is negative (deficit), revert it by adding the released quantity
-          // But don't go above 0 (we can't have positive stock from releasing a reservation)
-          if (stockItemForMovement.quantity < 0) {
-            const releaseQty = reservation.quantity;
-            const newQuantity = Math.min(0, stockItemForMovement.quantity + releaseQty);
-            
-            // Only adjust if the quantity actually changes
-            if (newQuantity !== stockItemForMovement.quantity) {
-              stockItemForMovement = await tx.stockItem.update({
-                where: { id: stockItemForMovement.id },
-                data: { quantity: newQuantity },
-              });
-
-              // Create movement (ADJUST type) to reflect the deficit reversion
-              await this.createMovement(
-                tx,
-                organizationId,
-                stockItemForMovement.id,
-                StockMovementType.ADJUST,
-                stockItems[0].quantity, // Original quantity before update
-                newQuantity,
-                userId,
-                `Ajuste automático por liberación de reserva (déficit revertido: ${releaseQty} unidades)`,
-                undefined,
-                undefined,
-                { autoAdjusted: true, releaseQuantity: releaseQty },
-              );
-            }
-          }
-        } else if (reservation.stockItemId && reservation.stockItem) {
-            // Legacy: use stockItemId if available
-            stockItemForMovement = reservation.stockItem;
-          }
-      } else if (reservation.stockItemId && reservation.stockItem) {
-        // Legacy: use stockItemId if available
-        stockItemForMovement = reservation.stockItem;
-      }
-
-      // Create movement (RELEASE type) with REAL quantity (reservation.quantity)
-      // This movement tracks the release itself
-      if (stockItemForMovement) {
-        const currentQty = stockItemForMovement.quantity;
-        await this.createMovement(
-          tx,
-          organizationId,
-          stockItemForMovement.id,
-          StockMovementType.RELEASE,
-          currentQty,
-          currentQty, // quantity doesn't change on release (physical stock unchanged)
-          userId,
-          `Reservation released: ${reservation.quantity} units`,
-          reservationId,
-          reservation.saleId || undefined,
-          { releaseQuantity: reservation.quantity }, // Pass actual quantity in metadata
-        );
-      }
-
-      // Audit log
-      const metadata = this.getRequestMetadata();
-      await this.auditLogService.log({
-        organizationId,
-        actorUserId: userId,
-        requestId: metadata.requestId,
-        action: AuditAction.RELEASE,
-        entityType: AuditEntityType.StockReservation,
-        entityId: reservationId,
-        before: {
-          id: reservation.id,
-          status: reservation.status,
-          quantity: reservation.quantity.toString(),
-        },
-        after: {
-          id: updatedReservation.id,
-          status: updatedReservation.status,
-        },
-        metadata: {
-          ...metadata,
-          stockItemId: reservation.stockItemId,
-          saleId: reservation.saleId || null,
-        },
-      });
-
-      return updatedReservation;
-    });
-  }
-
-  async confirmReservation(organizationId: string, userId: string, reservationId: string) {
-    await this.verifyMembership(organizationId, userId);
-
-    return this.prisma.$transaction(async (tx) => {
-      const reservation = await tx.stockReservation.findFirst({
-        where: {
-          id: reservationId,
-          organizationId,
-        },
-        include: {
-          stockItem: true,
-        },
-      });
-
-      if (!reservation) {
-        throw new NotFoundException('Reservation not found');
-      }
-
-      if (reservation.status !== ReservationStatus.ACTIVE) {
-        throw new BadRequestException(
-          `Cannot confirm reservation. Status is ${reservation.status}`,
-        );
-      }
-
-      // Handle item-based reservations differently from stockItem-based
-      if (reservation.itemId && !reservation.stockItemId) {
-        // Item-based reservation: reduce quantity from any available stock items
-        // This is a simplified approach - in production you might want more sophisticated allocation
-        const stockItems = await tx.stockItem.findMany({
-          where: {
-            organizationId: reservation.organizationId,
-            itemId: reservation.itemId,
-            deletedAt: null,
-            status: StockStatus.AVAILABLE,
-          },
-          orderBy: { createdAt: 'asc' },
-        });
-
-        let remainingQty = reservation.quantity;
-        const updates: Array<{ id: string; qtyBefore: number; qtyAfter: number }> = [];
-
-        for (const stockItem of stockItems) {
-          if (remainingQty <= 0) break;
-
-          const qtyToDeduct = Math.min(remainingQty, stockItem.quantity);
-          const qtyAfter = stockItem.quantity - qtyToDeduct;
-
-          await tx.stockItem.update({
-            where: { id: stockItem.id },
-            data: {
-              quantity: qtyAfter,
-              ...(stockItem.imei && qtyAfter === 0 ? { status: StockStatus.SOLD } : {}),
-            },
-          });
-
-          updates.push({ id: stockItem.id, qtyBefore: stockItem.quantity, qtyAfter });
-          remainingQty -= qtyToDeduct;
-
-          // Create movement for each stock item
-          await this.createMovement(
-            tx,
-            organizationId,
-            stockItem.id,
-            StockMovementType.SOLD,
-            stockItem.quantity,
-            qtyAfter,
-            userId,
-            'Reservation confirmed - stock sold',
-            reservationId,
-            reservation.saleId || undefined,
-          );
-        }
-
-        if (remainingQty > 0) {
-          throw new BadRequestException(
-            `Not enough stock available. Could only allocate ${reservation.quantity - remainingQty} of ${reservation.quantity} requested.`,
-          );
-        }
-      } else if (reservation.stockItemId && reservation.stockItem) {
-        // Legacy: stockItem-based reservation
-        const quantityBefore = reservation.stockItem.quantity;
-        const quantityAfter = quantityBefore - reservation.quantity;
-
-        // Never allow negative stock
-        if (quantityAfter < 0) {
-          throw new BadRequestException(
-            `Cannot confirm reservation. Current quantity: ${quantityBefore}, reservation: ${reservation.quantity}. Result would be negative.`,
-          );
-        }
-
-        // Update item quantity and status if IMEI (quantity = 1)
-        const updateData: any = {
-          quantity: quantityAfter,
-        };
-
-        if (reservation.stockItem.imei && quantityAfter === 0) {
-          updateData.status = StockStatus.SOLD;
-        }
-
-        await tx.stockItem.update({
-          where: { id: reservation.stockItemId },
-          data: updateData,
-        });
-
-        // Create movement (SOLD type)
-        await this.createMovement(
-          tx,
-          organizationId,
-          reservation.stockItemId,
-          StockMovementType.SOLD,
-          quantityBefore,
-          quantityAfter,
-          userId,
-          'Reservation confirmed - stock sold',
-          reservationId,
-          reservation.saleId || undefined,
-        );
-      } else {
-        throw new BadRequestException('Reservation must have either itemId or stockItemId');
-      }
-
-      const before = {
-        id: reservation.id,
-        status: reservation.status,
-        quantity: reservation.quantity.toString(),
-      };
-
-      // Update reservation status
-      const updatedReservation = await tx.stockReservation.update({
-        where: { id: reservationId },
-        data: { status: ReservationStatus.CONFIRMED },
-      });
-
-      // Audit log
-      const metadata = this.getRequestMetadata();
-      await this.auditLogService.log({
-        organizationId,
-        actorUserId: userId,
-        requestId: metadata.requestId,
-        action: AuditAction.CONFIRM,
-        entityType: AuditEntityType.StockReservation,
-        entityId: reservationId,
-        before,
-        after: {
-          id: updatedReservation.id,
-          status: updatedReservation.status,
-        },
-        metadata: {
-          ...metadata,
-          itemId: reservation.itemId || null,
-          stockItemId: reservation.stockItemId || null,
-          saleId: reservation.saleId || null,
-        },
-      });
-
-      return updatedReservation;
-    });
-  }
+  // Reservation methods removed - feature eliminated
+  // async reserveStock removed
+  // async releaseReservation removed
+  // async confirmReservation removed
+  // async listReservations removed
+  // async extendReservation removed
+  // async getReservation removed
 
   async listMovements(
     organizationId: string,
@@ -1241,183 +617,6 @@ export class StockService {
         totalPages: Math.ceil(total / limit),
       },
     };
-  }
-
-  async listReservations(
-    organizationId: string,
-    userId: string,
-    dto: any,
-  ) {
-    await this.verifyMembership(organizationId, userId);
-
-    const page = dto.page || 1;
-    const limit = dto.limit || 50;
-    const skip = (page - 1) * limit;
-
-    const where: any = {
-      organizationId,
-    };
-
-    if (dto.itemId) {
-      where.itemId = dto.itemId;
-    }
-
-    if (dto.status) {
-      if (dto.status === 'ALL') {
-        // Don't filter by status
-      } else {
-        where.status = dto.status;
-      }
-    }
-
-    if (dto.q) {
-      where.OR = [
-        { customerName: { contains: dto.q, mode: 'insensitive' } },
-        { notes: { contains: dto.q, mode: 'insensitive' } },
-        {
-          item: {
-            OR: [
-              { name: { contains: dto.q, mode: 'insensitive' } },
-              { sku: { contains: dto.q, mode: 'insensitive' } },
-              { model: { contains: dto.q, mode: 'insensitive' } },
-            ],
-          },
-        },
-        {
-          stockItem: {
-            OR: [
-              { model: { contains: dto.q, mode: 'insensitive' } },
-              { sku: { contains: dto.q, mode: 'insensitive' } },
-            ],
-          },
-        },
-      ];
-    }
-
-    if (dto.from || dto.to) {
-      where.createdAt = {};
-      if (dto.from) {
-        where.createdAt.gte = new Date(dto.from);
-      }
-      if (dto.to) {
-        where.createdAt.lte = new Date(dto.to);
-      }
-    }
-
-    const [reservations, total] = await Promise.all([
-      this.prisma.stockReservation.findMany({
-        where,
-        include: {
-          item: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-              brand: true,
-              model: true,
-              storageGb: true,
-              color: true,
-              condition: true,
-            },
-          },
-          stockItem: {
-            select: {
-              id: true,
-              model: true,
-              sku: true,
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.stockReservation.count({ where }),
-    ]);
-
-    return {
-      data: reservations,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async extendReservation(
-    organizationId: string,
-    userId: string,
-    reservationId: string,
-    hours: number = 24,
-  ) {
-    await this.verifyMembership(organizationId, userId);
-
-    return this.prisma.$transaction(async (tx) => {
-      const reservation = await tx.stockReservation.findFirst({
-        where: {
-          id: reservationId,
-          organizationId,
-        },
-      });
-
-      if (!reservation) {
-        throw new NotFoundException('Reservation not found');
-      }
-
-      if (reservation.status !== ReservationStatus.ACTIVE) {
-        throw new BadRequestException(
-          `Cannot extend reservation. Status is ${reservation.status}`,
-        );
-      }
-
-      // Extend expiration date
-      const currentExpiresAt = reservation.expiresAt || new Date();
-      const newExpiresAt = new Date(currentExpiresAt);
-      newExpiresAt.setHours(newExpiresAt.getHours() + hours);
-
-      const updatedReservation = await tx.stockReservation.update({
-        where: { id: reservationId },
-        data: { expiresAt: newExpiresAt },
-      });
-
-      return updatedReservation;
-    });
-  }
-
-  async getReservation(organizationId: string, userId: string, reservationId: string) {
-    await this.verifyMembership(organizationId, userId);
-
-    const reservation = await this.prisma.stockReservation.findFirst({
-      where: {
-        id: reservationId,
-        organizationId,
-      },
-      include: {
-        stockItem: true,
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    if (!reservation) {
-      throw new NotFoundException('Reservation not found');
-    }
-
-    return reservation;
   }
 
   async createStockEntry(organizationId: string, userId: string, dto: CreateStockEntryDto) {
@@ -1525,7 +724,6 @@ export class StockService {
             userId,
             'Stock entry created',
             undefined,
-            undefined,
             dto.metadata,
           );
 
@@ -1606,7 +804,6 @@ export class StockService {
           dto.quantity!, // Use the exact quantity, not stockItem.quantity (should be same but explicit)
           userId,
           'Stock entry created',
-          undefined,
           undefined,
           dto.metadata,
         );
@@ -1766,7 +963,6 @@ export class StockService {
               userId,
               dto.note || 'Bulk stock add',
               undefined,
-              undefined,
               {
                 bulkAdd: true,
                 source: dto.source || 'manual',
@@ -1811,7 +1007,6 @@ export class StockService {
               totalQuantity,
               userId,
               dto.note || 'Bulk stock add',
-              undefined,
               undefined,
               {
                 bulkAdd: true,
@@ -1962,30 +1157,9 @@ export class StockService {
 
         // Calculate total quantity: sum of all stockItems.quantity
         const totalQty = stockItems.reduce((sum, si) => sum + si.quantity, 0);
-
-        // Get active reservations for this item (not expired, not released, not cancelled)
-        const activeReservations = await this.prisma.stockReservation.findMany({
-          where: {
-            organizationId,
-            itemId: item.id,
-            status: {
-              in: ['ACTIVE', 'CONFIRMED'],
-            },
-            OR: [
-              { expiresAt: null },
-              { expiresAt: { gt: new Date() } },
-            ],
-          },
-        });
-
-        const reservedQty = activeReservations.reduce((sum, r) => sum + r.quantity, 0);
-        // Calculate available quantity
-        // IMPORTANT: If totalQty is negative (auto-created stock for deficit), it already represents the deficit
-        // In this case, we should NOT subtract reservedQty again because it would double-count
-        // Rule: 
-        // - If totalQty >= 0: availableQty = totalQty - reservedQty (normal case)
-        // - If totalQty < 0: availableQty = totalQty (negative stock already accounts for the deficit)
-        const availableQty = totalQty < 0 ? totalQty : totalQty - reservedQty;
+        
+        // Available quantity is the same as total quantity (no reservations)
+        const availableQty = totalQty;
 
         // Get last IN movement date
         const lastInMovement = await this.prisma.stockMovement.findFirst({
@@ -2009,7 +1183,6 @@ export class StockService {
           color: item.color,
           condition: item.condition,
           availableQty,
-          reservedQty,
           totalQty,
           lastInAt: lastInMovement?.createdAt || null,
         };
@@ -2019,7 +1192,7 @@ export class StockService {
     // Filter out zero-stock items if not including zeros
     let filteredRows = itemsWithStock;
     if (!includeZero) {
-      filteredRows = itemsWithStock.filter((row) => row.totalQty > 0 || row.reservedQty > 0);
+      filteredRows = itemsWithStock.filter((row) => row.totalQty > 0);
     }
 
     // Now apply pagination
@@ -2036,6 +1209,200 @@ export class StockService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async getSellerStockView(organizationId: string, userId: string, dto: { search?: string }) {
+    await this.verifyMembership(organizationId, userId);
+
+    // Get all stock items with quantity > 0
+    const where: any = {
+      organizationId,
+      deletedAt: null,
+      quantity: { gt: 0 },
+    };
+
+    if (dto.search) {
+      where.OR = [
+        { model: { contains: dto.search, mode: 'insensitive' } },
+        { storage: { contains: dto.search, mode: 'insensitive' } },
+        { color: { contains: dto.search, mode: 'insensitive' } },
+        { sku: { contains: dto.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const stockItems = await this.prisma.stockItem.findMany({
+      where,
+      include: {
+        item: {
+          select: {
+            name: true,
+            model: true,
+            storageGb: true,
+            color: true,
+            condition: true,
+          },
+        },
+      },
+      orderBy: { model: 'asc' },
+    });
+
+    // Helper function to parse and format display text
+    const parseItem = (item: any) => {
+      const model = item.model || item.item?.model || item.item?.name || '';
+      const storage = item.storage || item.item?.storageGb ? `${item.item.storageGb}GB` : '';
+      const color = item.color || item.item?.color || '';
+      const condition = item.condition || item.item?.condition || 'USED';
+      const quantity = item.quantity;
+
+      // Detect category
+      const modelUpper = model.toUpperCase();
+      let category = 'OTROS';
+      let subCategory = '';
+
+      if (modelUpper.includes('IPHONE')) {
+        category = 'IPHONE';
+        // Detect condition flags from model name or condition field
+        const modelNameUpper = (item.model || '').toUpperCase();
+        const conditionUpper = condition.toUpperCase();
+        
+        if (modelNameUpper.includes('OEM') || conditionUpper === 'OEM') {
+          subCategory = 'OEM';
+        } else if (modelNameUpper.includes('SIN CAJA') || modelNameUpper.includes('NO BOX') || modelNameUpper.includes('OPEN BOX')) {
+          subCategory = 'SIN CAJA';
+        } else if (modelNameUpper.includes('ACTIVADO')) {
+          subCategory = 'ACTIVADO';
+        } else if (modelNameUpper.includes('SELLADO') || modelNameUpper.includes('SEALED') || conditionUpper === 'NEW') {
+          subCategory = 'NUEVOS';
+        } else {
+          subCategory = 'USADOS';
+        }
+      } else if (modelUpper.includes('IPAD')) {
+        category = 'IPAD';
+      } else if (modelUpper.includes('WATCH') || modelUpper.includes('APPLE WATCH')) {
+        category = 'APPLE WATCH';
+      } else if (modelUpper.includes('MACBOOK') || modelUpper.includes('MAC')) {
+        category = 'MACBOOK';
+      } else if (modelUpper.includes('AIRPOD')) {
+        category = 'AIRPODS';
+      } else if (modelUpper.includes('PLAYSTATION') || modelUpper.includes('PS5') || modelUpper.includes('PS4')) {
+        category = 'PLAYSTATION';
+      } else if (modelUpper.includes('JOYSTICK') || modelUpper.includes('CONTROL')) {
+        category = 'JOYSTICKS';
+      } else if (modelUpper.includes('NINTENDO') || modelUpper.includes('SWITCH')) {
+        category = 'NINTENDO';
+      } else if (modelUpper.includes('CABLE') || modelUpper.includes('CARGADOR') || modelUpper.includes('CASE') || modelUpper.includes('VAPE')) {
+        category = 'ACCESORIOS';
+      }
+
+      // Extract model number (e.g., "12", "12 PRO", "12 PRO MAX", "13", "14", etc.)
+      const modelMatch = modelUpper.match(/IPHONE\s+(\d+)(?:\s+(PRO|MAX|PLUS|MINI))?(?:\s+(PRO\s+MAX|MAX))?/i);
+      let modelBase = '';
+      let modelSuffix = '';
+      if (modelMatch) {
+        modelBase = `IPHONE ${modelMatch[1]}`;
+        if (modelMatch[2]) {
+          modelSuffix = modelMatch[2];
+          if (modelMatch[3]) {
+            modelSuffix = modelMatch[3].replace(/\s+/g, ' ');
+          }
+        }
+      } else {
+        modelBase = modelUpper;
+      }
+
+      // Format display text
+      let displayText = '';
+      if (subCategory && subCategory !== 'USADOS') {
+        displayText = `${subCategory} ${modelBase}`.trim();
+      } else {
+        displayText = modelBase;
+      }
+      if (modelSuffix) {
+        displayText += ` ${modelSuffix}`;
+      }
+      if (storage) {
+        displayText += ` ${storage}`;
+      }
+      if (color) {
+        displayText += ` ${color.toUpperCase()}`;
+      }
+
+      // Sort key: category, subCategory, modelBase, storage (numeric), color
+      const storageNum = storage ? parseInt(storage.replace(/GB|TB/gi, '')) || 0 : 0;
+      const sortKey = `${category}_${subCategory}_${modelBase}_${String(storageNum).padStart(6, '0')}_${color.toUpperCase()}`;
+
+      return {
+        label: displayText,
+        qty: quantity,
+        category,
+        subCategory,
+        sortKey,
+      };
+    };
+
+    // Parse all items
+    const parsedItems = stockItems.map(parseItem);
+
+    // Group by section
+    const sections: Record<string, Array<{ label: string; qty: number; sortKey: string }>> = {};
+
+    parsedItems.forEach((item) => {
+      const sectionKey = item.subCategory ? `${item.category} ${item.subCategory}` : item.category;
+      if (!sections[sectionKey]) {
+        sections[sectionKey] = [];
+      }
+      sections[sectionKey].push({
+        label: item.label,
+        qty: item.qty,
+        sortKey: item.sortKey,
+      });
+    });
+
+    // Aggregate quantities for same label
+    Object.keys(sections).forEach((sectionKey) => {
+      const grouped: Record<string, { label: string; qty: number; sortKey: string }> = {};
+      sections[sectionKey].forEach((item) => {
+        if (!grouped[item.label]) {
+          grouped[item.label] = { ...item, qty: 0 };
+        }
+        grouped[item.label].qty += item.qty;
+      });
+      sections[sectionKey] = Object.values(grouped);
+    });
+
+    // Sort within each section
+    Object.keys(sections).forEach((sectionKey) => {
+      sections[sectionKey].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    });
+
+    // Define section order
+    const sectionOrder = [
+      'IPHONE USADOS',
+      'IPHONE OEM',
+      'IPHONE SIN CAJA',
+      'IPHONE ACTIVADO',
+      'IPHONE ACTIVADOS',
+      'IPHONE NUEVOS',
+      'IPAD',
+      'APPLE WATCH',
+      'MACBOOK',
+      'AIRPODS',
+      'PLAYSTATION',
+      'JOYSTICKS',
+      'NINTENDO',
+      'ACCESORIOS',
+      'OTROS',
+    ];
+
+    // Build final response
+    const result = sectionOrder
+      .filter((sectionName) => sections[sectionName] && sections[sectionName].length > 0)
+      .map((sectionName) => ({
+        section: sectionName,
+        rows: sections[sectionName],
+      }));
+
+    return result;
   }
 
   async getStockMovements(organizationId: string, userId: string, dto: any) {
@@ -2093,24 +1460,6 @@ export class StockService {
               },
             },
           },
-          reservation: {
-            select: {
-              id: true,
-              itemId: true,
-              item: {
-                select: {
-                  id: true,
-                  name: true,
-                  sku: true,
-                  brand: true,
-                  model: true,
-                  storageGb: true,
-                  color: true,
-                  condition: true,
-                },
-              },
-            },
-          },
           createdBy: {
             select: {
               id: true,
@@ -2131,12 +1480,12 @@ export class StockService {
         id: m.id,
         type: m.type,
         qty: m.quantity,
-        itemId: m.stockItem?.itemId || m.reservation?.itemId || null,
+        itemId: m.stockItem?.itemId || null,
         stockItemId: m.stockItemId,
-        item: m.stockItem?.item || m.reservation?.item || null,
+        item: m.stockItem?.item || null,
         stockItem: m.stockItem || null,
         createdAt: m.createdAt,
-        ref: m.reservationId || m.saleId || null,
+        ref: m.saleId || null,
         reason: m.reason,
         createdBy: m.createdBy,
       })),
@@ -2159,22 +1508,6 @@ export class StockService {
       },
       include: {
         stockItem: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-                brand: true,
-                model: true,
-                storageGb: true,
-                color: true,
-                condition: true,
-              },
-            },
-          },
-        },
-        reservation: {
           include: {
             item: {
               select: {

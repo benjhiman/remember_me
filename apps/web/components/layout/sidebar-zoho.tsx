@@ -107,10 +107,8 @@ function normalizePathname(pathname: string | null): string | null {
   // Map legacy routes to canonical routes for active state matching
   const legacyMap: Record<string, string> = {
     '/stock': '/inventory/stock',
-    '/stock/reservations': '/inventory/reservas',
     '/items': '/inventory/items',
     '/items/price-lists': '/inventory/pricelist',
-    '/inventory/reservations': '/inventory/reservas',
     '/inventory/price-lists': '/inventory/pricelist',
     '/sales/purchases': '/purchases',
     '/sales/clients': '/sales/customers', // Map /sales/clients to /sales/customers for active state

@@ -20,7 +20,7 @@ import { StockModule } from './stock/stock.module';
     MetricsModule, // Needed by RateLimitModule
     RateLimitModule, // Needed by IntegrationsModule
     IntegrationsModule, // Includes JobRunnerService and all processors
-    StockModule, // Includes ReservationsExpirerService
+    StockModule,
   ],
   providers: [LoggerService],
 })

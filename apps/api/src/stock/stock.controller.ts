@@ -23,13 +23,11 @@ import { CreateStockItemDto } from './dto/create-stock-item.dto';
 import { UpdateStockItemDto } from './dto/update-stock-item.dto';
 import { ListStockItemsDto } from './dto/list-stock-items.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
-import { CreateReservationDto } from './dto/create-reservation.dto';
 import { CreateStockEntryDto } from './dto/create-stock-entry.dto';
 import { BulkStockAddDto } from './dto/bulk-stock-add.dto';
 import { StockSummaryDto } from './dto/stock-summary.dto';
 import { StockMovementsDto } from './dto/stock-movements.dto';
-import { ListReservationsDto } from './dto/list-reservations.dto';
-import { ExtendReservationDto } from './dto/extend-reservation.dto';
+import { SellerStockViewDto } from './dto/seller-stock-view.dto';
 import { Idempotent } from '../common/idempotency/idempotent.decorator';
 import { Role } from '@remember-me/prisma';
 
@@ -53,6 +51,15 @@ export class StockController {
     return this.stockService.getStockSummary(organizationId, user.userId, query);
   }
 
+  @Get('seller-view')
+  async getSellerStockView(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Query() query: SellerStockViewDto,
+  ) {
+    return this.stockService.getSellerStockView(organizationId, user.userId, query);
+  }
+
   @Get('movements')
   async getStockMovements(
     @CurrentOrganization() organizationId: string,
@@ -69,62 +76,6 @@ export class StockController {
     @Param('id') id: string,
   ) {
     return this.stockService.getStockMovementDetail(organizationId, user.userId, id);
-  }
-
-  // Reservations (MUST come before @Get(':id') to avoid route conflicts)
-  @Get('reservations')
-  async listReservations(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Query() query: ListReservationsDto,
-  ) {
-    return this.stockService.listReservations(organizationId, user.userId, query);
-  }
-
-  @Post('reservations')
-  async createReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Body() dto: CreateReservationDto,
-  ) {
-    return this.stockService.reserveStock(organizationId, user.userId, dto);
-  }
-
-  @Get('reservations/:id')
-  async getReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
-    return this.stockService.getReservation(organizationId, user.userId, id);
-  }
-
-  @Post('reservations/:id/release')
-  async releaseReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
-    return this.stockService.releaseReservation(organizationId, user.userId, id);
-  }
-
-  @Post('reservations/:id/extend')
-  async extendReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-    @Body() dto: ExtendReservationDto,
-  ) {
-    return this.stockService.extendReservation(organizationId, user.userId, id, dto.hours || 24);
-  }
-
-  @Post('reservations/:id/confirm')
-  async confirmReservation(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id') id: string,
-  ) {
-    return this.stockService.confirmReservation(organizationId, user.userId, id);
   }
 
   // Stock entries
