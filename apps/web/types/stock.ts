@@ -66,3 +66,34 @@ export interface MovementListResponse {
     totalPages: number;
   };
 }
+
+export interface StockReservation {
+  id: string;
+  organizationId: string;
+  stockItemId?: string;
+  itemId?: string;
+  quantity: number;
+  status: 'ACTIVE' | 'CONFIRMED' | 'EXPIRED' | 'CANCELLED' | 'RELEASED';
+  expiresAt?: string;
+  customerName?: string;
+  notes?: string;
+  saleId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  item?: StockItem;
+  stockItem?: StockItem;
+}
+
+export interface ReservationListResponse {
+  data: StockReservation[];
+  total: number;
+  page: number;
+  pageSize: number;
+  meta?: {
+    totalItems: number;
+    itemCount: number;
+    itemsPerPage: number;
+    totalPages: number;
+    currentPage: number;
+  };
+}
