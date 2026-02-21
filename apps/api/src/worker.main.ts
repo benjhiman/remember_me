@@ -45,16 +45,31 @@ async function bootstrap() {
 
   // CRITICAL: Guardrail - prevent ANY localhost Redis connections
   // Even if old code tries to use localhost, we disable it at process level
-  const originalRedisUrl = process.env.REDIS_URL;
-  if (originalRedisUrl && process.env.NODE_ENV === 'production') {
-    const lower = originalRedisUrl.toLowerCase();
-    if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
-      logger.error(`[redis][worker] GUARDRAIL: REDIS_URL contains localhost/127.0.0.1 - DISABLING`);
-      process.env.REDIS_URL = ''; // Clear it to prevent any connection attempts
-      process.env.RATE_LIMIT_REDIS_URL = '';
-      process.env.BULL_REDIS_URL = '';
-      process.env.QUEUE_REDIS_URL = '';
-      process.env.JOB_REDIS_URL = '';
+  // Check ALL possible Redis URL environment variables
+  const redisEnvVars = [
+    'REDIS_URL',
+    'RATE_LIMIT_REDIS_URL',
+    'BULL_REDIS_URL',
+    'QUEUE_REDIS_URL',
+    'JOB_REDIS_URL',
+  ];
+
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  if (nodeEnv === 'production') {
+    for (const envVar of redisEnvVars) {
+      const value = process.env[envVar];
+      if (value) {
+        const lower = value.toLowerCase();
+        if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
+          logger.error(`[redis][worker] GUARDRAIL: ${envVar} contains localhost/127.0.0.1 - CLEARING ALL Redis env vars`);
+          // Clear ALL Redis env vars to prevent any connection attempts
+          for (const varToClear of redisEnvVars) {
+            delete process.env[varToClear];
+            process.env[varToClear] = ''; // Set to empty string as well
+          }
+          break; // Exit loop after clearing all
+        }
+      }
     }
   }
 

@@ -184,18 +184,52 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       return; // Don't start worker if Redis is not configured
     }
 
+    // CRITICAL: Double-check that redisUrl does NOT contain localhost (defense in depth)
+    const lower = redisUrl.toLowerCase();
+    const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+    if (nodeEnv === 'production' && (lower.includes('127.0.0.1') || lower.includes('localhost'))) {
+      this.logger.error('[redis][worker] FATAL: REDIS_URL contains localhost/127.0.0.1 in production. Worker will NOT start.');
+      return; // Hard stop - do not create worker
+    }
+
     // Log Redis host for diagnostics
     const redisHost = getRedisHost(redisUrl);
     if (redisHost) {
       this.logger.log(`[redis][worker] Connected to Redis: ${redisHost}`);
+    } else {
+      this.logger.error('[redis][worker] FATAL: Could not parse Redis host from URL. Worker will NOT start.');
+      return; // Hard stop - do not create worker
     }
 
     const queueName = configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
 
     // BullMQ Worker connection options
-    // Use redisUrl as string - BullMQ will parse it correctly
+    // CRITICAL: Parse connection as object to ensure BullMQ uses exact URL (no defaults)
+    let connectionConfig: any;
+    try {
+      const url = new URL(redisUrl);
+      connectionConfig = {
+        host: url.hostname,
+        port: parseInt(url.port || '6379', 10),
+        password: url.password || undefined,
+        // Explicitly set to prevent BullMQ from using defaults
+        enableReadyCheck: true,
+        maxRetriesPerRequest: 1,
+        retryStrategy: () => null, // Disable retries - fail fast
+      };
+    } catch (e) {
+      this.logger.error(`[redis][worker] FATAL: Invalid Redis URL format. Worker will NOT start. Error: ${e instanceof Error ? e.message : 'Unknown'}`);
+      return; // Hard stop - do not create worker
+    }
+
+    // CRITICAL: Final validation - ensure host is NOT localhost
+    if (nodeEnv === 'production' && (connectionConfig.host === '127.0.0.1' || connectionConfig.host === 'localhost')) {
+      this.logger.error(`[redis][worker] FATAL: Parsed Redis host is localhost (${connectionConfig.host}). Worker will NOT start.`);
+      return; // Hard stop - do not create worker
+    }
+
     const workerOptions = {
-      connection: redisUrl as any, // BullMQ accepts string URLs
+      connection: connectionConfig, // Use parsed object, not string (prevents BullMQ defaults)
       concurrency: this.workerConcurrency,
       limiter: {
         max: 100, // Max 100 jobs per duration
@@ -224,8 +258,19 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
 
       this.bullWorker.on('error', (err: Error) => {
         const errorMsg = err.message || String(err);
-        // Log connection errors only once to avoid spam
-        if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('127.0.0.1')) {
+        // CRITICAL: If we detect localhost connection attempt, destroy worker immediately
+        if (errorMsg.includes('ECONNREFUSED') && errorMsg.includes('127.0.0.1')) {
+          this.logger.error(`[redis][worker] FATAL: Worker attempted to connect to localhost. Destroying worker immediately.`);
+          if (this.bullWorker) {
+            this.bullWorker.close().catch(() => {
+              // Ignore close errors
+            });
+            this.bullWorker = null;
+          }
+          return; // Stop processing - worker is destroyed
+        }
+        // Log other connection errors only once to avoid spam
+        if (errorMsg.includes('ECONNREFUSED')) {
           this.logger.error(`[redis][worker] Connection error (logged once): ${errorMsg}`);
           // Don't spam logs - BullMQ will handle retries internally
         } else {
