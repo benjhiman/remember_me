@@ -205,31 +205,31 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
 
     // BullMQ Worker connection options
     // CRITICAL: Parse connection as object to ensure BullMQ uses exact URL (no defaults)
+    // Use the full Redis URL string directly - BullMQ handles URL parsing internally
+    // This prevents any default connection attempts
     let connectionConfig: any;
     try {
-      const url = new URL(redisUrl);
-      connectionConfig = {
-        host: url.hostname,
-        port: parseInt(url.port || '6379', 10),
-        password: url.password || undefined,
-        // Explicitly set to prevent BullMQ from using defaults
-        enableReadyCheck: true,
-        maxRetriesPerRequest: 1,
-        retryStrategy: () => null, // Disable retries - fail fast
-      };
+      // Use the Redis URL string directly - BullMQ will parse it correctly
+      // This ensures we use the exact connection string without any defaults
+      connectionConfig = redisUrl;
+      
+      // Log the connection config (without password) for debugging
+      const urlForLogging = redisUrl.replace(/:[^:@]+@/, ':****@');
+      this.logger.log(`[redis][worker] Using Redis URL for BullMQ Worker: ${urlForLogging}`);
     } catch (e) {
       this.logger.error(`[redis][worker] FATAL: Invalid Redis URL format. Worker will NOT start. Error: ${e instanceof Error ? e.message : 'Unknown'}`);
       return; // Hard stop - do not create worker
     }
 
-    // CRITICAL: Final validation - ensure host is NOT localhost
-    if (nodeEnv === 'production' && (connectionConfig.host === '127.0.0.1' || connectionConfig.host === 'localhost')) {
-      this.logger.error(`[redis][worker] FATAL: Parsed Redis host is localhost (${connectionConfig.host}). Worker will NOT start.`);
+    // CRITICAL: Final validation - ensure URL does NOT contain localhost
+    const lowerUrl = redisUrl.toLowerCase();
+    if (nodeEnv === 'production' && (lowerUrl.includes('127.0.0.1') || lowerUrl.includes('localhost'))) {
+      this.logger.error(`[redis][worker] FATAL: Redis URL contains localhost. Worker will NOT start.`);
       return; // Hard stop - do not create worker
     }
 
     const workerOptions = {
-      connection: connectionConfig, // Use parsed object, not string (prevents BullMQ defaults)
+      connection: connectionConfig, // Use Redis URL string directly
       concurrency: this.workerConcurrency,
       limiter: {
         max: 100, // Max 100 jobs per duration
@@ -237,6 +237,9 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       },
       // Prevent reconnection loops
       maxStalledCount: 1,
+      // CRITICAL: Disable automatic retries to prevent localhost fallback
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null, // Disable retries - fail fast
     };
 
     this.bullWorker = new Worker(
