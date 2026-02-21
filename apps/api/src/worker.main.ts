@@ -11,6 +11,44 @@ async function bootstrap() {
   const logger = new Logger('Worker');
   const runOnce = process.env.WORKER_RUN_ONCE === 'true' || process.env.WORKER_RUN_ONCE === '1';
 
+  // CRITICAL: NUCLEAR OPTION - Intercept ALL Redis connections at process level
+  // This runs BEFORE any module initialization to prevent ANY localhost connections
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  if (nodeEnv === 'production') {
+    const originalConnect = net.Socket.prototype.connect;
+    net.Socket.prototype.connect = function(...args: any[]) {
+      // Check if this is a Redis connection attempt (port 6379)
+      if (args.length > 0) {
+        const address = args[0];
+        if (typeof address === 'object' && address.port === 6379) {
+          const host = address.host || address.hostname || 'unknown';
+          if (host === '127.0.0.1' || host === 'localhost') {
+            logger.error(`[redis][worker] NUCLEAR INTERCEPT: Blocked connection attempt to ${host}:6379`);
+            const error = new Error(`Connection to localhost:6379 is BLOCKED in production`);
+            (error as any).code = 'ECONNREFUSED';
+            throw error;
+          }
+        } else if (typeof address === 'string' && (address.includes('127.0.0.1') || address.includes('localhost'))) {
+          logger.error(`[redis][worker] NUCLEAR INTERCEPT: Blocked connection attempt to ${address}`);
+          const error = new Error(`Connection to localhost is BLOCKED in production`);
+          (error as any).code = 'ECONNREFUSED';
+          throw error;
+        } else if (args.length >= 2 && typeof args[1] === 'number' && args[1] === 6379) {
+          // Check port as second argument
+          const host = typeof address === 'string' ? address : 'unknown';
+          if (host === '127.0.0.1' || host === 'localhost') {
+            logger.error(`[redis][worker] NUCLEAR INTERCEPT: Blocked connection attempt to ${host}:6379`);
+            const error = new Error(`Connection to localhost:6379 is BLOCKED in production`);
+            (error as any).code = 'ECONNREFUSED';
+            throw error;
+          }
+        }
+      }
+      return originalConnect.apply(this, args);
+    };
+    logger.log('[redis][worker] NUCLEAR INTERCEPT: Socket.connect intercepted to block localhost Redis connections');
+  }
+
   // CRITICAL: Deployment diagnostics - log commit, build time, cwd, and entry point
   // Try to read BUILD_COMMIT.txt from Dockerfile if available
   let buildCommitFromFile: string | null = null;

@@ -181,6 +181,15 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
 
     if (!redisUrl) {
       this.logger.warn('[redis][worker] REDIS_URL not configured or invalid, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');
+      // CRITICAL: Clear ALL Redis env vars to prevent BullMQ from using defaults
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.BULL_REDIS_URL;
+      process.env.BULL_REDIS_URL = '';
+      delete process.env.QUEUE_REDIS_URL;
+      process.env.QUEUE_REDIS_URL = '';
+      delete process.env.JOB_REDIS_URL;
+      process.env.JOB_REDIS_URL = '';
       return; // Don't start worker if Redis is not configured
     }
 
@@ -189,6 +198,15 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     const nodeEnv = configService.get<string>('NODE_ENV', 'development');
     if (nodeEnv === 'production' && (lower.includes('127.0.0.1') || lower.includes('localhost'))) {
       this.logger.error('[redis][worker] FATAL: REDIS_URL contains localhost/127.0.0.1 in production. Worker will NOT start.');
+      // CRITICAL: Clear ALL Redis env vars to prevent BullMQ from using defaults
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.BULL_REDIS_URL;
+      process.env.BULL_REDIS_URL = '';
+      delete process.env.QUEUE_REDIS_URL;
+      process.env.QUEUE_REDIS_URL = '';
+      delete process.env.JOB_REDIS_URL;
+      process.env.JOB_REDIS_URL = '';
       return; // Hard stop - do not create worker
     }
 
@@ -225,7 +243,47 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     const lowerUrl = redisUrl.toLowerCase();
     if (nodeEnv === 'production' && (lowerUrl.includes('127.0.0.1') || lowerUrl.includes('localhost'))) {
       this.logger.error(`[redis][worker] FATAL: Redis URL contains localhost. Worker will NOT start.`);
+      // CRITICAL: Clear ALL Redis env vars to prevent BullMQ from using defaults
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.BULL_REDIS_URL;
+      process.env.BULL_REDIS_URL = '';
+      delete process.env.QUEUE_REDIS_URL;
+      process.env.QUEUE_REDIS_URL = '';
+      delete process.env.JOB_REDIS_URL;
+      process.env.JOB_REDIS_URL = '';
       return; // Hard stop - do not create worker
+    }
+
+    // CRITICAL: Final validation before creating Worker - ensure connectionConfig is valid and not localhost
+    if (!connectionConfig || typeof connectionConfig !== 'string' || connectionConfig.trim() === '') {
+      this.logger.error('[redis][worker] FATAL: Connection config is invalid before creating Worker. Worker will NOT start.');
+      // CRITICAL: Clear ALL Redis env vars to prevent BullMQ from using defaults
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.BULL_REDIS_URL;
+      process.env.BULL_REDIS_URL = '';
+      delete process.env.QUEUE_REDIS_URL;
+      process.env.QUEUE_REDIS_URL = '';
+      delete process.env.JOB_REDIS_URL;
+      process.env.JOB_REDIS_URL = '';
+      return;
+    }
+
+    // CRITICAL: One more check - ensure connectionConfig does NOT contain localhost
+    const connectionLower = String(connectionConfig).toLowerCase();
+    if (nodeEnv === 'production' && (connectionLower.includes('127.0.0.1') || connectionLower.includes('localhost'))) {
+      this.logger.error('[redis][worker] FATAL: Connection config contains localhost before creating Worker. Worker will NOT start.');
+      // CRITICAL: Clear ALL Redis env vars to prevent BullMQ from using defaults
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.BULL_REDIS_URL;
+      process.env.BULL_REDIS_URL = '';
+      delete process.env.QUEUE_REDIS_URL;
+      process.env.QUEUE_REDIS_URL = '';
+      delete process.env.JOB_REDIS_URL;
+      process.env.JOB_REDIS_URL = '';
+      return;
     }
 
     const workerOptions = {
