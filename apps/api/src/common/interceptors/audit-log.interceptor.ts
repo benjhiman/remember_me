@@ -9,6 +9,7 @@ import { tap } from 'rxjs/operators';
 import { Request } from 'express';
 import { AuditLogService } from '../audit/audit-log.service';
 import { AuditAction, AuditEntityType } from '@remember-me/prisma';
+import { extractIp, extractUserAgent } from '../utils/request-helpers';
 
 /**
  * AuditLogInterceptor
@@ -38,8 +39,8 @@ export class AuditLogInterceptor implements NestInterceptor {
     const organizationId = user?.organizationId || (request as any).organizationId || null;
     const actorRole = user?.role || null;
     const actorEmail = user?.email || null;
-    const ip = request.ip || (request.socket?.remoteAddress) || request.headers['x-forwarded-for'] || null;
-    const userAgent = request.get('user-agent') || null;
+    const ip = extractIp(request);
+    const userAgent = extractUserAgent(request);
 
     // Only intercept mutations
     const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);

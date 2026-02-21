@@ -64,7 +64,7 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     const redisUrlPresent = !!process.env.REDIS_URL;
     const redisHostEnv = process.env.REDIS_HOST || null;
     const redisPortEnv = process.env.REDIS_PORT || null;
-    const redisHost = getRedisHost(redisUrl);
+    const redisUrlHost = getRedisHost(redisUrl);
     
     let chosenMode: string;
     if (redisUrl && redisUrlPresent) {
@@ -79,7 +79,7 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     
     this.logger.log(`[redis] BullMQ queue adapter connection diagnostics:`);
     this.logger.log(`[redis] redisUrlPresent=${redisUrlPresent}`);
-    this.logger.log(`[redis] redisUrlHost=${redisHost || 'null'}`);
+    this.logger.log(`[redis] redisUrlHost=${redisUrlHost || 'null'}`);
     this.logger.log(`[redis] redisHost=${redisHostEnv || 'null'}`);
     this.logger.log(`[redis] redisPort=${redisPortEnv || 'null'}`);
     this.logger.log(`[redis] chosenMode=${chosenMode}`);
@@ -125,9 +125,9 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     }
 
     // Log Redis host for diagnostics
-    const redisHost = getRedisHost(redisUrl);
-    if (redisHost) {
-      this.logger.log(`[redis] BullMQ queue adapter using Redis: ${redisHost}`);
+    const detectedRedisHost = getRedisHost(redisUrl);
+    if (detectedRedisHost) {
+      this.logger.log(`[redis] BullMQ queue adapter using Redis: ${detectedRedisHost}`);
     }
 
     this.redisConnection = redisUrl;

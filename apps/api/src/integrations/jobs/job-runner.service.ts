@@ -185,7 +185,7 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     const redisUrlPresent = !!process.env.REDIS_URL;
     const redisHostEnv = process.env.REDIS_HOST || null;
     const redisPortEnv = process.env.REDIS_PORT || null;
-    const redisHost = getRedisHost(redisUrl);
+    const redisUrlHost = getRedisHost(redisUrl);
     
     let chosenMode: string;
     if (redisUrl && redisUrlPresent) {
@@ -200,7 +200,7 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     
     this.logger.log(`[redis][worker] BullMQ worker connection diagnostics:`);
     this.logger.log(`[redis][worker] redisUrlPresent=${redisUrlPresent}`);
-    this.logger.log(`[redis][worker] redisUrlHost=${redisHost || 'null'}`);
+    this.logger.log(`[redis][worker] redisUrlHost=${redisUrlHost || 'null'}`);
     this.logger.log(`[redis][worker] redisHost=${redisHostEnv || 'null'}`);
     this.logger.log(`[redis][worker] redisPort=${redisPortEnv || 'null'}`);
     this.logger.log(`[redis][worker] chosenMode=${chosenMode}`);
@@ -237,9 +237,9 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Log Redis host for diagnostics
-    const redisHost = getRedisHost(redisUrl);
-    if (redisHost) {
-      this.logger.log(`[redis][worker] Connected to Redis: ${redisHost}`);
+    const detectedRedisHost = getRedisHost(redisUrl);
+    if (detectedRedisHost) {
+      this.logger.log(`[redis][worker] Connected to Redis: ${detectedRedisHost}`);
     } else {
       this.logger.error('[redis][worker] FATAL: Could not parse Redis host from URL. Worker will NOT start.');
       return; // Hard stop - do not create worker

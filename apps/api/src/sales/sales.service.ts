@@ -13,6 +13,7 @@ import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit/audit-log.service';
 import { AuditAction, AuditEntityType } from '@remember-me/prisma';
+import { extractIp, extractUserAgent } from '../common/utils/request-helpers';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ListSalesDto } from './dto/list-sales.dto';
@@ -43,12 +44,12 @@ export class SalesService {
   ) {}
 
   // Helper: Get request metadata for audit log
-  private getRequestMetadata(): { requestId: string | null; method: string; path: string; ip: string; userAgent: string } {
+  private getRequestMetadata(): { requestId: string | null; method: string; path: string; ip: string | null; userAgent: string | null } {
     const requestId = (this.request as any).requestId || null;
     const method = this.request.method || 'UNKNOWN';
     const path = this.request.path || this.request.url || 'UNKNOWN';
-    const ip = this.request.ip || (this.request.socket?.remoteAddress) || 'UNKNOWN';
-    const userAgent = this.request.get('user-agent') || '';
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
     return { requestId, method, path, ip, userAgent };
   }
 
@@ -616,8 +617,8 @@ export class SalesService {
     // Audit log
     const user = (this.request as any).user;
     const requestId = (this.request as any).requestId || null;
-    const ip = this.request.ip || (this.request.socket?.remoteAddress) || this.request.headers['x-forwarded-for'] || null;
-    const userAgent = this.request.get('user-agent') || null;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
     await this.auditLogService.log({
       organizationId,
       actorUserId: userId,

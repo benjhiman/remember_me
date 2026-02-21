@@ -4,7 +4,7 @@ import { RolesGuard } from '../guards/roles.guard';
 import { OwnerOnly } from '../decorators/owner-only.decorator';
 import { OwnerOnlyGuard } from '../guards/owner-only.guard';
 import { CurrentOrganization } from '../decorators/current-organization.decorator';
-import { Role, Prisma } from '@remember-me/prisma';
+import { Role, Prisma, AuditAction } from '@remember-me/prisma';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('audit-logs')
@@ -82,13 +82,27 @@ export class AuditLogController {
 
     // Search filter (safe search - only if >= 3 chars)
     if (search && search.length >= 3) {
-      where.OR = [
+      const searchLower = search.toLowerCase();
+      
+      // For enum fields (action), we need to match against enum values using 'in'
+      // Get all AuditAction enum values and filter those that match the search
+      const allActions = Object.values(AuditAction) as string[];
+      const matchedActions = allActions.filter((a) =>
+        a.toLowerCase().includes(searchLower)
+      );
+      
+      // Build OR conditions
+      const orConditions: Prisma.AuditLogWhereInput[] = [
         { actorEmail: { contains: search, mode: 'insensitive' } },
-        { action: { contains: search, mode: 'insensitive' } },
         { entityId: { contains: search, mode: 'insensitive' } },
-        // Note: Full JSONB text search would require raw SQL query
-        // For now, we search in actorEmail, action, and entityId only
       ];
+      
+      // Only add action filter if we have matches
+      if (matchedActions.length > 0) {
+        orConditions.push({ action: { in: matchedActions as any } });
+      }
+      
+      where.OR = orConditions;
     }
 
     const [data, total] = await this.prisma.$transaction([

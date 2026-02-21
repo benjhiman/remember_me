@@ -13,6 +13,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { ListCustomersDto } from './dto/list-customers.dto';
 import { AuditAction, AuditEntityType, Role } from '@remember-me/prisma';
+import { extractIp, extractUserAgent } from '../common/utils/request-helpers';
 
 @Injectable({ scope: Scope.REQUEST })
 export class CustomersService {
@@ -283,8 +284,8 @@ export class CustomersService {
     // Audit log
     const user = (this.request as any).user;
     const requestId = (this.request as any).requestId || null;
-    const ip = this.request.ip || (this.request.socket?.remoteAddress) || this.request.headers['x-forwarded-for'] || null;
-    const userAgent = this.request.get('user-agent') || null;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
     await this.auditLogService.log({
       organizationId,
       actorUserId: userId,
@@ -364,8 +365,8 @@ export class CustomersService {
     // Audit log
     const user = (this.request as any).user;
     const requestId = (this.request as any).requestId || null;
-    const ip = this.request.ip || (this.request.socket?.remoteAddress) || this.request.headers['x-forwarded-for'] || null;
-    const userAgent = this.request.get('user-agent') || null;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
     await this.auditLogService.log({
       organizationId,
       actorUserId: userId,
