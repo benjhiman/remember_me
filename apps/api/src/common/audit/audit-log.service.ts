@@ -5,13 +5,19 @@ import { AuditAction, AuditEntityType, Prisma } from '@remember-me/prisma';
 export interface AuditLogData {
   organizationId: string;
   actorUserId: string | null;
+  actorRole?: string | null;      // Role del usuario (OWNER, ADMIN, MANAGER, SELLER)
+  actorEmail?: string | null;      // Email del usuario
   requestId?: string | null;
   action: AuditAction;
   entityType: AuditEntityType;
   entityId: string;
   before?: any;
   after?: any;
-  metadata?: any;
+  metadata?: any;                  // Contiene: ip, userAgent, saleId, customerId, sellerId, depoId, officeId, etc.
+  severity?: 'info' | 'warn' | 'error';
+  source?: 'web' | 'api' | 'worker' | 'system';
+  ip?: string | null;
+  userAgent?: string | null;
 }
 
 @Injectable()
@@ -25,10 +31,16 @@ export class AuditLogService {
 
   async log(data: AuditLogData): Promise<void> {
     try {
+      // Extract ip and userAgent from metadata if not provided directly
+      const ip = data.ip || (data.metadata && typeof data.metadata === 'object' && 'ip' in data.metadata ? data.metadata.ip : null);
+      const userAgent = data.userAgent || (data.metadata && typeof data.metadata === 'object' && 'userAgent' in data.metadata ? data.metadata.userAgent : null);
+
       await this.prisma.auditLog.create({
         data: {
           organizationId: data.organizationId,
           actorUserId: data.actorUserId,
+          actorRole: data.actorRole || null,
+          actorEmail: data.actorEmail || null,
           requestId: data.requestId || null,
           action: data.action,
           entityType: data.entityType,
@@ -36,6 +48,10 @@ export class AuditLogService {
           beforeJson: data.before ? (data.before as Prisma.InputJsonValue) : Prisma.JsonNull,
           afterJson: data.after ? (data.after as Prisma.InputJsonValue) : Prisma.JsonNull,
           metadataJson: data.metadata ? (data.metadata as Prisma.InputJsonValue) : Prisma.JsonNull,
+          severity: data.severity || 'info',
+          source: data.source || 'api',
+          ip: ip || null,
+          userAgent: userAgent || null,
         },
       });
     } catch (error) {

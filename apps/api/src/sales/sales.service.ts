@@ -614,12 +614,17 @@ export class SalesService {
     });
 
     // Audit log
-    const metadata = this.getRequestMetadata();
+    const user = (this.request as any).user;
+    const requestId = (this.request as any).requestId || null;
+    const ip = this.request.ip || (this.request.socket?.remoteAddress) || this.request.headers['x-forwarded-for'] || null;
+    const userAgent = this.request.get('user-agent') || null;
     await this.auditLogService.log({
       organizationId,
       actorUserId: userId,
-      requestId: metadata.requestId,
-      action: AuditAction.UPDATE,
+      actorRole: role,
+      actorEmail: user?.email || null,
+      requestId,
+      action: AuditAction.SALE_UPDATED,
       entityType: AuditEntityType.Sale,
       entityId: saleId,
       before,
@@ -631,9 +636,15 @@ export class SalesService {
         total: updated.total.toString(),
       },
       metadata: {
-        ...metadata,
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
         updatedFields: Object.keys(updateData),
       },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
 
     return updated;

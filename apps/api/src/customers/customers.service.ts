@@ -281,15 +281,35 @@ export class CustomersService {
     });
 
     // Audit log
+    const user = (this.request as any).user;
     const requestId = (this.request as any).requestId || null;
+    const ip = this.request.ip || (this.request.socket?.remoteAddress) || this.request.headers['x-forwarded-for'] || null;
+    const userAgent = this.request.get('user-agent') || null;
     await this.auditLogService.log({
       organizationId,
       actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
       requestId,
-      action: AuditAction.CREATE,
+      action: AuditAction.CUSTOMER_CREATED,
       entityType: AuditEntityType.Customer,
       entityId: customer.id,
-      after: customer,
+      before: null,
+      after: {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+      },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
 
     return customer;
@@ -342,16 +362,41 @@ export class CustomersService {
     });
 
     // Audit log
+    const user = (this.request as any).user;
     const requestId = (this.request as any).requestId || null;
+    const ip = this.request.ip || (this.request.socket?.remoteAddress) || this.request.headers['x-forwarded-for'] || null;
+    const userAgent = this.request.get('user-agent') || null;
     await this.auditLogService.log({
       organizationId,
       actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
       requestId,
-      action: AuditAction.UPDATE,
+      action: AuditAction.CUSTOMER_UPDATED,
       entityType: AuditEntityType.Customer,
-      entityId: customer.id,
-      before: existing,
-      after: customer,
+      entityId: id,
+      before: {
+        id: existing.id,
+        name: existing.name,
+        email: existing.email,
+        phone: existing.phone,
+      },
+      after: {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+      },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+        updatedFields: Object.keys(dto),
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
 
     return customer;

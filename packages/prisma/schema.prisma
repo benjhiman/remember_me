@@ -852,6 +852,21 @@ enum AuditAction {
   DELIVER
   ASSIGN
   ADJUST
+  RESERVE
+  CONFIRM
+  RELEASE
+  PAYMENT_RECEIVED
+  PAYMENT_APPLIED
+  STOCK_ADDED
+  STOCK_CONFIRMED
+  STOCK_ADJUSTED
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  CUSTOMER_CREATED
+  CUSTOMER_UPDATED
+  SALE_CREATED
+  SALE_UPDATED
+  SALE_STATUS_CHANGED
 }
 
 enum AuditEntityType {
@@ -868,27 +883,43 @@ enum AuditEntityType {
   LedgerAccount
   LedgerCategory
   Item
+  Payment
+  StockMovement
+  StockReservation
+  User
+  Organization
+  Folder
 }
 
 model AuditLog {
   id             String          @id @default(cuid())
   organizationId String
   actorUserId    String?
+  actorRole      String?         // Role del usuario (OWNER, ADMIN, MANAGER, SELLER, etc.)
+  actorEmail     String?         // Email del usuario para búsquedas rápidas
   action         AuditAction
   entityType     AuditEntityType
   entityId       String
   beforeJson     Json?
   afterJson      Json?
-  metadataJson   Json?
+  metadataJson   Json?           // Contiene: saleId, customerId, sellerId, depoId, officeId, etc.
   requestId      String?
+  severity       String          @default("info") // info, warn, error
+  source         String          @default("api")  // web, api, worker, system
+  ip             String?         // IP del cliente (para queries rápidas)
+  userAgent      String?         // User agent (para queries rápidas)
   createdAt      DateTime        @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
-  @@index([entityType, entityId])
-  @@index([actorUserId, createdAt])
+  @@index([organizationId, actorUserId, createdAt])
+  @@index([organizationId, actorRole, createdAt])
+  @@index([organizationId, action, createdAt])
+  @@index([organizationId, entityType, entityId])
   @@index([requestId])
+  @@index([actorEmail])
+  @@index([ip])
 }
 
 // ===== IDEMPOTENCY =====

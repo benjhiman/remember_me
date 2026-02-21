@@ -176,8 +176,34 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     // Import Worker dynamically to avoid initialization issues
     const { Worker } = require('bullmq');
     const configService = this.configService;
+    
     // CRITICAL: Use centralized Redis URL function (single source of truth)
+    // This function ALWAYS prioritizes REDIS_URL if it exists and is valid
     const redisUrl = getRedisUrlOrNull();
+    
+    // CRITICAL: Log detailed diagnostics
+    const redisUrlPresent = !!process.env.REDIS_URL;
+    const redisHostEnv = process.env.REDIS_HOST || null;
+    const redisPortEnv = process.env.REDIS_PORT || null;
+    const redisHost = getRedisHost(redisUrl);
+    
+    let chosenMode: string;
+    if (redisUrl && redisUrlPresent) {
+      chosenMode = 'redis_url';
+    } else if (redisUrl && !redisUrlPresent) {
+      chosenMode = 'fallback_url';
+    } else if (redisHostEnv && redisPortEnv) {
+      chosenMode = 'host_port';
+    } else {
+      chosenMode = 'disabled';
+    }
+    
+    this.logger.log(`[redis][worker] BullMQ worker connection diagnostics:`);
+    this.logger.log(`[redis][worker] redisUrlPresent=${redisUrlPresent}`);
+    this.logger.log(`[redis][worker] redisUrlHost=${redisHost || 'null'}`);
+    this.logger.log(`[redis][worker] redisHost=${redisHostEnv || 'null'}`);
+    this.logger.log(`[redis][worker] redisPort=${redisPortEnv || 'null'}`);
+    this.logger.log(`[redis][worker] chosenMode=${chosenMode}`);
 
     if (!redisUrl) {
       this.logger.warn('[redis][worker] REDIS_URL not configured or invalid, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');

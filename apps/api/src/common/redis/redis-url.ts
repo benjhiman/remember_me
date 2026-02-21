@@ -18,27 +18,58 @@ const logger = new Logger('RedisConfig');
  * Get Redis URL from environment variables
  * Returns null if no valid URL is found or if URL contains localhost in production
  * 
+ * PRIORITY ORDER (CRITICAL):
+ * 1. REDIS_URL (highest priority - ALWAYS use if present and valid)
+ * 2. RATE_LIMIT_REDIS_URL
+ * 3. BULL_REDIS_URL
+ * 4. QUEUE_REDIS_URL
+ * 5. JOB_REDIS_URL
+ * 
+ * NEVER falls back to REDIS_HOST/REDIS_PORT or localhost defaults
+ * 
  * @returns Redis URL string or null
  */
 export function getRedisUrlOrNull(): string | null {
-  // Try all possible Redis URL environment variables
-  const redisUrl =
-    process.env.REDIS_URL ||
+  // CRITICAL: REDIS_URL has HIGHEST priority - use it if it exists and is valid
+  const redisUrl = process.env.REDIS_URL;
+  
+  if (redisUrl) {
+    // Validate REDIS_URL first
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    if (nodeEnv === 'production') {
+      const lower = redisUrl.toLowerCase();
+      if (
+        lower.includes('127.0.0.1') ||
+        lower.includes('localhost') ||
+        lower === 'redis://redis:6379' ||
+        lower.startsWith('redis://redis:')
+      ) {
+        logger.error(
+          `[redis] REDIS_URL contains localhost/127.0.0.1 - REJECTED in production. Redis features disabled.`,
+        );
+        return null;
+      }
+    }
+    // REDIS_URL is valid - return it immediately (highest priority)
+    return redisUrl;
+  }
+
+  // Fallback to other Redis URL env vars (only if REDIS_URL is not set)
+  const fallbackUrl =
     process.env.RATE_LIMIT_REDIS_URL ||
     process.env.BULL_REDIS_URL ||
     process.env.QUEUE_REDIS_URL ||
     process.env.JOB_REDIS_URL ||
     null;
 
-  // If no URL is configured, return null
-  if (!redisUrl) {
+  if (!fallbackUrl) {
     return null;
   }
 
-  // CRITICAL: In production, reject localhost/127.0.0.1
+  // Validate fallback URL
   const nodeEnv = process.env.NODE_ENV || 'development';
   if (nodeEnv === 'production') {
-    const lower = redisUrl.toLowerCase();
+    const lower = fallbackUrl.toLowerCase();
     if (
       lower.includes('127.0.0.1') ||
       lower.includes('localhost') ||
@@ -46,14 +77,13 @@ export function getRedisUrlOrNull(): string | null {
       lower.startsWith('redis://redis:')
     ) {
       logger.error(
-        `[redis] REDIS_URL contains localhost/127.0.0.1 - REJECTED in production. Redis features disabled.`,
+        `[redis] Fallback Redis URL contains localhost/127.0.0.1 - REJECTED in production. Redis features disabled.`,
       );
       return null;
     }
   }
 
-  // Return valid URL
-  return redisUrl;
+  return fallbackUrl;
 }
 
 /**

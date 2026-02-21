@@ -57,10 +57,57 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     }
 
     // CRITICAL: Use centralized Redis URL function (single source of truth)
+    // This function ALWAYS prioritizes REDIS_URL if it exists and is valid
     const redisUrl = getRedisUrlOrNull();
+    
+    // CRITICAL: Log detailed diagnostics
+    const redisUrlPresent = !!process.env.REDIS_URL;
+    const redisHostEnv = process.env.REDIS_HOST || process.env.REDIS_HOST || null;
+    const redisPortEnv = process.env.REDIS_PORT || null;
+    const redisHost = getRedisHost(redisUrl);
+    
+    let chosenMode: string;
+    if (redisUrl && redisUrlPresent) {
+      chosenMode = 'redis_url';
+    } else if (redisUrl && !redisUrlPresent) {
+      chosenMode = 'fallback_url';
+    } else if (redisHostEnv && redisPortEnv) {
+      chosenMode = 'host_port';
+    } else {
+      chosenMode = 'disabled';
+    }
+    
+    this.logger.log(`[redis] BullMQ queue adapter connection diagnostics:`);
+    this.logger.log(`[redis] redisUrlPresent=${redisUrlPresent}`);
+    this.logger.log(`[redis] redisUrlHost=${redisHost || 'null'}`);
+    this.logger.log(`[redis] redisHost=${redisHostEnv || 'null'}`);
+    this.logger.log(`[redis] redisPort=${redisPortEnv || 'null'}`);
+    this.logger.log(`[redis] chosenMode=${chosenMode}`);
 
     if (!redisUrl) {
-      this.logger.warn('[redis] REDIS_URL not configured or invalid, BullMQ queue adapter will not initialize. Set REDIS_URL to enable BullMQ queue processing.');
+      // CRITICAL: Check if REDIS_HOST/REDIS_PORT are set but REDIS_URL is missing
+      if (redisHostEnv && redisPortEnv) {
+        this.logger.warn(`[redis] REDIS_URL not configured. REDIS_HOST=${redisHostEnv} and REDIS_PORT=${redisPortEnv} are set, but REDIS_URL is required. BullMQ queue adapter will not initialize. Set REDIS_URL to enable BullMQ queue processing.`);
+      } else if (redisHostEnv && !redisPortEnv) {
+        this.logger.warn(`[redis] REDIS_HOST is set but REDIS_PORT is missing. Redis features disabled to prevent localhost fallback.`);
+      } else {
+        this.logger.warn('[redis] REDIS_URL not configured or invalid, BullMQ queue adapter will not initialize. Set REDIS_URL to enable BullMQ queue processing.');
+      }
+      
+      // CRITICAL: Clear ALL Redis env vars to prevent BullMQ from using defaults
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.BULL_REDIS_URL;
+      process.env.BULL_REDIS_URL = '';
+      delete process.env.QUEUE_REDIS_URL;
+      process.env.QUEUE_REDIS_URL = '';
+      delete process.env.JOB_REDIS_URL;
+      process.env.JOB_REDIS_URL = '';
+      // Also clear HOST/PORT to prevent any fallback
+      delete process.env.REDIS_HOST;
+      process.env.REDIS_HOST = '';
+      delete process.env.REDIS_PORT;
+      process.env.REDIS_PORT = '';
       this.enabled = false;
       return; // Don't initialize queue if Redis is not configured
     }

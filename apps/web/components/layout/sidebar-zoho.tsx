@@ -45,6 +45,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard, permission: Permission.VIEW_DASHBOARD },
+  { href: '/seller', label: 'Vista Vendedor', icon: Users, permission: Permission.VIEW_SALES },
+  { href: '/owner/movimientos', label: 'Movimientos', icon: FileText, permission: Permission.MANAGE_MEMBERS, ownerOnly: true },
   {
     href: '/inventory/stock',
     label: 'Inventory',
@@ -208,6 +210,11 @@ function NavItemComponent({
 
   // Purchases is always visible (legacy gating removed temporarily)
   if (item.label !== 'Purchases' && !userCan(user, item.permission)) {
+    return null;
+  }
+
+  // Owner-only items: only show if user is OWNER
+  if (item.ownerOnly && user?.role !== 'OWNER') {
     return null;
   }
 

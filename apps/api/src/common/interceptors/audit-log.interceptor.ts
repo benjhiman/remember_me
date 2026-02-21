@@ -33,8 +33,13 @@ export class AuditLogInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest<Request>();
     const { method, url, path } = request;
     const requestId = (request as any).requestId || null;
-    const userId = (request as any).user?.userId || null;
-    const organizationId = (request as any).user?.organizationId || (request as any).organizationId || null;
+    const user = (request as any).user;
+    const userId = user?.userId || null;
+    const organizationId = user?.organizationId || (request as any).organizationId || null;
+    const actorRole = user?.role || null;
+    const actorEmail = user?.email || null;
+    const ip = request.ip || (request.socket?.remoteAddress) || request.headers['x-forwarded-for'] || null;
+    const userAgent = request.get('user-agent') || null;
 
     // Only intercept mutations
     const isMutation = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(method);
@@ -66,6 +71,8 @@ export class AuditLogInterceptor implements NestInterceptor {
               await this.logAudit({
                 organizationId,
                 actorUserId: userId,
+                actorRole,
+                actorEmail,
                 requestId,
                 action,
                 entityType,
@@ -79,6 +86,10 @@ export class AuditLogInterceptor implements NestInterceptor {
                   statusCode,
                   inferred: true, // Mark as inferred/automatic
                 },
+                ip,
+                userAgent,
+                source: 'api',
+                severity: 'info',
               });
             }
           } else if (data && typeof data === 'object' && 'id' in data) {
@@ -86,6 +97,8 @@ export class AuditLogInterceptor implements NestInterceptor {
             await this.logAudit({
               organizationId,
               actorUserId: userId,
+              actorRole,
+              actorEmail,
               requestId,
               action,
               entityType,
@@ -98,6 +111,10 @@ export class AuditLogInterceptor implements NestInterceptor {
                 url,
                 inferred: true,
               },
+              ip,
+              userAgent,
+              source: 'api',
+              severity: 'info',
             });
           }
         },
@@ -110,6 +127,8 @@ export class AuditLogInterceptor implements NestInterceptor {
             await this.logAudit({
               organizationId,
               actorUserId: userId,
+              actorRole,
+              actorEmail,
               requestId,
               action,
               entityType,
@@ -125,6 +144,10 @@ export class AuditLogInterceptor implements NestInterceptor {
                 inferred: true,
                 failed: true,
               },
+              ip,
+              userAgent,
+              source: 'api',
+              severity: statusCode >= 500 ? 'error' : 'warn',
             });
           }
         },
@@ -135,6 +158,8 @@ export class AuditLogInterceptor implements NestInterceptor {
   private async logAudit(data: {
     organizationId: string;
     actorUserId: string | null;
+    actorRole?: string | null;
+    actorEmail?: string | null;
     requestId: string | null;
     action: AuditAction;
     entityType: AuditEntityType;
@@ -142,6 +167,10 @@ export class AuditLogInterceptor implements NestInterceptor {
     before: any;
     after: any;
     metadata: any;
+    ip?: string | null;
+    userAgent?: string | null;
+    source?: 'web' | 'api' | 'worker' | 'system';
+    severity?: 'info' | 'warn' | 'error';
   }): Promise<void> {
     if (!data.entityId) {
       // Can't log without entity ID
@@ -152,6 +181,8 @@ export class AuditLogInterceptor implements NestInterceptor {
       await this.auditLogService.log({
         organizationId: data.organizationId,
         actorUserId: data.actorUserId,
+        actorRole: data.actorRole,
+        actorEmail: data.actorEmail,
         requestId: data.requestId,
         action: data.action,
         entityType: data.entityType,
@@ -159,6 +190,10 @@ export class AuditLogInterceptor implements NestInterceptor {
         before: data.before,
         after: data.after,
         metadata: data.metadata,
+        ip: data.ip,
+        userAgent: data.userAgent,
+        source: data.source,
+        severity: data.severity,
       });
     } catch (error) {
       // Audit log failures are handled by AuditLogService based on AUDIT_FAIL_MODE

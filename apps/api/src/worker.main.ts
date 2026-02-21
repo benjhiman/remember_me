@@ -6,6 +6,7 @@ import { BUILD_INFO } from './build-info';
 import { getRedisUrlOrNull, getRedisHost } from './common/redis/redis-url';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as net from 'net';
 
 async function bootstrap() {
   const logger = new Logger('Worker');
