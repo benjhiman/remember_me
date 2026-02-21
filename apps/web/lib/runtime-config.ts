@@ -141,24 +141,12 @@ export function getApiBaseUrl(): string {
 
   // Client-side (browser): ALWAYS use same-origin /api proxy
   // This ensures requests go through Next.js rewrites to the backend
-  // and avoids CORS issues while using the proxy we configured
-  const isLocalhost = 
-    window.location.hostname === 'localhost' ||
-    window.location.hostname.includes('127.0.0.1') ||
-    window.location.hostname.includes('192.168.') ||
-    window.location.hostname.includes('10.0.') ||
-    window.location.hostname.includes('.local');
-
-  if (isLocalhost) {
-    // Development: use localhost backend directly (no proxy needed)
-    const devUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
-    return devUrl.replace(/\/+$/, '');
-  }
-
-  // Production/preview: use same-origin /api proxy
-  // This will be rewritten by Next.js to the backend URL
+  // and cookies are set on the correct domain (app.iphonealcosto.com)
+  // CRITICAL: Even in localhost, use /api proxy to maintain consistency
+  // The Next.js rewrite will handle routing to localhost:4000 in dev
+  
   if (!(window as any).__API_BASE_LOGGED) {
-    console.log('[API_BASE] using same-origin /api proxy');
+    console.log('[API_BASE] browser: using same-origin /api proxy (all requests go through Next.js rewrites)');
     (window as any).__API_BASE_LOGGED = true;
   }
   

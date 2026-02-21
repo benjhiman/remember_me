@@ -17,9 +17,19 @@ export class AppController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Public()
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  getRoot() {
+    const commitSha = this.configService.get<string>('RAILWAY_GIT_COMMIT_SHA') || 
+                      this.configService.get<string>('VERCEL_GIT_COMMIT_SHA') || 
+                      this.configService.get<string>('GIT_COMMIT') || 
+                      null;
+    return {
+      ok: true,
+      service: 'api',
+      commit: commitSha ? commitSha.substring(0, 7) : null,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   @Public()
