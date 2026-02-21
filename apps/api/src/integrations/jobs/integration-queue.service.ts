@@ -24,8 +24,8 @@ export class IntegrationQueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(IntegrationQueueService.name);
   private queue: Queue<QueueJobData> | null = null;
   private readonly queueName = 'integration-jobs';
-  private readonly redisConnection: ConnectionOptions | string;
-  private readonly enabled: boolean;
+  private redisConnection: ConnectionOptions | string;
+  private enabled: boolean;
 
   constructor(
     private readonly configService: ConfigService,
