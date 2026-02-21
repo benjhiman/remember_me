@@ -147,20 +147,20 @@ export class AttributionService {
     // TODO: MetaAttributionSnapshot model not in schema - returning empty array
     const snapshots: any[] = [];
     // const snapshots = await this.prisma.metaAttributionSnapshot.findMany({
-      where,
-      include: {
-        sale: {
-          include: {
-            items: true,
-          },
-        },
-        lead: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
+    //   where,
+    //   include: {
+    //     sale: {
+    //       include: {
+    //         items: true,
+    //       },
+    //     },
+    //     lead: {
+    //       select: {
+    //         id: true,
+    //       },
+    //     },
+    //   },
+    // });
 
     // Get spend data for the same date range
     // TODO: MetaSpendDaily model not in schema - returning empty array
