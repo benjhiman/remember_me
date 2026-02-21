@@ -54,7 +54,9 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 
 # Install OpenSSL for Prisma (required for Alpine Linux)
-RUN apk add --no-cache openssl1.1-compat
+# Prisma 5.x works with OpenSSL 3.x (default in Alpine 3.17+)
+# Just install openssl which provides libssl.so.3
+RUN apk add --no-cache openssl
 
 # Install pnpm
 RUN npm install -g pnpm@latest
