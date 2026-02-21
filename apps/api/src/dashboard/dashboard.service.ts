@@ -251,23 +251,17 @@ export class DashboardService {
     }));
 
     // Breakdown: leads by stage
-    const leadsByStage = await this.prisma.lead.groupBy({
-      by: ['stageId'],
-      where: {
-        organizationId,
-        ...(dateFilter && { createdAt: dateFilter }),
-      },
-      _count: {
-        id: true,
-      },
-      orderBy: {
-        _count: {
-          id: 'desc',
-        },
-      },
-    });
+    // Note: Using raw query because stageId might not be in groupBy fields
+    const leadsByStageRaw = await this.prisma.$queryRaw<Array<{ stageId: string; _count: number }>>`
+      SELECT "stageId", COUNT(*)::int as "_count"
+      FROM "Lead"
+      WHERE "organizationId" = ${organizationId}
+      ${dateFilter ? Prisma.sql`AND "createdAt" >= ${dateFilter.gte} AND "createdAt" <= ${dateFilter.lte}` : Prisma.empty}
+      GROUP BY "stageId"
+      ORDER BY "_count" DESC
+    `;
 
-    const stageIds = leadsByStage.map((l) => l.stageId);
+    const stageIds = leadsByStageRaw.map((l) => l.stageId);
     const stages = await this.prisma.stage.findMany({
       where: {
         id: { in: stageIds },
@@ -282,13 +276,13 @@ export class DashboardService {
       },
     });
 
-    const breakdown = leadsByStage.map((item) => {
+    const breakdown = leadsByStageRaw.map((item) => {
       const stage = stages.find((s) => s.id === item.stageId);
       return {
         stageId: item.stageId,
         stageName: stage?.name || 'Unknown',
         stageColor: stage?.color || null,
-        count: item._count.id,
+        count: item._count,
       };
     });
 
