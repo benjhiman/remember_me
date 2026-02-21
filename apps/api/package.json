@@ -31,6 +31,7 @@
     "smoke:e2e": "jest --config ./test/jest-smoke-e2e.json",
     "type-check": "tsc --noEmit",
     "seed:owner": "ts-node -r tsconfig-paths/register src/scripts/seed-owner.ts",
+    "promote:owner": "ts-node -r tsconfig-paths/register src/scripts/promote-to-owner.ts",
     "ops:e2e-seed": "ts-node -r tsconfig-paths/register src/scripts/e2e-seed.ts",
     "prisma:recover": "ts-node -r tsconfig-paths/register scripts/prisma-recover.ts",
     "prisma:resolve-folder-prefix": "ts-node -r tsconfig-paths/register scripts/resolve-folder-prefix-migration.ts",
