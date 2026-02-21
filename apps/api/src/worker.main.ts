@@ -37,11 +37,12 @@ async function bootstrap() {
   const cwd = process.cwd();
   const entryFile = __filename || 'unknown';
   
-  logger.log(`[worker] Deployment diagnostics:`);
-  logger.log(`[worker] commit=${commitSha}`);
-  logger.log(`[worker] buildTime=${buildTime}`);
-  logger.log(`[worker] cwd=${cwd}`);
-  logger.log(`[worker] entry=${entryFile}`);
+         logger.log(`[worker] Deployment diagnostics:`);
+         logger.log(`[worker] commit=${commitSha}`);
+         logger.log(`[worker] buildTime=${buildTime}`);
+         logger.log(`[worker] cwd=${cwd}`);
+         logger.log(`[worker] entry=${entryFile}`);
+         logger.log(`[worker] FORCE_REBUILD_CHECK=20260221060000`);
 
   // CRITICAL: Guardrail - prevent ANY localhost Redis connections
   // Even if old code tries to use localhost, we disable it at process level

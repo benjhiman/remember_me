@@ -4,7 +4,7 @@ import { IntegrationJobsService } from './integration-jobs.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JobRunnerStateService } from './job-runner-state.service';
 import { MetricsService } from '../../common/metrics/metrics.service';
-import { IntegrationQueueService } from './integration-queue.service';
+import { IntegrationQueueService } from './queue/integration-queue.service';
 import {
   IntegrationJobType,
   IntegrationProvider,

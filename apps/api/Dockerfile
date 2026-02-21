@@ -14,12 +14,20 @@ COPY turbo.json ./
 
 # CRITICAL: Copy deploy trigger FIRST to bust cache (changes on every commit)
 # This MUST be before other COPY commands to invalidate Docker cache
+# FORCE REBUILD: Adding timestamp to force cache invalidation
+ARG FORCE_REBUILD=20260221060000
+RUN echo "FORCE_REBUILD=${FORCE_REBUILD}" > /tmp/force_rebuild.txt
 COPY apps/api/DEPLOY_TRIGGER.txt ./apps/api/DEPLOY_TRIGGER.txt
 COPY apps/api/RAILWAY_DEPLOY_VERSION.txt ./apps/api/RAILWAY_DEPLOY_VERSION.txt
+COPY apps/api/FORCE_REBUILD_NOW.txt ./apps/api/FORCE_REBUILD_NOW.txt
+COPY apps/api/FORCE_DEPLOY.txt ./apps/api/FORCE_DEPLOY.txt
 
 # Force cache invalidation by reading trigger content
 RUN cat ./apps/api/DEPLOY_TRIGGER.txt || echo "DEPLOY_TRIGGER.txt not found" && \
-    cat ./apps/api/RAILWAY_DEPLOY_VERSION.txt || echo "RAILWAY_DEPLOY_VERSION.txt not found"
+    cat ./apps/api/RAILWAY_DEPLOY_VERSION.txt || echo "RAILWAY_DEPLOY_VERSION.txt not found" && \
+    cat ./apps/api/FORCE_REBUILD_NOW.txt || echo "FORCE_REBUILD_NOW.txt not found" && \
+    cat ./apps/api/FORCE_DEPLOY.txt || echo "FORCE_DEPLOY.txt not found" && \
+    cat /tmp/force_rebuild.txt || echo "force_rebuild.txt not found"
 
 # Copy packages
 COPY packages ./packages
