@@ -105,7 +105,7 @@ export class DashboardService {
       },
     });
 
-    const leadsByStageWithNames = leadsByStage.map((item) => {
+    const leadsByStageWithNames = leadsByStageRaw.map((item) => {
       const stage = stages.find((s) => s.id === item.stageId);
       return {
         stageId: item.stageId,
