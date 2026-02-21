@@ -106,12 +106,12 @@ export class DashboardService {
     });
 
     const leadsByStageWithNames = leadsByStageRaw.map((item) => {
-      const stage = stages.find((s) => s.id === item.stageId);
+      const stage = stages.find((s: { id: string; name: string | null; color: string | null }) => s.id === item.stageId);
       return {
         stageId: item.stageId,
         stageName: stage?.name || 'Unknown',
         stageColor: stage?.color || null,
-        count: item._count.id,
+        count: item._count,
       };
     });
 
@@ -262,7 +262,7 @@ export class DashboardService {
     `;
 
     const stageIds = leadsByStageRaw.map((l) => l.stageId);
-    const stages = await this.prisma.pipelineStage.findMany({
+    const stages = await this.prisma.stage.findMany({
       where: {
         id: { in: stageIds },
         pipeline: {
@@ -323,7 +323,7 @@ export class DashboardService {
         userId: item.assignedToId,
         userName: user?.name || 'Unknown',
         userEmail: user?.email || null,
-        count: item._count.id,
+        count: item._count,
       };
     });
 
