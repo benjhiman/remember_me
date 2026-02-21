@@ -19,7 +19,7 @@ export function useStockMovements(params: UseStockMovementsParams) {
 
   return useQuery({
     queryKey: ['stock-movements', itemId, page, limit],
-    queryFn: () => api.get<MovementListResponse>(`/stock/${itemId}/movements?${queryParams.toString()}`),
+    queryFn: () => api.get<MovementListResponse>(`/stock/item/${itemId}/movements?${queryParams.toString()}`),
     enabled: enabled && !!itemId,
   });
 }
@@ -35,7 +35,7 @@ export function useAdjustStock(itemId: string) {
 
   return useMutation({
     mutationFn: (data: AdjustStockData) =>
-      api.post<StockItem>(`/stock/${itemId}/adjust`, data),
+      api.post<StockItem>(`/stock/item/${itemId}/adjust`, data),
     onSuccess: () => {
       // Invalidate stock item and movements
       queryClient.invalidateQueries({ queryKey: ['stock-item', itemId] });
