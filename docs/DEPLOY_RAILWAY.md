@@ -316,7 +316,14 @@ Since Railway doesn't support multi-service configuration in a single `railway.t
    - **Build Command**: (leave empty)
    - **Start Command**: (leave empty - uses Dockerfile CMD)
 
-3. **Environment Variables** (Worker Service):
+3. **⚠️ CRITICAL: Disable Healthcheck** (Worker Service):
+   - Railway → Worker Service → Settings → Deploy
+   - **Healthcheck Path**: (leave EMPTY or set to empty string)
+   - **Healthcheck Timeout**: (leave empty)
+   - **Why**: Worker doesn't have an HTTP server, so healthcheck will always fail
+   - **If healthcheck is enabled**: Worker will fail deployment with "Healthcheck failed!" error
+
+4. **Environment Variables** (Worker Service):
    - `WORKER_MODE=1` (required)
    - `JOB_RUNNER_ENABLED=true` (required)
    - `REDIS_URL` (required if using BullMQ) - should be Railway Redis URL
@@ -324,7 +331,7 @@ Since Railway doesn't support multi-service configuration in a single `railway.t
    - `NODE_ENV=production` (required)
    - All other env vars as needed
 
-4. **Verify Source**:
+5. **Verify Source**:
    - Railway → Worker Service → Settings → Source
    - Repository: `benjhiman/remember_me`
    - Branch: `main`

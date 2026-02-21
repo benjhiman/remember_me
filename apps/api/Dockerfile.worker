@@ -82,6 +82,11 @@ WORKDIR /app/apps/api
 
 # Worker does NOT need port or healthcheck (no HTTP server)
 # Worker runs in continuous mode processing jobs
+# CRITICAL: Railway must be configured to NOT use healthcheck for this service
+# In Railway Dashboard: Settings -> Deploy -> Healthcheck Path: (leave EMPTY)
+
+# Explicitly disable healthcheck (Railway may still require manual config)
+# HEALTHCHECK NONE
 
 # Start worker application
 # CRITICAL: Use worker.main.js, NOT main.js
