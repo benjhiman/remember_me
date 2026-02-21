@@ -78,25 +78,19 @@ export class DashboardService {
     });
 
     // Leads by Stage (top 10)
-    const leadsByStage = await this.prisma.lead.groupBy({
-      by: ['stageId'],
-      where: {
-        organizationId,
-        ...(dateFilter && { createdAt: dateFilter }),
-      },
-      _count: {
-        id: true,
-      },
-      orderBy: {
-        _count: {
-          id: 'desc',
-        },
-      },
-      take: 10,
-    });
+    // Note: Using raw query because stageId might not be in groupBy fields
+    const leadsByStageRaw = await this.prisma.$queryRaw<Array<{ stageId: string; _count: number }>>`
+      SELECT "stageId", COUNT(*)::int as "_count"
+      FROM "Lead"
+      WHERE "organizationId" = ${organizationId}
+      ${dateFilter ? Prisma.sql`AND "createdAt" >= ${dateFilter.gte} AND "createdAt" <= ${dateFilter.lte}` : Prisma.empty}
+      GROUP BY "stageId"
+      ORDER BY "_count" DESC
+      LIMIT 10
+    `;
 
     // Get stage names
-    const stageIds = leadsByStage.map((l) => l.stageId);
+    const stageIds = leadsByStageRaw.map((l) => l.stageId);
     const stages = await this.prisma.stage.findMany({
       where: {
         id: { in: stageIds },
