@@ -2,11 +2,18 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
+# Build arguments for cache busting
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME
+
 WORKDIR /app
 
 # Copy workspace files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY turbo.json ./
+
+# Copy deploy trigger (cache bust - changes on every commit)
+COPY apps/api/DEPLOY_TRIGGER.txt ./apps/api/DEPLOY_TRIGGER.txt
 
 # Copy packages
 COPY packages ./packages
@@ -28,6 +35,10 @@ RUN pnpm prisma generate
 WORKDIR /app/apps/api
 RUN pnpm build
 
+# Create BUILD_COMMIT.txt with commit and build time (for runtime verification)
+RUN echo "commit=${GIT_COMMIT}" > /app/BUILD_COMMIT.txt && \
+    echo "buildTime=${BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" >> /app/BUILD_COMMIT.txt
+
 # Stage 2: Runtime
 FROM node:20-alpine AS runtime
 
@@ -47,6 +58,9 @@ COPY packages ./packages
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+
+# Copy BUILD_COMMIT.txt from builder (for runtime verification)
+COPY --from=builder /app/BUILD_COMMIT.txt ./BUILD_COMMIT.txt
 
 # Install production dependencies only
 RUN pnpm install --prod --frozen-lockfile

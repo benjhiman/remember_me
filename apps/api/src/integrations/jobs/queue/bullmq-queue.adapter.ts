@@ -55,29 +55,22 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
       return;
     }
 
-    // Get Redis URL - use REDIS_URL as primary, fallback to other variants
-    // NEVER default to localhost in production
-    const redisUrl =
-      this.configService.get<string>('REDIS_URL') ||
-      this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
-      this.configService.get<string>('BULL_REDIS_URL') ||
-      this.configService.get<string>('QUEUE_REDIS_URL') ||
-      this.configService.get<string>('JOB_REDIS_URL');
+    // CRITICAL: Use centralized Redis URL function (single source of truth)
+    const redisUrl = getRedisUrlOrNull();
 
     if (!redisUrl) {
-      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-      if (nodeEnv === 'production') {
-        this.logger.warn('REDIS_URL not configured, BullMQ queue adapter will not initialize. Set REDIS_URL to enable BullMQ queue processing.');
-        this.enabled = false;
-        return; // Don't initialize queue if Redis is not configured in production
-      }
-      // Don't use localhost fallback - just disable the adapter
-      this.logger.warn('No REDIS_URL found, BullMQ queue adapter will not initialize. Set REDIS_URL to enable queue processing.');
+      this.logger.warn('[redis] REDIS_URL not configured or invalid, BullMQ queue adapter will not initialize. Set REDIS_URL to enable BullMQ queue processing.');
       this.enabled = false;
       return; // Don't initialize queue if Redis is not configured
-    } else {
-      this.redisConnection = redisUrl;
     }
+
+    // Log Redis host for diagnostics
+    const redisHost = getRedisHost(redisUrl);
+    if (redisHost) {
+      this.logger.log(`[redis] BullMQ queue adapter using Redis: ${redisHost}`);
+    }
+
+    this.redisConnection = redisUrl;
 
     try {
       const queueOptions: QueueOptions = {

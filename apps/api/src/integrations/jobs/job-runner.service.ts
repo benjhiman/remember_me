@@ -6,6 +6,7 @@ import { JobRunnerStateService } from './job-runner-state.service';
 import { IntegrationQueueService } from './queue/integration-queue.service';
 import { IntegrationProvider, IntegrationJobType } from '@remember-me/prisma';
 import { Worker } from 'bullmq';
+import { getRedisUrlOrNull, getRedisHost } from '../../common/redis/redis-url';
 
 @Injectable()
 export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
@@ -175,46 +176,18 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     // Import Worker dynamically to avoid initialization issues
     const { Worker } = require('bullmq');
     const configService = this.configService;
-    // Get Redis URL - use REDIS_URL as primary, fallback to other variants
-    // NEVER default to localhost in production
-    let redisUrl =
-      configService.get<string>('REDIS_URL') ||
-      configService.get<string>('RATE_LIMIT_REDIS_URL') ||
-      configService.get<string>('BULL_REDIS_URL') ||
-      configService.get<string>('QUEUE_REDIS_URL') ||
-      configService.get<string>('JOB_REDIS_URL');
+    // CRITICAL: Use centralized Redis URL function (single source of truth)
+    const redisUrl = getRedisUrlOrNull();
 
     if (!redisUrl) {
-      const nodeEnv = configService.get<string>('NODE_ENV', 'development');
-      if (nodeEnv === 'production') {
-        this.logger.warn('[redis][worker] REDIS_URL not configured, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');
-        return; // Don't start worker if Redis is not configured in production
-      }
-      // Don't use localhost fallback - just disable the worker
-      this.logger.warn('[redis][worker] No REDIS_URL found, BullMQ worker will not start. Set REDIS_URL to enable queue processing.');
+      this.logger.warn('[redis][worker] REDIS_URL not configured or invalid, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');
       return; // Don't start worker if Redis is not configured
     }
 
-    // CRITICAL: Validate Redis URL to prevent localhost connections
-    const nodeEnv = configService.get<string>('NODE_ENV', 'development');
-    if (nodeEnv === 'production') {
-      if (redisUrl.includes('localhost') || 
-          redisUrl.includes('127.0.0.1') || 
-          redisUrl.includes('redis://redis:') ||
-          redisUrl === 'redis://redis:6379') {
-        this.logger.error('[redis][worker] REDIS_URL contains localhost/127.0.0.1 - cannot use in production. Worker disabled.');
-        return; // Don't start worker with localhost in production
-      }
-    }
-
-    // Parse and log Redis host (without credentials) for diagnostics
-    try {
-      const url = new URL(redisUrl);
-      const host = url.hostname;
-      const port = url.port || '6379';
-      this.logger.log(`[redis][worker] Connected to Redis: ${host}:${port}`);
-    } catch (e) {
-      this.logger.warn(`[redis][worker] Could not parse Redis URL (non-critical): ${redisUrl.substring(0, 30)}...`);
+    // Log Redis host for diagnostics
+    const redisHost = getRedisHost(redisUrl);
+    if (redisHost) {
+      this.logger.log(`[redis][worker] Connected to Redis: ${redisHost}`);
     }
 
     const queueName = configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');

@@ -6,6 +6,9 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma/prisma.service';
 import { seedOwnerOnBoot } from './bootstrap/seed-owner-on-boot';
+import { BUILD_INFO } from './build-info';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -159,11 +162,24 @@ async function bootstrap() {
 
   // Set X-App-Commit header for version tracking
   app.use((req: any, res: any, next: any) => {
-    const commitSha = process.env.RAILWAY_GIT_COMMIT_SHA || 
-                      process.env.VERCEL_GIT_COMMIT_SHA || 
-                      process.env.GIT_COMMIT || 
-                      'unknown';
+    // Try to read BUILD_COMMIT.txt from Dockerfile if available
+    let buildCommitFromFile: string | null = null;
+    try {
+      const buildCommitPath = path.join(process.cwd(), 'BUILD_COMMIT.txt');
+      if (fs.existsSync(buildCommitPath)) {
+        const content = fs.readFileSync(buildCommitPath, 'utf-8').trim();
+        const match = content.match(/commit=([a-f0-9]+)/);
+        if (match) {
+          buildCommitFromFile = match[1].substring(0, 7);
+        }
+      }
+    } catch (e) {
+      // Ignore errors reading file
+    }
+
+    const commitSha = buildCommitFromFile || BUILD_INFO.commit;
     res.setHeader('X-App-Commit', commitSha);
+    res.setHeader('X-App-Build-Time', BUILD_INFO.buildTime);
     next();
   });
 
@@ -202,12 +218,32 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
-  // Log commit hash on startup for deployment verification
-  const commitSha = process.env.RAILWAY_GIT_COMMIT_SHA || 
-                    process.env.VERCEL_GIT_COMMIT_SHA || 
-                    process.env.GIT_COMMIT || 
-                    'unknown';
-  console.log(`📦 Deployed commit: ${commitSha.substring(0, 7)}`);
+  // CRITICAL: Deployment diagnostics - log commit, build time, cwd, and entry point
+  // Try to read BUILD_COMMIT.txt from Dockerfile if available
+  let buildCommitFromFile: string | null = null;
+  try {
+    const buildCommitPath = path.join(process.cwd(), 'BUILD_COMMIT.txt');
+    if (fs.existsSync(buildCommitPath)) {
+      const content = fs.readFileSync(buildCommitPath, 'utf-8').trim();
+      const match = content.match(/commit=([a-f0-9]+)/);
+      if (match) {
+        buildCommitFromFile = match[1].substring(0, 7);
+      }
+    }
+  } catch (e) {
+    // Ignore errors reading file
+  }
+
+  const commitSha = buildCommitFromFile || BUILD_INFO.commit;
+  const buildTime = BUILD_INFO.buildTime;
+  const cwd = process.cwd();
+  const entryFile = __filename;
+
+  console.log(`📦 Deployment diagnostics:`);
+  console.log(`📦 commit=${commitSha}`);
+  console.log(`📦 buildTime=${buildTime}`);
+  console.log(`📦 cwd=${cwd}`);
+  console.log(`📦 entry=${entryFile}`);
 
   // Log registered routes (diagnostic - only in production for now)
   if (process.env.NODE_ENV === 'production' || process.env.LOG_ROUTES === 'true') {

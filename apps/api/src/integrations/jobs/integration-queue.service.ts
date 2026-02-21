@@ -7,6 +7,7 @@ import {
   IntegrationJobStatus,
 } from '@remember-me/prisma';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getRedisUrlOrNull, getRedisHost } from '../../common/redis/redis-url';
 
 export interface QueueJobData {
   jobId: string; // DB job ID
@@ -30,72 +31,37 @@ export class IntegrationQueueService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    // Use REDIS_URL as primary, fallback to other variants
-    // NEVER default to localhost in production
-    const redisUrl =
-      this.configService.get<string>('REDIS_URL') ||
-      this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
-      this.configService.get<string>('BULL_REDIS_URL') ||
-      this.configService.get<string>('QUEUE_REDIS_URL') ||
-      this.configService.get<string>('JOB_REDIS_URL');
+    // Queue is enabled if QUEUE_MODE is 'bull' or 'dual'
+    const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
+    this.enabled = queueMode === 'bull' || queueMode === 'dual';
     
-    if (!redisUrl) {
-      // Don't use localhost fallback - disable queue if no Redis URL
-      this.redisConnection = '' as any;
-      this.enabled = false;
-      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-      if (nodeEnv === 'production') {
-        this.logger.warn('[redis] REDIS_URL not configured, IntegrationQueueService disabled. Set REDIS_URL to enable queue processing.');
-      } else {
-        this.logger.warn('[redis] No REDIS_URL found, IntegrationQueueService disabled. Set REDIS_URL to enable queue processing.');
-      }
-    } else {
-      // Parse Redis URL for BullMQ connection
-      // BullMQ accepts connection string directly or ConnectionOptions
-      this.redisConnection = redisUrl as any; // BullMQ accepts string URLs
-      
-      // Queue is enabled if QUEUE_MODE is 'bull' or 'dual'
-      const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
-      this.enabled = queueMode === 'bull' || queueMode === 'dual';
-    }
+    // Redis connection will be set in onModuleInit using centralized function
+    this.redisConnection = '' as any;
   }
 
   async onModuleInit() {
     if (!this.enabled) {
-      this.logger.log('[redis] BullMQ queue disabled (QUEUE_MODE != bull|dual or REDIS_URL missing)');
+      this.logger.log('[redis] BullMQ queue disabled (QUEUE_MODE != bull|dual)');
       return;
     }
 
-    if (!this.redisConnection || this.redisConnection === '') {
-      this.logger.warn('[redis] Redis connection not configured, queue will not initialize');
+    // CRITICAL: Use centralized Redis URL function (single source of truth)
+    const redisUrl = getRedisUrlOrNull();
+
+    if (!redisUrl) {
+      this.logger.warn('[redis] REDIS_URL not configured or invalid, queue will not initialize');
       this.enabled = false;
       return;
     }
 
-    // CRITICAL: Validate Redis URL to prevent localhost connections
-    const nodeEnv = this.configService.get<string>('NODE_ENV', 'production');
-    const redisUrl = this.redisConnection as string;
-    if (nodeEnv === 'production') {
-      if (redisUrl.includes('localhost') || 
-          redisUrl.includes('127.0.0.1') || 
-          redisUrl.includes('redis://redis:') ||
-          redisUrl === 'redis://redis:6379') {
-        this.logger.error('[redis] REDIS_URL contains localhost/127.0.0.1 - cannot use in production. Queue disabled.');
-        this.enabled = false;
-        return;
-      }
+    // Log Redis host for diagnostics
+    const redisHost = getRedisHost(redisUrl);
+    if (redisHost) {
+      this.logger.log(`[redis] Connected to Redis: ${redisHost}`);
     }
 
     try {
-      // Parse and log Redis host (without credentials) for diagnostics
-      try {
-        const url = new URL(redisUrl);
-        const host = url.hostname;
-        const port = url.port || '6379';
-        this.logger.log(`[redis] Connected to Redis: ${host}:${port}`);
-      } catch (e) {
-        this.logger.warn(`[redis] Could not parse Redis URL (non-critical): ${redisUrl.substring(0, 30)}...`);
-      }
+      this.redisConnection = redisUrl as any; // BullMQ accepts string URLs
 
       const queueOptions: QueueOptions = {
         connection: this.redisConnection as ConnectionOptions,

@@ -80,6 +80,29 @@ If Railway were to use Nixpacks instead of Dockerfile, it would run:
 
 But we use Dockerfile for consistency.
 
+### Build Arguments (Cache Busting)
+
+Both Dockerfiles (`Dockerfile` and `Dockerfile.worker`) accept build arguments:
+- `GIT_COMMIT`: Commit hash (default: `unknown`)
+- `BUILD_TIME`: Build timestamp (default: current time)
+
+**Railway automatically sets these** from environment variables:
+- `GIT_COMMIT` from `RAILWAY_GIT_COMMIT_SHA`
+- `BUILD_TIME` from build timestamp
+
+These are used to:
+1. Create `/app/BUILD_COMMIT.txt` in the image (for runtime verification)
+2. Invalidate Docker cache (DEPLOY_TRIGGER.txt changes on every commit)
+
+**Manual Build (for testing)**:
+```bash
+docker build \
+  --build-arg GIT_COMMIT=$(git rev-parse HEAD) \
+  --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  -f apps/api/Dockerfile \
+  -t remember-me-api .
+```
+
 ## Environment Variables
 
 Railway should have these environment variables set:

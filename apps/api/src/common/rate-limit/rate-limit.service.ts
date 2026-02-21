@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { getRedisUrlOrNull, getRedisHost } from '../redis/redis-url';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -42,18 +43,19 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // Get Redis URL - ONLY use RATE_LIMIT_REDIS_URL if it exists
-    const rateLimitRedisUrl = this.configService.get<string>('RATE_LIMIT_REDIS_URL');
+    // CRITICAL: Use centralized Redis URL function (single source of truth)
+    // Rate limiting can use RATE_LIMIT_REDIS_URL or fallback to REDIS_URL
+    const rateLimitRedisUrl = getRedisUrlOrNull();
     
     if (!rateLimitRedisUrl) {
-      this.logWarnOnce('Rate limiting disabled: RATE_LIMIT_REDIS_URL not set');
+      this.logWarnOnce('[redis] Rate limiting disabled: no valid Redis URL');
       this._isEnabled = false;
       return;
     }
 
     // Validate URL format
     if (!rateLimitRedisUrl.match(/^rediss?:\/\//)) {
-      this.logWarnOnce(`Rate limiting disabled: Invalid Redis URL format: ${rateLimitRedisUrl}`);
+      this.logWarnOnce(`[redis] Rate limiting disabled: Invalid Redis URL format`);
       this._isEnabled = false;
       return;
     }
@@ -61,22 +63,15 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
     // CRITICAL: Only use URLs with authentication (must contain @)
     // This prevents NOAUTH errors
     if (!rateLimitRedisUrl.includes('@')) {
-      this.logWarnOnce('Rate limiting disabled: Redis URL must include password (format: redis://password@host:port)');
+      this.logWarnOnce('[redis] Rate limiting disabled: Redis URL must include password (format: redis://password@host:port)');
       this._isEnabled = false;
       return;
     }
 
-    // CRITICAL: Never use localhost or redis://redis in production
-    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-    if (nodeEnv === 'production') {
-      if (rateLimitRedisUrl.includes('localhost') || 
-          rateLimitRedisUrl.includes('127.0.0.1') || 
-          rateLimitRedisUrl.includes('redis://redis:') ||
-          rateLimitRedisUrl === 'redis://redis:6379') {
-        this.logWarnOnce('Rate limiting disabled: Cannot use localhost/redis://redis in production');
-        this._isEnabled = false;
-        return;
-      }
+    // Log Redis host for diagnostics
+    const redisHost = getRedisHost(rateLimitRedisUrl);
+    if (redisHost) {
+      this.logger.log(`[redis] Rate limiting using Redis: ${redisHost}`);
     }
 
     // Attempt to initialize Redis connection

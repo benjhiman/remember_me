@@ -8,6 +8,9 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma/prisma.service';
 import { Role } from '@remember-me/prisma';
 import * as bcrypt from 'bcrypt';
+import { BUILD_INFO } from './build-info';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Controller()
 export class AppController {
@@ -20,15 +23,27 @@ export class AppController {
   @Public()
   @Get()
   getHello() {
-    const commit =
-      process.env.RAILWAY_GIT_COMMIT_SHA ||
-      process.env.VERCEL_GIT_COMMIT_SHA ||
-      this.configService.get<string>('GIT_COMMIT') ||
-      null;
+    // Try to read BUILD_COMMIT.txt from Dockerfile if available
+    let buildCommitFromFile: string | null = null;
+    try {
+      const buildCommitPath = path.join(process.cwd(), 'BUILD_COMMIT.txt');
+      if (fs.existsSync(buildCommitPath)) {
+        const content = fs.readFileSync(buildCommitPath, 'utf-8').trim();
+        const match = content.match(/commit=([a-f0-9]+)/);
+        if (match) {
+          buildCommitFromFile = match[1].substring(0, 7);
+        }
+      }
+    } catch (e) {
+      // Ignore errors reading file
+    }
+
+    const commit = buildCommitFromFile || BUILD_INFO.commit;
     return {
       ok: true,
       service: 'api',
-      commit: commit ? commit.substring(0, 7) : null,
+      commit,
+      buildTime: BUILD_INFO.buildTime,
     };
   }
 

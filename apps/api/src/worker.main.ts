@@ -2,68 +2,70 @@ import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './worker.module';
 import { Logger } from '@nestjs/common';
 import { JobRunnerService } from './integrations/jobs/job-runner.service';
+import { BUILD_INFO } from './build-info';
+import { getRedisUrlOrNull, getRedisHost } from './common/redis/redis-url';
+import * as fs from 'fs';
+import * as path from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Worker');
   const runOnce = process.env.WORKER_RUN_ONCE === 'true' || process.env.WORKER_RUN_ONCE === '1';
 
-  // CRITICAL: Deployment diagnostics - log commit, cwd, and entry point
-  const commitSha = process.env.RAILWAY_GIT_COMMIT_SHA || 
-                    process.env.VERCEL_GIT_COMMIT_SHA || 
-                    process.env.GIT_COMMIT || 
-                    'unknown';
+  // CRITICAL: Deployment diagnostics - log commit, build time, cwd, and entry point
+  // Try to read BUILD_COMMIT.txt from Dockerfile if available
+  let buildCommitFromFile: string | null = null;
+  let buildTimeFromFile: string | null = null;
+  try {
+    const buildCommitPath = path.join(process.cwd(), 'BUILD_COMMIT.txt');
+    if (fs.existsSync(buildCommitPath)) {
+      const content = fs.readFileSync(buildCommitPath, 'utf-8').trim();
+      const commitMatch = content.match(/commit=([a-f0-9]+)/);
+      if (commitMatch) {
+        buildCommitFromFile = commitMatch[1].substring(0, 7);
+      }
+      const timeMatch = content.match(/buildTime=([^\n]+)/);
+      if (timeMatch) {
+        buildTimeFromFile = timeMatch[1];
+      }
+    }
+  } catch (e) {
+    // Ignore errors reading file
+  }
+
+  const commitSha = buildCommitFromFile || BUILD_INFO.commit;
+  const buildTime = buildTimeFromFile || BUILD_INFO.buildTime;
   const cwd = process.cwd();
   const entryFile = __filename || 'unknown';
   
   logger.log(`[worker] Deployment diagnostics:`);
-  logger.log(`[worker] commit=${commitSha.substring(0, 7)}`);
+  logger.log(`[worker] commit=${commitSha}`);
+  logger.log(`[worker] buildTime=${buildTime}`);
   logger.log(`[worker] cwd=${cwd}`);
   logger.log(`[worker] entry=${entryFile}`);
 
-  // Log Redis configuration for diagnostics
-  const redisUrl = process.env.REDIS_URL || 
-                   process.env.RATE_LIMIT_REDIS_URL || 
-                   process.env.BULL_REDIS_URL || 
-                   process.env.QUEUE_REDIS_URL || 
-                   process.env.JOB_REDIS_URL;
-  
-  if (redisUrl) {
-    // CRITICAL: Validate Redis URL does NOT contain localhost/127.0.0.1 in production
-    const nodeEnv = process.env.NODE_ENV || 'development';
-    if (nodeEnv === 'production') {
-      if (redisUrl.includes('localhost') || 
-          redisUrl.includes('127.0.0.1') || 
-          redisUrl.includes('redis://redis:') ||
-          redisUrl === 'redis://redis:6379') {
-        logger.error(`[redis][worker] REDIS_URL contains localhost/127.0.0.1 - CANNOT USE IN PRODUCTION`);
-        logger.error(`[redis][worker] Redis features will be DISABLED`);
-        // Don't crash - continue without Redis
-      } else {
-        // Parse host from URL (without credentials)
-        try {
-          const url = new URL(redisUrl);
-          const host = url.hostname;
-          const port = url.port || '6379';
-          logger.log(`[redis][worker] REDIS_URL present: true`);
-          logger.log(`[redis][worker] Redis host: ${host}:${port}`);
-        } catch (e) {
-          logger.warn(`[redis][worker] REDIS_URL present but invalid format: ${redisUrl.substring(0, 20)}...`);
-        }
-      }
-    } else {
-      // Development: allow localhost but log it
-      try {
-        const url = new URL(redisUrl);
-        const host = url.hostname;
-        const port = url.port || '6379';
-        logger.log(`[redis][worker] REDIS_URL present: true`);
-        logger.log(`[redis][worker] Redis host: ${host}:${port} (dev mode)`);
-      } catch (e) {
-        logger.warn(`[redis][worker] REDIS_URL present but invalid format: ${redisUrl.substring(0, 20)}...`);
-      }
+  // CRITICAL: Guardrail - prevent ANY localhost Redis connections
+  // Even if old code tries to use localhost, we disable it at process level
+  const originalRedisUrl = process.env.REDIS_URL;
+  if (originalRedisUrl && process.env.NODE_ENV === 'production') {
+    const lower = originalRedisUrl.toLowerCase();
+    if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
+      logger.error(`[redis][worker] GUARDRAIL: REDIS_URL contains localhost/127.0.0.1 - DISABLING`);
+      process.env.REDIS_URL = ''; // Clear it to prevent any connection attempts
+      process.env.RATE_LIMIT_REDIS_URL = '';
+      process.env.BULL_REDIS_URL = '';
+      process.env.QUEUE_REDIS_URL = '';
+      process.env.JOB_REDIS_URL = '';
     }
+  }
+
+  // Log Redis configuration for diagnostics using centralized function
+  const redisUrl = getRedisUrlOrNull();
+  const redisHost = getRedisHost(redisUrl);
+  
+  if (redisUrl && redisHost) {
+    logger.log(`[redis][worker] mode=enabled urlPresent=true host=${redisHost}`);
   } else {
-    logger.warn(`[redis][worker] REDIS_URL present: false - Redis features will be disabled`);
+    logger.log(`[redis][worker] mode=disabled urlPresent=false host=null`);
   }
 
   // Create NestJS application without HTTP server
