@@ -54,8 +54,11 @@ async function bootstrap() {
     'JOB_REDIS_URL',
   ];
 
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  if (nodeEnv === 'production') {
+  // CRITICAL: Guardrail - prevent ANY localhost Redis connections
+  // Even if old code tries to use localhost, we disable it at process level
+  // Check ALL possible Redis URL environment variables
+  const nodeEnvFirst = process.env.NODE_ENV || 'development';
+  if (nodeEnvFirst === 'production') {
     for (const envVar of redisEnvVars) {
       const value = process.env[envVar];
       if (value) {
@@ -86,8 +89,7 @@ async function bootstrap() {
   // CRITICAL: Clear Redis env vars ONE MORE TIME before creating NestJS app
   // This ensures that even if something tries to read env vars during module initialization,
   // they will be empty and won't cause localhost connection attempts
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  if (nodeEnv === 'production') {
+  if (nodeEnvFirst === 'production') {
     const redisEnvVars = ['REDIS_URL', 'RATE_LIMIT_REDIS_URL', 'BULL_REDIS_URL', 'QUEUE_REDIS_URL', 'JOB_REDIS_URL'];
     for (const envVar of redisEnvVars) {
       const value = process.env[envVar];
