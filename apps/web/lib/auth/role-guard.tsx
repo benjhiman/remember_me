@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { Role } from '@/lib/auth/permissions';
+import { Button } from '@/components/ui/button';
 
 // Re-export Role for convenience
 export { Role };
