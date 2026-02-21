@@ -24,7 +24,7 @@ import {
 } from '@remember-me/prisma';
 import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { WhatsAppAutomationsService } from '../integrations/whatsapp/whatsapp-automations.service';
+// import { WhatsAppAutomationsService } from '../integrations/whatsapp/whatsapp-automations.service';
 import { AttributionService } from '../dashboard/attribution.service';
 import { OrgSettingsService } from '../settings/org-settings.service';
 
@@ -36,8 +36,8 @@ export class SalesService {
     private prisma: PrismaService,
     private auditLogService: AuditLogService,
     @Inject(REQUEST) private request: Request,
-    @Inject(forwardRef(() => WhatsAppAutomationsService))
-    private automationsService?: WhatsAppAutomationsService,
+    // @Inject(forwardRef(() => WhatsAppAutomationsService))
+    // private automationsService?: WhatsAppAutomationsService,
     private attributionService?: AttributionService,
     private orgSettings?: OrgSettingsService,
   ) {}
