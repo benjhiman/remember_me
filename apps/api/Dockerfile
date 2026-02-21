@@ -33,8 +33,11 @@ RUN npm install -g pnpm@latest
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build Prisma client
+# Build Prisma package (TypeScript compilation)
 WORKDIR /app/packages/prisma
+RUN pnpm build
+
+# Generate Prisma client
 RUN pnpm prisma generate
 
 # Build API
@@ -59,6 +62,10 @@ COPY turbo.json ./
 
 # Copy packages (only what's needed for runtime)
 COPY packages ./packages
+
+# Copy built Prisma package dist from builder (required for @remember-me/prisma)
+COPY --from=builder /app/packages/prisma/dist ./packages/prisma/dist
+COPY --from=builder /app/packages/prisma/package.json ./packages/prisma/package.json
 
 # Copy built API
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
