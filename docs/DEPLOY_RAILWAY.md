@@ -96,9 +96,9 @@ Railway should have these environment variables set:
 
 ## Deployment Verification
 
-### 1. Check Railway Logs
+### 1. Check Railway Logs (API Service)
 
-After deployment, check logs for:
+After deployment, check API logs for:
 ```
 📦 Deployed commit: <7-char-hash>
 🚀 API server running on: http://localhost:4000/api
@@ -106,7 +106,26 @@ After deployment, check logs for:
 
 The commit hash should match the latest commit on `main`.
 
-### 2. Check Health Endpoint
+### 2. Check Railway Logs (Worker Service)
+
+After deployment, check Worker logs for:
+```
+[worker] Deployment diagnostics:
+[worker] commit=<7-char-hash>
+[worker] cwd=/app/apps/api
+[worker] entry=/app/apps/api/dist/worker.main.js
+[redis][worker] REDIS_URL present: true
+[redis][worker] Redis host: redis.railway.internal:6379
+🚀 Worker started (no HTTP server)
+```
+
+**Critical checks:**
+- ✅ Commit hash matches latest commit on `main`
+- ✅ Entry point is `worker.main.js` (NOT `main.js`)
+- ✅ Redis host is `redis.railway.internal:6379` (NOT `127.0.0.1` or `localhost`)
+- ✅ NO errors: `ECONNREFUSED 127.0.0.1:6379`
+
+### 3. Check Health Endpoint
 
 ```bash
 curl -I https://api.iphonealcosto.com/api/health
@@ -116,7 +135,7 @@ Response should include:
 - `HTTP/1.1 200 OK`
 - `X-App-Commit: <commit-hash>` (7 characters)
 
-### 3. Verify Commit Hash
+### 4. Verify Commit Hash
 
 ```bash
 # Get latest commit from GitHub
@@ -153,7 +172,7 @@ git push origin main
 ### Railway Not Deploying
 
 1. **Check GitHub Connection**:
-   - Railway → Settings → Source
+   - Railway → Settings → Source (for each service)
    - Verify repo and branch are correct
    - Reconnect if needed
 
@@ -162,12 +181,19 @@ git push origin main
    - Look for build errors
 
 3. **Check Dockerfile**:
-   - Ensure `apps/api/Dockerfile` exists
-   - Verify `railway.toml` points to correct path
+   - **API**: Ensure `apps/api/Dockerfile` exists
+   - **Worker**: Ensure `apps/api/Dockerfile.worker` exists
+   - Verify `railway.toml` points to correct path (API only)
 
-4. **Force Redeploy**:
+4. **Worker Using Wrong Entrypoint**:
+   - Railway → Worker Service → Settings → Build
+   - Verify Dockerfile Path: `apps/api/Dockerfile.worker`
+   - Verify Start Command is empty (uses Dockerfile CMD)
+   - If using custom start command, ensure it's: `node dist/worker.main.js`
+
+5. **Force Redeploy**:
    - Use `DEPLOY_TRIGGER.txt` method above
-   - Or manually trigger in Railway dashboard
+   - Or manually trigger in Railway dashboard (for each service)
 
 ### Wrong Commit Deployed
 
@@ -250,7 +276,33 @@ Railway provides:
 
 ## Related Files
 
-- `apps/api/Dockerfile` - Build configuration
-- `railway.toml` - Railway service configuration
+- `apps/api/Dockerfile` - Build configuration (API service)
+- `apps/api/Dockerfile.worker` - Build configuration (Worker service)
+- `railway.toml` - Railway service configuration (API service)
 - `apps/api/package.json` - Build scripts
 - `package.json` (root) - Monorepo scripts
+
+## Worker Service Setup (Railway Dashboard)
+
+Since Railway doesn't support multi-service configuration in a single `railway.toml`, the worker service must be configured manually:
+
+1. **Go to Railway Dashboard** → Your Project → Worker Service → Settings → Build
+
+2. **Configure Build**:
+   - **Dockerfile Path**: `apps/api/Dockerfile.worker`
+   - **Build Command**: (leave empty)
+   - **Start Command**: (leave empty - uses Dockerfile CMD)
+
+3. **Environment Variables** (Worker Service):
+   - `WORKER_MODE=1` (required)
+   - `JOB_RUNNER_ENABLED=true` (required)
+   - `REDIS_URL` (required if using BullMQ) - should be Railway Redis URL
+   - `DATABASE_URL` (required)
+   - `NODE_ENV=production` (required)
+   - All other env vars as needed
+
+4. **Verify Source**:
+   - Railway → Worker Service → Settings → Source
+   - Repository: `benjhiman/remember_me`
+   - Branch: `main`
+   - Auto Deploy: Enabled
