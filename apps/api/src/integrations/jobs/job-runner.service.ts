@@ -312,8 +312,10 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // CRITICAL: Worker options - connection MUST be a string (Redis URL)
+    // NEVER pass an object with host/port - this would allow BullMQ to use defaults
     const workerOptions = {
-      connection: connectionConfig, // Use Redis URL string directly
+      connection: connectionConfig as string, // Use Redis URL string directly - BullMQ will parse it
       concurrency: this.workerConcurrency,
       limiter: {
         max: 100, // Max 100 jobs per duration
@@ -325,6 +327,23 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       maxRetriesPerRequest: 1,
       retryStrategy: () => null, // Disable retries - fail fast
     };
+    
+    // CRITICAL: Log final connection config before creating Worker
+    this.logger.log(`[redis][worker] Creating BullMQ Worker with connection type: ${typeof workerOptions.connection}`);
+    if (typeof workerOptions.connection === 'string') {
+      const urlForLogging = (workerOptions.connection as string).replace(/:[^:@]+@/, ':****@');
+      this.logger.log(`[redis][worker] Worker connection URL: ${urlForLogging}`);
+    } else {
+      this.logger.error(`[redis][worker] FATAL: Worker connection is not a string! Type: ${typeof workerOptions.connection}`);
+      // Clear env vars and abort
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      delete process.env.REDIS_HOST;
+      process.env.REDIS_HOST = '';
+      delete process.env.REDIS_PORT;
+      process.env.REDIS_PORT = '';
+      return;
+    }
 
     this.bullWorker = new Worker(
       queueName,

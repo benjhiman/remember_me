@@ -62,7 +62,7 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
     
     // CRITICAL: Log detailed diagnostics
     const redisUrlPresent = !!process.env.REDIS_URL;
-    const redisHostEnv = process.env.REDIS_HOST || process.env.REDIS_HOST || null;
+    const redisHostEnv = process.env.REDIS_HOST || null;
     const redisPortEnv = process.env.REDIS_PORT || null;
     const redisHost = getRedisHost(redisUrl);
     
