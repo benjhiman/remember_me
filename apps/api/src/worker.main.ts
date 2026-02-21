@@ -85,12 +85,16 @@ async function bootstrap() {
 
   // Create NestJS application WITH minimal HTTP server for healthcheck
   // Railway requires healthcheck endpoint, so we start a minimal HTTP server
+  logger.log('Creating NestJS application with HTTP server...');
   const app = await NestFactory.create(WorkerModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
 
+  logger.log('NestJS application created, setting up healthcheck endpoint...');
+
   // Add minimal healthcheck endpoint for Railway
   app.getHttpAdapter().get('/api/health', (req: any, res: any) => {
+    logger.log('Healthcheck endpoint called');
     res.status(200).json({
       status: 'ok',
       service: 'worker',
@@ -101,8 +105,17 @@ async function bootstrap() {
 
   // Start HTTP server on port 4000 (or PORT env var) for healthcheck only
   const port = process.env.PORT || 4000;
-  await app.listen(port);
-  logger.log(`🚀 Worker started with minimal HTTP server on port ${port} (healthcheck only)`);
+  logger.log(`Starting HTTP server on port ${port}...`);
+  
+  try {
+    await app.listen(port, '0.0.0.0'); // Bind to all interfaces
+    logger.log(`✅ HTTP server started successfully on port ${port} (0.0.0.0:${port})`);
+    logger.log(`🚀 Worker started with minimal HTTP server on port ${port} (healthcheck only)`);
+  } catch (error) {
+    logger.error(`❌ Failed to start HTTP server: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(`Error details: ${error instanceof Error ? error.stack : String(error)}`);
+    throw error;
+  }
   logger.log(`Worker mode: ${process.env.WORKER_MODE || 'not set'}`);
   logger.log(`Job runner enabled: ${process.env.JOB_RUNNER_ENABLED || 'true (default in worker mode)'}`);
   logger.log(`Run once: ${runOnce}`);
