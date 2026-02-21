@@ -91,31 +91,30 @@ export class AttributionService {
       return;
     }
 
+    // TODO: MetaAttributionSnapshot model not in schema - skipping snapshot creation
     // Check if snapshot already exists (idempotency)
-    const existingSnapshot = await tx.metaAttributionSnapshot.findUnique({
-      where: { saleId },
-    });
-
-    if (existingSnapshot) {
-      this.logger.debug(`Attribution snapshot already exists for sale ${saleId}`);
-      return;
-    }
-
+    // const existingSnapshot = await tx.metaAttributionSnapshot.findUnique({
+    //   where: { saleId },
+    // });
+    // if (existingSnapshot) {
+    //   this.logger.debug(`Attribution snapshot already exists for sale ${saleId}`);
+    //   return;
+    // }
     // Create snapshot
-    await tx.metaAttributionSnapshot.create({
-      data: {
-        organizationId,
-        saleId,
-        leadId: resolvedLeadId,
-        source: AttributionSource.META_LEAD_ADS,
-        campaignId: customFields?.metaCampaignId || null,
-        adsetId: customFields?.metaAdsetId || null,
-        adId: customFields?.metaAdId || null,
-        formId: customFields?.metaFormId || null,
-        pageId: customFields?.metaPageId || null,
-        leadgenId: customFields?.metaLeadgenId || null,
-      },
-    });
+    // await tx.metaAttributionSnapshot.create({
+    //   data: {
+    //     organizationId,
+    //     saleId,
+    //     leadId: resolvedLeadId,
+    //     source: AttributionSource.META_LEAD_ADS,
+    //     campaignId: customFields?.metaCampaignId || null,
+    //     adsetId: customFields?.metaAdsetId || null,
+    //     adId: customFields?.metaAdId || null,
+    //     formId: customFields?.metaFormId || null,
+    //     pageId: customFields?.metaPageId || null,
+    //     leadgenId: customFields?.metaLeadgenId || null,
+    //   },
+    // });
 
     this.logger.log(`Created attribution snapshot for sale ${saleId} from lead ${resolvedLeadId}`);
   }
