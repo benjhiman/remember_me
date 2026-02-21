@@ -262,7 +262,7 @@ export class DashboardService {
     `;
 
     const stageIds = leadsByStageRaw.map((l) => l.stageId);
-    const stages = await this.prisma.stage.findMany({
+    const stages = await this.prisma.pipelineStage.findMany({
       where: {
         id: { in: stageIds },
         pipeline: {
@@ -277,7 +277,7 @@ export class DashboardService {
     });
 
     const breakdown = leadsByStageRaw.map((item) => {
-      const stage = stages.find((s) => s.id === item.stageId);
+      const stage = stages.find((s: { id: string; name: string | null; color: string | null }) => s.id === item.stageId);
       return {
         stageId: item.stageId,
         stageName: stage?.name || 'Unknown',
