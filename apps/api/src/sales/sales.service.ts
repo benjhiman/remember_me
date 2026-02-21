@@ -499,15 +499,6 @@ export class SalesService {
             },
           },
         },
-          include: {
-            stockItem: {
-              select: {
-                id: true,
-                model: true,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -615,15 +606,6 @@ export class SalesService {
                 sku: true,
                 imei: true,
                 status: true,
-              },
-            },
-          },
-        },
-          include: {
-            stockItem: {
-              select: {
-                id: true,
-                model: true,
               },
             },
           },
@@ -769,15 +751,6 @@ export class SalesService {
                 },
               },
             },
-              include: {
-                stockItem: {
-                  select: {
-                    id: true,
-                    model: true,
-                  },
-                },
-              },
-            },
           },
         });
 
@@ -896,15 +869,6 @@ export class SalesService {
                 },
               },
             },
-              include: {
-                stockItem: {
-                  select: {
-                    id: true,
-                    model: true,
-                  },
-                },
-              },
-            },
           },
         });
 
@@ -998,15 +962,6 @@ export class SalesService {
             },
           },
         },
-          include: {
-            stockItem: {
-              select: {
-                id: true,
-                model: true,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -1095,15 +1050,6 @@ export class SalesService {
                 sku: true,
                 imei: true,
                 status: true,
-              },
-            },
-          },
-        },
-          include: {
-            stockItem: {
-              select: {
-                id: true,
-                model: true,
               },
             },
           },
