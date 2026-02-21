@@ -160,19 +160,20 @@ export class AttributionService {
     });
 
     // Get spend data for the same date range
-    const spendWhere: Prisma.MetaSpendDailyWhereInput = {
-      organizationId,
-      date: filters.from || filters.to
-        ? {
-            ...(filters.from ? { gte: filters.from } : {}),
-            ...(filters.to ? { lte: filters.to } : {}),
-          }
-        : undefined,
-    };
-
-    const spendRecords = (await this.prisma.metaSpendDaily.findMany({
-      where: spendWhere,
-    })) || [];
+    // TODO: MetaSpendDaily model not in schema - returning empty array
+    const spendRecords: any[] = [];
+    // const spendWhere: Prisma.MetaSpendDailyWhereInput = {
+    //   organizationId,
+    //   date: filters.from || filters.to
+    //     ? {
+    //         ...(filters.from ? { gte: filters.from } : {}),
+    //         ...(filters.to ? { lte: filters.to } : {}),
+    //       }
+    //     : undefined,
+    // };
+    // const spendRecords = (await this.prisma.metaSpendDaily.findMany({
+    //   where: spendWhere,
+    // })) || [];
 
     // Group by campaign/adset/ad
     const groups = new Map<
