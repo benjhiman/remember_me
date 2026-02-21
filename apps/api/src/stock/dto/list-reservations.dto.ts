@@ -1,6 +1,15 @@
 import { IsString, IsOptional, IsEnum, IsInt, Min, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ReservationStatus } from '@prisma/client';
+// TODO: ReservationStatus enum needs to be added to Prisma schema
+// import { ReservationStatus } from '@prisma/client';
+
+export enum ReservationStatus {
+  ACTIVE = 'ACTIVE',
+  CONFIRMED = 'CONFIRMED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+  RELEASED = 'RELEASED',
+}
 
 export class ListReservationsDto {
   @IsString()
