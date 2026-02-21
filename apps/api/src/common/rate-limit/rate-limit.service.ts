@@ -100,6 +100,15 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
       this.redis.on('error', (error) => {
         const errorMsg = error.message || String(error);
         
+        // CRITICAL: If attempting to connect to localhost in production, disable immediately
+        const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
+        if (nodeEnv === 'production' && 
+            (errorMsg.includes('127.0.0.1') || errorMsg.includes('localhost'))) {
+          this.logWarnOnce(`[redis] FATAL: Attempted to connect to localhost in production. Rate limiting disabled.`);
+          this.disableRateLimit();
+          return;
+        }
+        
         // Handle NOAUTH and connection errors
         if (errorMsg.includes('NOAUTH') || 
             errorMsg.includes('ECONNREFUSED') || 
