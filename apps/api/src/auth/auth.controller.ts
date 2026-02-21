@@ -151,12 +151,24 @@ export class AuthController {
       await this.authService.logout(refreshToken);
     }
     
-    // Clear cookies
+    // Clear cookies (use host-only, same as setAuthCookies)
     const isProduction = this.configService.get('NODE_ENV') === 'production';
-    const domain = isProduction ? '.iphonealcosto.com' : undefined;
+    const domain = undefined; // Host-only cookies work better with proxy
     
-    res.clearCookie('accessToken', { path: '/', domain });
-    res.clearCookie('refreshToken', { path: '/', domain });
+    res.clearCookie('accessToken', {
+      path: '/',
+      domain,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+    });
+    res.clearCookie('refreshToken', {
+      path: '/',
+      domain,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+    });
     
     return { message: 'Logged out successfully' };
   }

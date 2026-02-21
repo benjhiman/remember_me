@@ -13,6 +13,8 @@ export class StockItemIdPipe implements PipeTransform<string, string> {
     'health',
     'entries',
     'bulk-add',
+    'ping',
+    'item', // Reserved for /stock/item/:id routes
   ];
 
   transform(value: string): string {

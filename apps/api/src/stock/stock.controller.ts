@@ -137,7 +137,7 @@ export class StockController {
     return this.stockService.bulkAddStock(organizationId, user.userId, dto);
   }
 
-  // CRUD StockItem (dynamic routes must come after specific routes)
+  // CRUD StockItem - moved to /stock/item/:id to avoid route conflicts
   @Get()
   async listStockItems(
     @CurrentOrganization() organizationId: string,
@@ -145,16 +145,6 @@ export class StockController {
     @Query() query: ListStockItemsDto,
   ) {
     return this.stockService.listStockItems(organizationId, user.userId, query);
-  }
-
-  @Get(':id')
-  async getStockItem(
-    @CurrentOrganization() organizationId: string,
-    @CurrentUser() user: any,
-    @Param('id', StockItemIdPipe) id: string,
-  ) {
-    // StockItemIdPipe will reject reserved route names like "seller-view" before reaching here
-    return this.stockService.getStockItem(organizationId, user.userId, id);
   }
 
   @Post()
@@ -168,60 +158,70 @@ export class StockController {
     return this.stockService.createStockItem(organizationId, user.userId, dto);
   }
 
-  @Put(':id')
+  // Stock item CRUD routes (moved to /item/:id to avoid conflicts with reserved routes)
+  @Get('item/:id')
+  async getStockItem(
+    @CurrentOrganization() organizationId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ) {
+    return this.stockService.getStockItem(organizationId, user.userId, id);
+  }
+
+  @Put('item/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
   async updateStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id', StockItemIdPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateStockItemDto,
   ) {
     return this.stockService.updateStockItem(organizationId, user.userId, id, dto);
   }
 
-  @Delete(':id')
+  @Delete('item/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id', StockItemIdPipe) id: string,
+    @Param('id') id: string,
   ) {
     await this.stockService.deleteStockItem(organizationId, user.userId, id);
   }
 
-  @Patch(':id/restore')
+  @Patch('item/:id/restore')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
   async restoreStockItem(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id', StockItemIdPipe) id: string,
+    @Param('id') id: string,
   ) {
     return this.stockService.restoreStockItem(organizationId, user.userId, id);
   }
 
   // Stock adjustments
-  @Post(':id/adjust')
+  @Post('item/:id/adjust')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.MANAGER, Role.OWNER)
   async adjustStock(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id', StockItemIdPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: AdjustStockDto,
   ) {
     return this.stockService.adjustStock(organizationId, user.userId, id, dto);
   }
 
-  // Stock movements (legacy - by stock item ID) - must come after @Get(':id')
-  @Get(':id/movements')
+  // Stock movements (by stock item ID)
+  @Get('item/:id/movements')
   async listMovements(
     @CurrentOrganization() organizationId: string,
     @CurrentUser() user: any,
-    @Param('id', StockItemIdPipe) id: string,
+    @Param('id') id: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {

@@ -19,211 +19,168 @@ export class AppController {
 
   @Public()
   @Get()
-  getRoot() {
-    const commitSha = this.configService.get<string>('RAILWAY_GIT_COMMIT_SHA') || 
-                      this.configService.get<string>('VERCEL_GIT_COMMIT_SHA') || 
-                      this.configService.get<string>('GIT_COMMIT') || 
-                      null;
+  getHello() {
+    const commit =
+      process.env.RAILWAY_GIT_COMMIT_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      this.configService.get<string>('GIT_COMMIT') ||
+      null;
     return {
       ok: true,
       service: 'api',
-      commit: commitSha ? commitSha.substring(0, 7) : null,
-      timestamp: new Date().toISOString(),
+      commit: commit ? commit.substring(0, 7) : null,
     };
   }
 
   @Public()
   @Get('health')
   health() {
-    return { status: 'ok', timestamp: new Date().toISOString() };
-  }
-
-  @Public()
-  @Get('health/extended')
-  async getExtendedHealth() {
     return this.appService.getExtendedHealth();
   }
 
   @Public()
-  @Get('debug/config')
-  getConfigDebug() {
-    const jwtSecret = this.configService.get<string>('JWT_SECRET');
-    const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
-    const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
-    
+  @Get('_debug/cookies')
+  debugCookies(@Req() req: Request) {
+    // Completely disabled in production (return 404 without details)
+    if (process.env.NODE_ENV === 'production') {
+      return { error: 'Not found' };
+    }
+
+    // Development only: return cookie debug info
     return {
       ok: true,
-      envLoaded: true,
-      nodeEnv,
-      hasJwtSecret: !!jwtSecret,
-      hasJwtRefreshSecret: !!jwtRefreshSecret,
-      jwtSecretLength: jwtSecret ? jwtSecret.length : 0,
-      jwtRefreshSecretLength: jwtRefreshSecret ? jwtRefreshSecret.length : 0,
+      host: req.headers.host || null,
+      origin: req.headers.origin || null,
+      path: req.path,
+      cookieHeader: req.headers.cookie || null,
+      cookieKeys: Object.keys(req.cookies || {}),
+      cookies: req.cookies || {},
+    };
+  }
+
+  @Public()
+  @Get('_debug/headers')
+  debugHeaders(@Req() req: Request) {
+    // Completely disabled in production
+    if (process.env.NODE_ENV === 'production') {
+      return { error: 'Not found' };
+    }
+
+    // Development only: return header debug info
+    return {
+      ok: true,
+      headers: {
+        host: req.headers.host,
+        origin: req.headers.origin,
+        'user-agent': req.headers['user-agent'],
+        cookie: req.headers.cookie,
+        authorization: req.headers.authorization ? '***' : null,
+      },
+    };
+  }
+
+  @Public()
+  @Get('_debug/env')
+  debugEnv() {
+    // Completely disabled in production
+    if (process.env.NODE_ENV === 'production') {
+      return { error: 'Not found' };
+    }
+
+    // Development only: return safe env vars (no secrets)
+    return {
+      ok: true,
+      nodeEnv: process.env.NODE_ENV,
+      hasRedisUrl: !!process.env.REDIS_URL,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      databaseUrl: process.env.DATABASE_URL ? '***' : null,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  getMe(@CurrentOrganization() organizationId: string, @Req() req: any) {
+    return {
+      user: req.user,
+      organizationId,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('test-auth')
+  testAuth(@CurrentOrganization() organizationId: string, @Req() req: any) {
+    return {
+      ok: true,
+      message: 'Auth works!',
+      user: req.user,
+      organizationId,
+    };
+  }
+
+  @Public()
+  @Post('test')
+  async test(@Body() body: any) {
+    return {
+      ok: true,
+      received: body,
       timestamp: new Date().toISOString(),
     };
   }
 
   @Public()
-  @Get('debug/cors')
-  getCorsDebug(@Req() req: Request, @Res() res: Response) {
-    const originReceived = (req.headers as any).origin || null;
-    const requestId = (req as any).requestId || (req.headers as any)['x-request-id'] || null;
-    
-    // Normalize origin (same logic as CORS callback)
-    function normalizeOrigin(origin: string): string {
-      return origin.trim().replace(/\/+$/, '');
-    }
-    
-    const originNormalized = originReceived ? normalizeOrigin(originReceived) : null;
-    
-    // Determine CORS decision (same logic as callback)
-    let corsDecision: { allowed: boolean; reason: string } | null = null;
-    if (originReceived) {
-      if (originNormalized === 'https://app.iphonealcosto.com') {
-        corsDecision = { allowed: true, reason: 'exact_match_app_iphonealcosto' };
-      } else if (originNormalized === 'https://iphonealcosto.com' || originNormalized === 'https://www.iphonealcosto.com') {
-        corsDecision = { allowed: true, reason: 'exact_match_main_domains' };
-      } else if (originNormalized?.endsWith('.vercel.app')) {
-        corsDecision = { allowed: true, reason: 'vercel_preview' };
-      } else if (originNormalized?.endsWith('.iphonealcosto.com')) {
-        corsDecision = { allowed: true, reason: 'iphonealcosto_subdomain' };
-      } else if (originNormalized?.startsWith('http://localhost:') || originNormalized?.startsWith('http://127.0.0.1:')) {
-        corsDecision = { allowed: true, reason: 'localhost_dev' };
-      } else {
-        corsDecision = { allowed: false, reason: 'not_allowed' };
-      }
-    }
-    
-    // Read actual response headers set by CORS middleware
-    // Note: getHeader returns string | string[] | number | undefined
-    // Use type assertion since Express Response has getHeader but TypeScript types may not reflect it
-    const getHeaderString = (name: string): string | null => {
-      const value = (res as any).getHeader(name);
-      if (value === undefined) return null;
-      if (Array.isArray(value)) return value[0] || null;
-      return String(value);
-    };
-    
-    const responseHeaders = {
-      'access-control-allow-origin': getHeaderString('access-control-allow-origin'),
-      'access-control-allow-credentials': getHeaderString('access-control-allow-credentials'),
-      'access-control-allow-headers': getHeaderString('access-control-allow-headers'),
-      'access-control-allow-methods': getHeaderString('access-control-allow-methods'),
-    };
-    
-    const appCommit = getHeaderString('x-app-commit');
-    
-    return {
-      originReceived,
-      originNormalized,
-      corsDecision,
-      responseHeaders,
-      requestId,
-      appCommit,
-      note: 'cors debug - responseHeaders show actual CORS headers sent to browser',
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  @Get('test-org')
-  @UseGuards(JwtAuthGuard)
-  testOrganization(@CurrentOrganization() organizationId: string) {
-    return {
-      message: 'Current organization endpoint test',
-      organizationId,
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  /**
-   * TEST-ONLY endpoint to bootstrap test organization and user
-   * Only available when NODE_ENV=test or STAGING_TEST_MODE=true
-   * Completely disabled in production
-   */
-  @Post('test/bootstrap')
-  async bootstrapTestOrg(@Body() body: { email?: string; password?: string; orgName?: string }) {
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-    const testMode = this.configService.get<string>('STAGING_TEST_MODE') === 'true';
-
-    // Only allow in test or staging test mode
-    if (nodeEnv !== 'test' && !testMode) {
-      throw new Error('Bootstrap endpoint is only available in test mode');
+  @Post('seed-owner')
+  async seedOwner(@Body() body: { email: string; password: string; name: string; organizationName: string }) {
+    // Only allow in development
+    if (process.env.NODE_ENV === 'production') {
+      return { error: 'Not allowed in production' };
     }
 
-    const email = body.email || 'test@example.com';
-    const password = body.password || 'TestPassword123!';
-    const orgName = body.orgName || 'Test Organization';
+    const { email, password, name, organizationName } = body;
 
     // Check if user already exists
-    let user = await this.prisma.user.findUnique({
+    const existingUser = await this.prisma.user.findUnique({
       where: { email },
-      include: { memberships: { include: { organization: true } } },
     });
 
-    let org;
-    if (user && user.memberships.length > 0) {
-      org = user.memberships[0].organization;
-    } else {
-      // Create org if doesn't exist (generate slug from name)
-      const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      org = await this.prisma.organization.findUnique({
-        where: { slug },
-      });
-
-      if (!org) {
-        org = await this.prisma.organization.create({
-          data: {
-            name: orgName,
-            slug: `${slug}-${Date.now()}`, // Make unique
-          },
-        });
-      }
-
-      // Create user if doesn't exist
-      if (!user) {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        user = await this.prisma.user.create({
-          data: {
-            email,
-            passwordHash: hashedPassword,
-            name: 'Test User',
-          },
-          include: { memberships: { include: { organization: true } } },
-        });
-      }
-
-      // Create membership if doesn't exist
-      const existingMembership = await this.prisma.membership.findUnique({
-        where: {
-          userId_organizationId: {
-            userId: user.id,
-            organizationId: org.id,
-          },
-        },
-      });
-
-      if (!existingMembership) {
-        await this.prisma.membership.create({
-          data: {
-            userId: user.id,
-            organizationId: org.id,
-            role: 'OWNER',
-          },
-        });
-      }
+    if (existingUser) {
+      return { error: 'User already exists', email };
     }
 
-    if (!user || !org) {
-      throw new Error('Failed to create or retrieve test user and organization');
-    }
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    // Generate JWT token (simplified, in real app use AuthService)
-    // For smoke tests, we'll use the actual auth/login endpoint instead
+    // Create organization
+    const organization = await this.prisma.organization.create({
+      data: {
+        name: organizationName,
+        slug: organizationName.toLowerCase().replace(/\s+/g, '-'),
+      },
+    });
+
+    // Create user
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        role: Role.OWNER,
+        organizationId: organization.id,
+      },
+    });
+
     return {
-      organizationId: org.id,
-      userId: user.id,
-      email: user.email,
-      message: 'Test organization and user created/retrieved. Use /api/auth/login to get token.',
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+      organization: {
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+      },
     };
   }
 }
