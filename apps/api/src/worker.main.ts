@@ -83,6 +83,28 @@ async function bootstrap() {
     logger.log(`[redis][worker] mode=disabled urlPresent=false host=null`);
   }
 
+  // CRITICAL: Clear Redis env vars ONE MORE TIME before creating NestJS app
+  // This ensures that even if something tries to read env vars during module initialization,
+  // they will be empty and won't cause localhost connection attempts
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  if (nodeEnv === 'production') {
+    const redisEnvVars = ['REDIS_URL', 'RATE_LIMIT_REDIS_URL', 'BULL_REDIS_URL', 'QUEUE_REDIS_URL', 'JOB_REDIS_URL'];
+    for (const envVar of redisEnvVars) {
+      const value = process.env[envVar];
+      if (value) {
+        const lower = value.toLowerCase();
+        if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
+          logger.error(`[redis][worker] FINAL GUARDRAIL: ${envVar} contains localhost - CLEARING ALL Redis env vars before app creation`);
+          for (const varToClear of redisEnvVars) {
+            delete process.env[varToClear];
+            process.env[varToClear] = '';
+          }
+          break;
+        }
+      }
+    }
+  }
+
   // Create NestJS application WITH minimal HTTP server for healthcheck
   // Railway requires healthcheck endpoint, so we start a minimal HTTP server
   logger.log('Creating NestJS application with HTTP server...');
