@@ -5,6 +5,8 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "apps/api/Dockerfile"
+# Force rebuild on every deploy (no cache)
+# Note: Railway may cache layers, but DEPLOY_TRIGGER.txt should bust cache
 
 [deploy]
 healthcheckPath = "/api/health"
@@ -17,6 +19,7 @@ restartPolicyMaxRetries = 10
 # This file is for the default (API) service
 # Worker service must be configured manually in Railway Dashboard:
 # - Service Name: "remember_me/worker" (or "worker")
-# - Dockerfile Path: "apps/api/Dockerfile.worker"
+# - Dockerfile Path: "apps/api/Dockerfile.worker" ⚠️ CRITICAL
+# - Custom Start Command: MUST BE EMPTY (Dockerfile has CMD)
 # - No healthcheck (worker doesn't serve HTTP)
-# - Start Command: handled by Dockerfile CMD
+# - Start Command: handled by Dockerfile CMD ["node", "dist/worker.main.js"]

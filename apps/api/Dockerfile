@@ -12,8 +12,14 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY turbo.json ./
 
-# Copy deploy trigger (cache bust - changes on every commit)
+# CRITICAL: Copy deploy trigger FIRST to bust cache (changes on every commit)
+# This MUST be before other COPY commands to invalidate Docker cache
 COPY apps/api/DEPLOY_TRIGGER.txt ./apps/api/DEPLOY_TRIGGER.txt
+COPY apps/api/RAILWAY_DEPLOY_VERSION.txt ./apps/api/RAILWAY_DEPLOY_VERSION.txt
+
+# Force cache invalidation by reading trigger content
+RUN cat ./apps/api/DEPLOY_TRIGGER.txt || echo "DEPLOY_TRIGGER.txt not found" && \
+    cat ./apps/api/RAILWAY_DEPLOY_VERSION.txt || echo "RAILWAY_DEPLOY_VERSION.txt not found"
 
 # Copy packages
 COPY packages ./packages

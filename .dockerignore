@@ -1,0 +1,34 @@
+# Docker ignore file to ensure Railway detects changes
+# DO NOT ignore files that trigger cache busting
+
+# Ignore node_modules (but not package files)
+node_modules
+**/node_modules
+
+# Ignore build outputs (but not source)
+dist
+**/dist
+build
+**/build
+.next
+**/.next
+
+# Ignore git (but Railway needs to detect commits)
+.git
+.gitignore
+
+# Ignore env files
+.env
+.env.*
+!.env.example
+
+# Ignore IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# DO NOT ignore these (they trigger cache busting):
+# !apps/api/DEPLOY_TRIGGER.txt
+# !apps/api/RAILWAY_DEPLOY_VERSION.txt
+# !railway.toml
