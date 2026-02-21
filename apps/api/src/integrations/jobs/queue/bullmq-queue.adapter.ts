@@ -5,6 +5,7 @@ import { IntegrationJobsService } from '../integration-jobs.service';
 import { IIntegrationQueue, EnqueueJobParams } from './i-integration-queue.interface';
 import { Queue, QueueOptions, ConnectionOptions } from 'bullmq';
 import { IntegrationProvider, IntegrationJobStatus } from '@remember-me/prisma';
+import { getRedisUrlOrNull, getRedisHost } from '../../../common/redis/redis-url';
 
 export interface BullMqJobData {
   jobId: string; // DB job ID
