@@ -12,7 +12,7 @@ import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../common/audit/audit-log.service';
-import { AuditAction, AuditEntityType, WhatsAppAutomationTrigger } from '@remember-me/prisma';
+import { AuditAction, AuditEntityType } from '@remember-me/prisma';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { UpdateSaleDto } from './dto/update-sale.dto';
 import { ListSalesDto } from './dto/list-sales.dto';
@@ -154,7 +154,7 @@ export class SalesService {
         quantityBefore,
         quantityAfter,
         reason,
-        reservationId,
+        // reservationId, // Not available in current schema
         saleId,
         createdById,
         metadata,
