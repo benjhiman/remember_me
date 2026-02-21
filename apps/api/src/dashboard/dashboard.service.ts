@@ -78,42 +78,18 @@ export class DashboardService {
     });
 
     // Leads by Stage (top 10)
-    // Note: Using raw query because stageId might not be in groupBy fields
-    const leadsByStageRaw = await this.prisma.$queryRaw<Array<{ stageId: string; _count: number }>>`
-      SELECT "stageId", COUNT(*)::int as "_count"
-      FROM "Lead"
-      WHERE "organizationId" = ${organizationId}
-      ${dateFilter ? Prisma.sql`AND "createdAt" >= ${dateFilter.gte} AND "createdAt" <= ${dateFilter.lte}` : Prisma.empty}
-      GROUP BY "stageId"
-      ORDER BY "_count" DESC
-      LIMIT 10
-    `;
-
-    // Get stage names
-    const stageIds = leadsByStageRaw.map((l) => l.stageId);
-    const stages = await this.prisma.stage.findMany({
-      where: {
-        id: { in: stageIds },
-        pipeline: {
-          organizationId,
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-      },
-    });
-
-    const leadsByStageWithNames = leadsByStageRaw.map((item) => {
-      const stage = stages.find((s: { id: string; name: string | null; color: string | null }) => s.id === item.stageId);
-      return {
-        stageId: item.stageId,
-        stageName: stage?.name || 'Unknown',
-        stageColor: stage?.color || null,
-        count: item._count,
-      };
-    });
+    // TODO: Stage model not implemented in schema yet - returning empty array
+    const leadsByStageWithNames: Array<{ stageId: string; stageName: string; stageColor: string | null; count: number }> = [];
+    // Note: Stage functionality not yet implemented in schema
+    // const leadsByStageRaw = await this.prisma.$queryRaw<Array<{ stageId: string; _count: number }>>`
+    //   SELECT "stageId", COUNT(*)::int as "_count"
+    //   FROM "Lead"
+    //   WHERE "organizationId" = ${organizationId}
+    //   ${dateFilter ? Prisma.sql`AND "createdAt" >= ${dateFilter.gte} AND "createdAt" <= ${dateFilter.lte}` : Prisma.empty}
+    //   GROUP BY "stageId"
+    //   ORDER BY "_count" DESC
+    //   LIMIT 10
+    // `;
 
     // Total Sales
     const totalSales = await this.prisma.sale.count({
@@ -251,40 +227,17 @@ export class DashboardService {
     }));
 
     // Breakdown: leads by stage
-    // Note: Using raw query because stageId might not be in groupBy fields
-    const leadsByStageRaw = await this.prisma.$queryRaw<Array<{ stageId: string; _count: number }>>`
-      SELECT "stageId", COUNT(*)::int as "_count"
-      FROM "Lead"
-      WHERE "organizationId" = ${organizationId}
-      ${dateFilter ? Prisma.sql`AND "createdAt" >= ${dateFilter.gte} AND "createdAt" <= ${dateFilter.lte}` : Prisma.empty}
-      GROUP BY "stageId"
-      ORDER BY "_count" DESC
-    `;
-
-    const stageIds = leadsByStageRaw.map((l) => l.stageId);
-    const stages = await this.prisma.stage.findMany({
-      where: {
-        id: { in: stageIds },
-        pipeline: {
-          organizationId,
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        color: true,
-      },
-    });
-
-    const breakdown = leadsByStageRaw.map((item) => {
-      const stage = stages.find((s: { id: string; name: string | null; color: string | null }) => s.id === item.stageId);
-      return {
-        stageId: item.stageId,
-        stageName: stage?.name || 'Unknown',
-        stageColor: stage?.color || null,
-        count: item._count,
-      };
-    });
+    // TODO: Stage model not implemented in schema yet - returning empty array
+    const breakdown: Array<{ stageId: string; stageName: string; stageColor: string | null; count: number }> = [];
+    // Note: Stage functionality not yet implemented in schema
+    // const leadsByStageRaw = await this.prisma.$queryRaw<Array<{ stageId: string; _count: number }>>`
+    //   SELECT "stageId", COUNT(*)::int as "_count"
+    //   FROM "Lead"
+    //   WHERE "organizationId" = ${organizationId}
+    //   ${dateFilter ? Prisma.sql`AND "createdAt" >= ${dateFilter.gte} AND "createdAt" <= ${dateFilter.lte}` : Prisma.empty}
+    //   GROUP BY "stageId"
+    //   ORDER BY "_count" DESC
+    // `;
 
     // Assigned leads count (top 10 users)
     const assignedLeadsCount = await this.prisma.lead.groupBy({
