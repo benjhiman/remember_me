@@ -22,11 +22,11 @@ async function bootstrap() {
     console.log('✅ Environment variables loaded successfully');
   }
 
+  // Cookie parser (required for httpOnly cookies) - MUST be before other middleware
+  app.use(cookieParser());
+  
   // Security headers
   app.use(helmet());
-  
-  // Cookie parser (required for httpOnly cookies)
-  app.use(cookieParser());
 
   // CORS configuration - Hard-fix: Simple, deterministic, bulletproof
   // ⚠️ PROD SAFETY: https://app.iphonealcosto.com is ALWAYS allowed, no exceptions

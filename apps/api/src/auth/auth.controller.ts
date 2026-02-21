@@ -22,27 +22,40 @@ export class AuthController {
 
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
-    const domain = isProduction ? '.iphonealcosto.com' : undefined;
+    // TEMPORARY: Don't set domain to avoid cookie rejection issues
+    // Host-only cookies work better across subdomains when using proxy
+    const domain = undefined; // isProduction ? '.iphonealcosto.com' : undefined;
     
-    // Set access token cookie (httpOnly, secure in production)
-    res.cookie('accessToken', accessToken, {
+    const cookieOptions = {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       path: '/',
       domain,
       maxAge: 15 * 60 * 1000, // 15 minutes (matches JWT_EXPIRES_IN)
-    });
+    };
+    
+    const refreshCookieOptions = {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches JWT_REFRESH_EXPIRES_IN)
+    };
+    
+    // Log cookie options for debugging (temporary)
+    if (process.env.LOG_AUTH_COOKIES === 'true' || !isProduction) {
+      console.log('[auth] Setting cookies with options:', JSON.stringify(cookieOptions, null, 2));
+    }
+    
+    // Set access token cookie (httpOnly, secure in production)
+    res.cookie('accessToken', accessToken, cookieOptions);
 
     // Set refresh token cookie (httpOnly, secure in production)
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: 'lax',
-      path: '/',
-      domain,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches JWT_REFRESH_EXPIRES_IN)
-    });
+    res.cookie('refreshToken', refreshToken, refreshCookieOptions);
+    
+    // Log Set-Cookie headers after setting (temporary)
+    if (process.env.LOG_AUTH_COOKIES === 'true' || !isProduction) {
+      const setCookieHeader = res.getHeader('set-cookie');
+      console.log('[auth] Set-Cookie header after setting:', setCookieHeader);
+    }
   }
 
   @Public()
