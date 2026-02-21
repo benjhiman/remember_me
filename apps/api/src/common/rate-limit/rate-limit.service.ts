@@ -74,6 +74,17 @@ export class RateLimitService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[redis] Rate limiting using Redis: ${redisHost}`);
     }
 
+    // CRITICAL: Double-check that URL is not localhost in production
+    const nodeEnv = this.configService.get<string>('NODE_ENV') || 'development';
+    if (nodeEnv === 'production') {
+      const lower = rateLimitRedisUrl.toLowerCase();
+      if (lower.includes('127.0.0.1') || lower.includes('localhost')) {
+        this.logWarnOnce('[redis] Rate limiting disabled: Redis URL contains localhost/127.0.0.1 in production');
+        this._isEnabled = false;
+        return;
+      }
+    }
+
     // Attempt to initialize Redis connection
     try {
       this.redis = new Redis(rateLimitRedisUrl, {
