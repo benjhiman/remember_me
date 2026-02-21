@@ -80,13 +80,12 @@ RUN prisma generate || echo "Prisma client already generated"
 
 WORKDIR /app/apps/api
 
-# Worker does NOT need port or healthcheck (no HTTP server)
 # Worker runs in continuous mode processing jobs
-# CRITICAL: Railway must be configured to NOT use healthcheck for this service
-# In Railway Dashboard: Settings -> Deploy -> Healthcheck Path: (leave EMPTY)
+# Worker now has minimal HTTP server for healthcheck endpoint (/api/health)
+# This allows Railway healthcheck to pass while worker processes jobs in background
 
-# Explicitly disable healthcheck (Railway may still require manual config)
-# HEALTHCHECK NONE
+# Expose port for healthcheck (same as API to avoid conflicts)
+EXPOSE 4000
 
 # Start worker application
 # CRITICAL: Use worker.main.js, NOT main.js
