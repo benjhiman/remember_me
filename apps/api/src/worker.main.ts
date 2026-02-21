@@ -117,13 +117,42 @@ async function bootstrap() {
   }
 
   // Log Redis configuration for diagnostics using centralized function
+  // CRITICAL: Check REDIS_URL first (highest priority)
+  const redisUrlPresent = !!process.env.REDIS_URL;
   const redisUrl = getRedisUrlOrNull();
   const redisHost = getRedisHost(redisUrl);
+  
+  // Parse host/port from env vars for logging (but NEVER use them if REDIS_URL exists)
+  const redisHostEnv = process.env.REDIS_HOST || null;
+  const redisPortEnv = process.env.REDIS_PORT || null;
+  
+  // Determine chosen mode
+  let chosenMode: string;
+  if (redisUrl && redisUrlPresent) {
+    chosenMode = 'redis_url';
+  } else if (redisUrl && !redisUrlPresent) {
+    chosenMode = 'fallback_url';
+  } else if (redisHostEnv && redisPortEnv) {
+    chosenMode = 'host_port';
+  } else {
+    chosenMode = 'disabled';
+  }
+  
+  // CRITICAL: Log detailed diagnostics
+  logger.log(`[redis][worker] Configuration diagnostics:`);
+  logger.log(`[redis][worker] redisUrlPresent=${redisUrlPresent}`);
+  logger.log(`[redis][worker] redisUrlHost=${redisHost || 'null'}`);
+  logger.log(`[redis][worker] redisHost=${redisHostEnv || 'null'}`);
+  logger.log(`[redis][worker] redisPort=${redisPortEnv || 'null'}`);
+  logger.log(`[redis][worker] chosenMode=${chosenMode}`);
   
   if (redisUrl && redisHost) {
     logger.log(`[redis][worker] mode=enabled urlPresent=true host=${redisHost}`);
   } else {
     logger.log(`[redis][worker] mode=disabled urlPresent=false host=null`);
+    if (redisHostEnv && !redisPortEnv) {
+      logger.warn(`[redis][worker] WARNING: REDIS_HOST is set but REDIS_PORT is missing. Redis features disabled to prevent localhost fallback.`);
+    }
   }
 
   // CRITICAL: Clear Redis env vars ONE MORE TIME before creating NestJS app
