@@ -120,7 +120,18 @@ async function bootstrap() {
   logger.log(`Job runner enabled: ${process.env.JOB_RUNNER_ENABLED || 'true (default in worker mode)'}`);
   logger.log(`Run once: ${runOnce}`);
 
-  const jobRunner = app.get(JobRunnerService);
+  // Get job runner service
+  logger.log('Getting JobRunnerService...');
+  let jobRunner: JobRunnerService;
+  try {
+    jobRunner = app.get(JobRunnerService);
+    logger.log('JobRunnerService obtained successfully');
+  } catch (error) {
+    logger.error(`Failed to get JobRunnerService: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Don't exit - server is already running for healthcheck
+    logger.warn('Continuing without JobRunnerService - healthcheck will still work');
+    jobRunner = null as any; // Will be checked before use
+  }
 
   // Graceful shutdown handler
   const shutdown = async (signal: string) => {
