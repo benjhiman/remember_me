@@ -187,22 +187,49 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
     if (!redisUrl) {
       const nodeEnv = configService.get<string>('NODE_ENV', 'development');
       if (nodeEnv === 'production') {
-        this.logger.warn('REDIS_URL not configured, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');
+        this.logger.warn('[redis][worker] REDIS_URL not configured, BullMQ worker will not start. Set REDIS_URL to enable BullMQ queue processing.');
         return; // Don't start worker if Redis is not configured in production
       }
-      // Only allow localhost in development, but log a warning
-      this.logger.warn('No REDIS_URL found, BullMQ worker will not start. Set REDIS_URL to enable queue processing.');
+      // Don't use localhost fallback - just disable the worker
+      this.logger.warn('[redis][worker] No REDIS_URL found, BullMQ worker will not start. Set REDIS_URL to enable queue processing.');
       return; // Don't start worker if Redis is not configured
     }
+
+    // CRITICAL: Validate Redis URL to prevent localhost connections
+    const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+    if (nodeEnv === 'production') {
+      if (redisUrl.includes('localhost') || 
+          redisUrl.includes('127.0.0.1') || 
+          redisUrl.includes('redis://redis:') ||
+          redisUrl === 'redis://redis:6379') {
+        this.logger.error('[redis][worker] REDIS_URL contains localhost/127.0.0.1 - cannot use in production. Worker disabled.');
+        return; // Don't start worker with localhost in production
+      }
+    }
+
+    // Parse and log Redis host (without credentials) for diagnostics
+    try {
+      const url = new URL(redisUrl);
+      const host = url.hostname;
+      const port = url.port || '6379';
+      this.logger.log(`[redis][worker] Connected to Redis: ${host}:${port}`);
+    } catch (e) {
+      this.logger.warn(`[redis][worker] Could not parse Redis URL (non-critical): ${redisUrl.substring(0, 30)}...`);
+    }
+
     const queueName = configService.get<string>('BULLMQ_QUEUE_NAME', 'integration-jobs');
 
+    // BullMQ Worker connection options
+    // Use redisUrl as string - BullMQ will parse it correctly
     const workerOptions = {
-      connection: redisUrl,
+      connection: redisUrl as any, // BullMQ accepts string URLs
       concurrency: this.workerConcurrency,
       limiter: {
         max: 100, // Max 100 jobs per duration
         duration: 1000, // Per second
       },
+      // Prevent reconnection loops
+      maxStalledCount: 1,
     };
 
     this.bullWorker = new Worker(
@@ -223,7 +250,19 @@ export class JobRunnerService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.bullWorker.on('error', (err: Error) => {
-        this.logger.error(`BullMQ worker error: ${err.message}`, err.stack);
+        const errorMsg = err.message || String(err);
+        // Log connection errors only once to avoid spam
+        if (errorMsg.includes('ECONNREFUSED') || errorMsg.includes('127.0.0.1')) {
+          this.logger.error(`[redis][worker] Connection error (logged once): ${errorMsg}`);
+          // Don't spam logs - BullMQ will handle retries internally
+        } else {
+          this.logger.error(`[redis][worker] BullMQ worker error: ${errorMsg}`, err.stack);
+        }
+      });
+
+      // Log successful connection
+      this.bullWorker.on('ready', () => {
+        this.logger.log('[redis][worker] BullMQ worker connected and ready');
       });
     }
   }

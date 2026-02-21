@@ -7,6 +7,28 @@ async function bootstrap() {
   const logger = new Logger('Worker');
   const runOnce = process.env.WORKER_RUN_ONCE === 'true' || process.env.WORKER_RUN_ONCE === '1';
 
+  // Log Redis configuration for diagnostics
+  const redisUrl = process.env.REDIS_URL || 
+                   process.env.RATE_LIMIT_REDIS_URL || 
+                   process.env.BULL_REDIS_URL || 
+                   process.env.QUEUE_REDIS_URL || 
+                   process.env.JOB_REDIS_URL;
+  
+  if (redisUrl) {
+    // Parse host from URL (without credentials)
+    try {
+      const url = new URL(redisUrl);
+      const host = url.hostname;
+      const port = url.port || '6379';
+      logger.log(`[redis][worker] REDIS_URL present: true`);
+      logger.log(`[redis][worker] Redis host: ${host}:${port}`);
+    } catch (e) {
+      logger.warn(`[redis][worker] REDIS_URL present but invalid format: ${redisUrl.substring(0, 20)}...`);
+    }
+  } else {
+    logger.warn(`[redis][worker] REDIS_URL present: false - Redis features will be disabled`);
+  }
+
   // Create NestJS application without HTTP server
   const app = await NestFactory.createApplicationContext(WorkerModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],

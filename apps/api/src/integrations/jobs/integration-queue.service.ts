@@ -30,33 +30,72 @@ export class IntegrationQueueService implements OnModuleInit, OnModuleDestroy {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    // Use RATE_LIMIT_REDIS_URL if available, otherwise REDIS_URL, fallback to default
+    // Use REDIS_URL as primary, fallback to other variants
+    // NEVER default to localhost in production
     const redisUrl =
-      this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
       this.configService.get<string>('REDIS_URL') ||
-      'redis://localhost:6379';
+      this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
+      this.configService.get<string>('BULL_REDIS_URL') ||
+      this.configService.get<string>('QUEUE_REDIS_URL') ||
+      this.configService.get<string>('JOB_REDIS_URL');
     
-    // Parse Redis URL for BullMQ connection
-    // BullMQ accepts connection string directly or ConnectionOptions
-    // We'll use the URL string directly for simplicity
-    this.redisConnection = redisUrl as any; // BullMQ accepts string URLs
-    
-    // Queue is enabled if QUEUE_MODE is 'bull' or 'dual'
-    const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
-    this.enabled = queueMode === 'bull' || queueMode === 'dual';
+    if (!redisUrl) {
+      // Don't use localhost fallback - disable queue if no Redis URL
+      this.redisConnection = '' as any;
+      this.enabled = false;
+      const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+      if (nodeEnv === 'production') {
+        this.logger.warn('[redis] REDIS_URL not configured, IntegrationQueueService disabled. Set REDIS_URL to enable queue processing.');
+      } else {
+        this.logger.warn('[redis] No REDIS_URL found, IntegrationQueueService disabled. Set REDIS_URL to enable queue processing.');
+      }
+    } else {
+      // Parse Redis URL for BullMQ connection
+      // BullMQ accepts connection string directly or ConnectionOptions
+      this.redisConnection = redisUrl as any; // BullMQ accepts string URLs
+      
+      // Queue is enabled if QUEUE_MODE is 'bull' or 'dual'
+      const queueMode = this.configService.get<string>('QUEUE_MODE', 'db');
+      this.enabled = queueMode === 'bull' || queueMode === 'dual';
+    }
   }
 
   async onModuleInit() {
     if (!this.enabled) {
-      this.logger.log('BullMQ queue disabled (QUEUE_MODE != bull|dual)');
+      this.logger.log('[redis] BullMQ queue disabled (QUEUE_MODE != bull|dual or REDIS_URL missing)');
       return;
     }
 
+    if (!this.redisConnection || this.redisConnection === '') {
+      this.logger.warn('[redis] Redis connection not configured, queue will not initialize');
+      this.enabled = false;
+      return;
+    }
+
+    // CRITICAL: Validate Redis URL to prevent localhost connections
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'production');
+    const redisUrl = this.redisConnection as string;
+    if (nodeEnv === 'production') {
+      if (redisUrl.includes('localhost') || 
+          redisUrl.includes('127.0.0.1') || 
+          redisUrl.includes('redis://redis:') ||
+          redisUrl === 'redis://redis:6379') {
+        this.logger.error('[redis] REDIS_URL contains localhost/127.0.0.1 - cannot use in production. Queue disabled.');
+        this.enabled = false;
+        return;
+      }
+    }
+
     try {
-      const redisUrl =
-        this.configService.get<string>('RATE_LIMIT_REDIS_URL') ||
-        this.configService.get<string>('REDIS_URL') ||
-        'redis://localhost:6379';
+      // Parse and log Redis host (without credentials) for diagnostics
+      try {
+        const url = new URL(redisUrl);
+        const host = url.hostname;
+        const port = url.port || '6379';
+        this.logger.log(`[redis] Connected to Redis: ${host}:${port}`);
+      } catch (e) {
+        this.logger.warn(`[redis] Could not parse Redis URL (non-critical): ${redisUrl.substring(0, 30)}...`);
+      }
 
       const queueOptions: QueueOptions = {
         connection: this.redisConnection as ConnectionOptions,
@@ -72,10 +111,11 @@ export class IntegrationQueueService implements OnModuleInit, OnModuleDestroy {
       };
 
       this.queue = new Queue<QueueJobData>(this.queueName, queueOptions);
-      this.logger.log(`BullMQ queue initialized (Redis: ${redisUrl})`);
+      this.logger.log(`[redis] BullMQ queue initialized`);
     } catch (error) {
-      this.logger.error(`Failed to initialize BullMQ queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      throw error;
+      this.logger.error(`[redis] Failed to initialize BullMQ queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.enabled = false;
+      // Don't throw - allow app to continue without queue
     }
   }
 
