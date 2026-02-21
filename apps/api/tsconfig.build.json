@@ -30,6 +30,7 @@
     "test",
     "**/*.spec.ts",
     "**/*.test.ts",
-    "**/__tests__/**"
+    "**/__tests__/**",
+    "**/scripts/**"
   ]
 }
