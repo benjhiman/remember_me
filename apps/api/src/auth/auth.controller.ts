@@ -120,13 +120,14 @@ export class AuthController {
     const result = await this.authService.refreshToken(refreshToken);
     
     // Update access token cookie (refresh token cookie remains the same)
+    // Use same cookie options as setAuthCookies (host-only, no domain)
     const isProduction = this.configService.get('NODE_ENV') === 'production';
-    const domain = isProduction ? '.iphonealcosto.com' : undefined;
+    const domain = undefined; // Host-only cookies work better with proxy
     
     res.cookie('accessToken', result.accessToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       path: '/',
       domain,
       maxAge: 15 * 60 * 1000, // 15 minutes

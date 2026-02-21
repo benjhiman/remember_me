@@ -29,7 +29,8 @@ function LoginPageContent() {
   const [diagnosticInfo, setDiagnosticInfo] = useState<Record<string, string> | null>(null);
   
   // Get API base URL (single source of truth)
-  const apiBaseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : 'https://api.iphonealcosto.com/api';
+  // In browser, getApiBaseUrl() returns '/api' (same-origin proxy)
+  const apiBaseUrl = typeof window !== 'undefined' ? getApiBaseUrl() : '/api';
   
   const redirectTo = searchParams.get('redirectTo') || '/dashboard';
 

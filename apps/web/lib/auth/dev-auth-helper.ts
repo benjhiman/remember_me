@@ -10,7 +10,18 @@ const TEST_USER_NAME = 'Test User';
 const TEST_ORG_NAME = 'iPhone al costo';
 const TEST_ORG_SLUG = 'iphone-al-costo';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+// In browser, always use same-origin /api proxy
+// In SSR/server, use env var or localhost fallback
+function getApiBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    // Browser: always use same-origin proxy
+    return '/api';
+  }
+  // SSR/Server: use env or localhost
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000/api';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 interface RegisterResponse {
   accessToken: string;
@@ -56,6 +67,7 @@ async function createTestUser(): Promise<RegisterResponse | null> {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // CRITICAL: Send/receive cookies
       body: JSON.stringify({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,
@@ -92,6 +104,7 @@ async function loginTestUser(): Promise<LoginResponse | null> {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include', // CRITICAL: Send/receive cookies
       body: JSON.stringify({
         email: TEST_USER_EMAIL,
         password: TEST_USER_PASSWORD,

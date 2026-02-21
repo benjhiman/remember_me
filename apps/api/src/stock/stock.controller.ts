@@ -18,6 +18,7 @@ import { StockItemIdPipe } from './pipes/stock-item-id.pipe';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { StockService } from './stock.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Public } from '../common/decorators/public.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -44,6 +45,7 @@ export class StockController {
     this.logger.log('StockController instantiated');
   }
 
+  @Public()
   @Get('health')
   health() {
     return this.stockService.health();
