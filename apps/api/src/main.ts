@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from './prisma/prisma.service';
@@ -23,6 +24,9 @@ async function bootstrap() {
 
   // Security headers
   app.use(helmet());
+  
+  // Cookie parser (required for httpOnly cookies)
+  app.use(cookieParser());
 
   // CORS configuration - Hard-fix: Simple, deterministic, bulletproof
   // ⚠️ PROD SAFETY: https://app.iphonealcosto.com is ALWAYS allowed, no exceptions

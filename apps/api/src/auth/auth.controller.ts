@@ -1,4 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Res, Req } from '@nestjs/common';
+import { Response, Request } from 'express';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -10,10 +11,39 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RateLimit } from '../common/rate-limit/rate-limit.decorator';
 import { RateLimitGuard } from '../common/rate-limit/rate-limit.guard';
 import { DevLoginGuard } from '../common/guards/dev-login.guard';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const domain = isProduction ? '.iphonealcosto.com' : undefined;
+    
+    // Set access token cookie (httpOnly, secure in production)
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      domain,
+      maxAge: 15 * 60 * 1000, // 15 minutes (matches JWT_EXPIRES_IN)
+    });
+
+    // Set refresh token cookie (httpOnly, secure in production)
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      domain,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches JWT_REFRESH_EXPIRES_IN)
+    });
+  }
 
   @Public()
   @UseGuards(ThrottlerGuard, RateLimitGuard)
@@ -30,8 +60,15 @@ export class AuthController {
   @RateLimit({ action: 'auth.login', limit: 10, windowSec: 60, skipIfDisabled: true })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.login(dto);
+    
+    // If login returned tokens (single org), set cookies
+    if ('accessToken' in result && 'refreshToken' in result) {
+      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    }
+    
+    return result;
   }
 
   @Public()
@@ -40,24 +77,73 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async selectOrganization(
     @CurrentUser() user: any,
-    @Body() dto: SelectOrganizationDto
+    @Body() dto: SelectOrganizationDto,
+    @Res({ passthrough: true }) res: Response
   ) {
     // user comes from TempTokenGuard (contains userId from tempToken)
-    return this.authService.selectOrganization(user.sub, dto);
+    const result = await this.authService.selectOrganization(user.sub, dto);
+    
+    // Set cookies after organization selection
+    this.setAuthCookies(res, result.accessToken, result.refreshToken);
+    
+    return result;
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(
+    @Body('refreshToken') refreshTokenFromBody: string | undefined,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    // Try to get refresh token from cookie first, fallback to body
+    const refreshToken = req.cookies?.refreshToken || refreshTokenFromBody;
+    
+    if (!refreshToken) {
+      throw new Error('Refresh token not found in cookies or body');
+    }
+    
+    const result = await this.authService.refreshToken(refreshToken);
+    
+    // Update access token cookie (refresh token cookie remains the same)
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const domain = isProduction ? '.iphonealcosto.com' : undefined;
+    
+    res.cookie('accessToken', result.accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      domain,
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+    
+    return result;
   }
 
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Body('refreshToken') refreshToken: string) {
-    await this.authService.logout(refreshToken);
+  async logout(
+    @Body('refreshToken') refreshTokenFromBody: string | undefined,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    // Try to get refresh token from cookie first, fallback to body
+    const refreshToken = req.cookies?.refreshToken || refreshTokenFromBody;
+    
+    if (refreshToken) {
+      await this.authService.logout(refreshToken);
+    }
+    
+    // Clear cookies
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const domain = isProduction ? '.iphonealcosto.com' : undefined;
+    
+    res.clearCookie('accessToken', { path: '/', domain });
+    res.clearCookie('refreshToken', { path: '/', domain });
+    
     return { message: 'Logged out successfully' };
   }
 

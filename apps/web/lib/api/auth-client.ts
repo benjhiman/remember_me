@@ -121,14 +121,16 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
+    // Refresh token is now in cookies (httpOnly), so we don't need to send it in body
+    // But we keep it as fallback for backward compatibility
     const response = await Promise.race([
       fetch(buildEndpointUrl('/auth/refresh'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ refreshToken }),
-        credentials: 'include',
+        body: JSON.stringify({ refreshToken }), // Fallback if cookies not available
+        credentials: 'include', // CRITICAL: Send cookies
         signal: controller.signal,
       }),
       createTimeoutPromise(REQUEST_TIMEOUT),
