@@ -1192,15 +1192,6 @@ export class SalesService {
             },
           },
         },
-          include: {
-            stockItem: {
-              select: {
-                id: true,
-                model: true,
-              },
-            },
-          },
-        },
       },
     });
 
