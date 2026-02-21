@@ -377,7 +377,7 @@ export default function InventoryReservasPage() {
             {data.meta && data.meta.totalPages > 1 && (
               <div className="mt-4 flex items-center justify-between">
                 <div className="text-sm text-gray-600">
-                  Mostrando {((page - 1) * data.meta.limit) + 1} - {Math.min(page * data.meta.limit, data.meta.total)} de {data.meta.total}
+                  Mostrando {((page - 1) * data.meta.itemsPerPage) + 1} - {Math.min(page * data.meta.itemsPerPage, data.meta.totalItems)} de {data.meta.totalItems}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -392,7 +392,7 @@ export default function InventoryReservasPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPage((p) => p + 1)}
-                    disabled={page * data.meta.limit >= data.meta.total}
+                    disabled={page * data.meta.itemsPerPage >= data.meta.totalItems}
                   >
                     Siguiente
                   </Button>
