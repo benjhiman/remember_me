@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "build:api": "cd apps/api && pnpm build:api",
+    "start:api": "cd apps/api && pnpm start:api",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "type-check": "turbo run type-check",
