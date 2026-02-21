@@ -19,7 +19,9 @@ import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [PrismaModule, SettingsModule, ExternalHttpClientModule],
-  controllers: [
+  // Controllers are only loaded when used in AppModule (API server)
+  // In WorkerModule, controllers are not registered, only providers
+  controllers: process.env.WORKER_MODE === '1' ? [] : [
     IntegrationsController,
     IntegrationsSettingsController,
     WebhooksController,
