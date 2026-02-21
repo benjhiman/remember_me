@@ -178,8 +178,17 @@ export class AppController {
         email,
         passwordHash,
         name,
-        role: Role.OWNER,
+        // role: Role.OWNER, // Role is in Membership, not User
+        // organizationId: organization.id, // User doesn't have organizationId directly
+      },
+    });
+
+    // Create membership with OWNER role
+    await this.prisma.membership.create({
+      data: {
+        userId: user.id,
         organizationId: organization.id,
+        role: Role.OWNER,
       },
     });
 
@@ -189,7 +198,7 @@ export class AppController {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: Role.OWNER, // Return role from membership
       },
       organization: {
         id: organization.id,

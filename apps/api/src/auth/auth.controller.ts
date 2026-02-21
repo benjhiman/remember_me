@@ -78,7 +78,11 @@ export class AuthController {
     
     // If login returned tokens (single org), set cookies
     if ('accessToken' in result && 'refreshToken' in result) {
-      this.setAuthCookies(res, result.accessToken, result.refreshToken);
+      const accessToken = result.accessToken;
+      const refreshToken = result.refreshToken;
+      if (accessToken && refreshToken) {
+        this.setAuthCookies(res, accessToken, refreshToken);
+      }
     }
     
     return result;

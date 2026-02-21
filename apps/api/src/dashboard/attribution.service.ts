@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AttributionSource, SaleStatus } from '@remember-me/prisma';
+import { SaleStatus } from '@remember-me/prisma';
+// import { AttributionSource } from '@remember-me/prisma'; // Not in schema
 import { Prisma } from '@prisma/client';
 
 @Injectable()
