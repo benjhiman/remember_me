@@ -65,6 +65,18 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
       return; // Don't initialize queue if Redis is not configured
     }
 
+    // CRITICAL: Double-check that redisUrl does NOT contain localhost (defense in depth)
+    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    const lower = redisUrl.toLowerCase();
+    if (nodeEnv === 'production' && (lower.includes('127.0.0.1') || lower.includes('localhost'))) {
+      this.logger.error('[redis] FATAL: REDIS_URL contains localhost/127.0.0.1 in production. BullMQ queue adapter will NOT initialize.');
+      this.enabled = false;
+      // Clear Redis env vars to prevent any further attempts
+      delete process.env.REDIS_URL;
+      process.env.REDIS_URL = '';
+      return;
+    }
+
     // Log Redis host for diagnostics
     const redisHost = getRedisHost(redisUrl);
     if (redisHost) {
@@ -95,9 +107,19 @@ export class BullMqQueueAdapter implements IIntegrationQueue, OnModuleInit {
       this.enabled = true;
       this.logger.log(`BullMQ queue adapter initialized (queue: ${this.queueName})`);
     } catch (error) {
-      this.logger.error(`Failed to initialize BullMQ queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      // Check if error is related to localhost connection
+      if (errorMsg.includes('127.0.0.1') || errorMsg.includes('localhost') || errorMsg.includes('ECONNREFUSED')) {
+        this.logger.error(`[redis] FATAL: Attempted to connect to localhost. BullMQ queue adapter will NOT initialize. Error: ${errorMsg}`);
+        this.enabled = false;
+        // Clear Redis env vars to prevent any further attempts
+        delete process.env.REDIS_URL;
+        process.env.REDIS_URL = '';
+        return; // Don't throw - allow app to continue
+      }
+      this.logger.error(`Failed to initialize BullMQ queue: ${errorMsg}`);
       this.enabled = false;
-      throw error;
+      // Don't throw - allow app to continue without queue
     }
   }
 
