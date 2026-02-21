@@ -20,7 +20,7 @@ export default function AuditLogPage() {
 
   const { data, isLoading, error } = useAuditLogs({
     page,
-    limit: 50,
+    pageSize: 50,
     entityType: entityTypeFilter || undefined,
     action: actionFilter || undefined,
   });
