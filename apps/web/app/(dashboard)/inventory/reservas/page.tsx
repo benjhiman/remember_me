@@ -374,7 +374,7 @@ export default function InventoryReservasPage() {
             )}
 
             {/* Pagination */}
-            {data.meta.totalPages > 1 && (
+            {data.meta && data.meta.totalPages > 1 && (
               <div className="mt-4 flex items-center justify-between">
                 <div className="text-sm text-gray-600">
                   Mostrando {((page - 1) * data.meta.limit) + 1} - {Math.min(page * data.meta.limit, data.meta.total)} de {data.meta.total}
