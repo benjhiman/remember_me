@@ -1,0 +1,65 @@
+# Multi-stage build for Remember Me Worker
+# Stage 1: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy workspace files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY turbo.json ./
+
+# Copy packages
+COPY packages ./packages
+
+# Copy app
+COPY apps/api ./apps/api
+
+# Install pnpm
+RUN npm install -g pnpm@latest
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Build Prisma client
+WORKDIR /app/packages/prisma
+RUN pnpm prisma generate
+
+# Build API (worker uses same build output)
+WORKDIR /app/apps/api
+RUN pnpm build
+
+# Stage 2: Runtime
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+
+# Install pnpm
+RUN npm install -g pnpm@latest
+
+# Copy workspace files
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY turbo.json ./
+
+# Copy packages (only what's needed for runtime)
+COPY packages ./packages
+
+# Copy built API (worker uses same dist as API)
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+
+# Install production dependencies only
+RUN pnpm install --prod --frozen-lockfile
+
+# Generate Prisma client in runtime image
+WORKDIR /app/packages/prisma
+RUN pnpm prisma generate
+
+WORKDIR /app/apps/api
+
+# Worker does NOT need port or healthcheck (no HTTP server)
+# Worker runs in continuous mode processing jobs
+
+# Start worker application
+# CRITICAL: Use worker.main.js, NOT main.js
+CMD ["node", "dist/worker.main.js"]

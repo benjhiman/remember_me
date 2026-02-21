@@ -15,14 +15,23 @@ This document describes how Railway deploys the Remember Me API backend (`apps/a
 ### Files
 
 1. **`railway.toml`** (root)
-   - Configures Railway to use `apps/api/Dockerfile`
+   - Configures Railway API service to use `apps/api/Dockerfile`
    - Sets health check to `/api/health`
    - Defines restart policy
+   - **Note**: Worker service requires separate configuration (see below)
 
 2. **`apps/api/Dockerfile`**
    - Multi-stage build for monorepo
    - Builds Prisma client and API
    - Production runtime image
+   - **Entrypoint**: `node dist/main.js` (API server)
+
+3. **`apps/api/Dockerfile.worker`** (NEW)
+   - Multi-stage build for worker (same build process as API)
+   - Builds Prisma client and API
+   - Production runtime image
+   - **Entrypoint**: `node dist/worker.main.js` (Worker, no HTTP server)
+   - **No port/healthcheck** (worker doesn't serve HTTP)
 
 ### GitHub Integration
 
@@ -163,16 +172,37 @@ git push origin main
 ### Wrong Commit Deployed
 
 1. **Check Railway Logs**:
-   - Look for `📦 Deployed commit: <hash>`
+   - **API**: Look for `📦 Deployed commit: <hash>`
+   - **Worker**: Look for `[worker] commit=<hash>`
    - Compare with `git log origin/main`
 
 2. **Verify Branch**:
-   - Railway → Settings → Source
+   - Railway → Settings → Source (for each service)
    - Ensure branch is `main`
 
 3. **Clear Cache**:
    - Railway may cache Docker layers
    - Force rebuild by updating `DEPLOY_TRIGGER.txt`
+   - Or manually trigger redeploy in Railway dashboard
+
+### Worker Connecting to Localhost Redis
+
+1. **Check Worker Logs**:
+   - Look for `[redis][worker] Redis host: ...`
+   - Should show `redis.railway.internal:6379` (NOT `127.0.0.1` or `localhost`)
+
+2. **Verify REDIS_URL**:
+   - Railway → Worker Service → Variables
+   - Ensure `REDIS_URL` is set to Railway Redis URL
+   - Should be: `redis://default:password@redis.railway.internal:6379` (or similar)
+
+3. **Check Code**:
+   - Worker logs should show `[worker] commit=<hash>` matching latest commit
+   - If commit is old, worker is running old code → redeploy
+
+4. **Verify Dockerfile**:
+   - Ensure Railway Worker uses `apps/api/Dockerfile.worker`
+   - NOT `apps/api/Dockerfile` (that's for API)
 
 ### Build Fails
 
