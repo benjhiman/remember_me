@@ -8,7 +8,7 @@ import {
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditLogService } from '../common/audit/audit-log.service';
+import { AuditDomainEventsService } from '../common/audit/audit-domain-events.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { ListCustomersDto } from './dto/list-customers.dto';
@@ -19,7 +19,7 @@ import { extractIp, extractUserAgent } from '../common/utils/request-helpers';
 export class CustomersService {
   constructor(
     private prisma: PrismaService,
-    private auditLogService: AuditLogService,
+    private auditDomainEvents: AuditDomainEventsService,
     @Inject(REQUEST) private request: Request,
   ) {}
 
@@ -286,7 +286,7 @@ export class CustomersService {
     const requestId = (this.request as any).requestId || null;
     const ip = extractIp(this.request);
     const userAgent = extractUserAgent(this.request);
-    await this.auditLogService.log({
+    await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       actorRole: role,
@@ -367,7 +367,7 @@ export class CustomersService {
     const requestId = (this.request as any).requestId || null;
     const ip = extractIp(this.request);
     const userAgent = extractUserAgent(this.request);
-    await this.auditLogService.log({
+    await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       actorRole: role,

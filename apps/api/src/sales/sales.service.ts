@@ -11,7 +11,7 @@ import {
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditLogService } from '../common/audit/audit-log.service';
+import { AuditDomainEventsService } from '../common/audit/audit-domain-events.service';
 import { AuditAction, AuditEntityType } from '@remember-me/prisma';
 import { extractIp, extractUserAgent } from '../common/utils/request-helpers';
 import { CreateSaleDto } from './dto/create-sale.dto';
@@ -35,7 +35,7 @@ export class SalesService {
 
   constructor(
     private prisma: PrismaService,
-    private auditLogService: AuditLogService,
+    private auditDomainEvents: AuditDomainEventsService,
     @Inject(REQUEST) private request: Request,
     // @Inject(forwardRef(() => WhatsAppAutomationsService))
     // private automationsService?: WhatsAppAutomationsService,
@@ -317,7 +317,7 @@ export class SalesService {
 
       // Audit log
       const metadata = this.getRequestMetadata();
-      await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
         organizationId,
         actorUserId: userId,
         requestId: metadata.requestId,
@@ -785,7 +785,7 @@ export class SalesService {
 
         // Audit log
         const metadata = this.getRequestMetadata();
-        await this.auditLogService.log({
+        await this.auditDomainEvents.emit({
           organizationId,
           actorUserId: userId,
           requestId: metadata.requestId,
@@ -886,7 +886,7 @@ export class SalesService {
 
         // Audit log
         const metadata = this.getRequestMetadata();
-        await this.auditLogService.log({
+        await this.auditDomainEvents.emit({
           organizationId,
           actorUserId: userId,
           requestId: metadata.requestId,

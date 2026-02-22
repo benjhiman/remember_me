@@ -9,7 +9,8 @@ import {
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditLogService } from '../common/audit/audit-log.service';
+import { AuditDomainEventsService } from '../common/audit/audit-domain-events.service';
+import { extractIp, extractUserAgent } from '../common/utils/request-helpers';
 import { AuditAction, AuditEntityType, Role, ItemCondition } from '@remember-me/prisma';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
@@ -24,7 +25,7 @@ import {
 export class ItemsService {
   constructor(
     private prisma: PrismaService,
-    private auditLogService: AuditLogService,
+    private auditDomainEvents: AuditDomainEventsService,
     @Inject(REQUEST) private request: Request,
   ) {}
 
@@ -233,7 +234,14 @@ export class ItemsService {
     });
 
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+    const user = (this.request as any).user;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
+    await this.auditDomainEvents.emit({
+      actorRole: role,
+      actorEmail: user?.email || null,
+      ip,
+      userAgent,
       organizationId,
       actorUserId: userId,
       action: AuditAction.CREATE,
@@ -328,7 +336,14 @@ export class ItemsService {
     });
 
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+    const user = (this.request as any).user;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
+    await this.auditDomainEvents.emit({
+      actorRole: role,
+      actorEmail: user?.email || null,
+      ip,
+      userAgent,
       organizationId,
       actorUserId: userId,
       action: AuditAction.UPDATE,
@@ -371,7 +386,14 @@ export class ItemsService {
     });
 
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+    const user = (this.request as any).user;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
+    await this.auditDomainEvents.emit({
+      actorRole: role,
+      actorEmail: user?.email || null,
+      ip,
+      userAgent,
       organizationId,
       actorUserId: userId,
       action: AuditAction.DELETE,
@@ -534,6 +556,36 @@ export class ItemsService {
       },
     });
 
+    // Audit log
+    const user = (this.request as any).user;
+    const requestId = (this.request as any).requestId || null;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
+    await this.auditDomainEvents.emit({
+      organizationId,
+      actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
+      requestId,
+      action: AuditAction.CREATE,
+      entityType: AuditEntityType.Folder,
+      entityId: folder.id,
+      before: null,
+      after: {
+        id: folder.id,
+        name: folder.name,
+      },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
+    });
+
     return folder;
   }
 
@@ -571,8 +623,40 @@ export class ItemsService {
       throw new BadRequestException('Cannot delete folder with items. Move or delete items first.');
     }
 
+    const before = {
+      id: folder.id,
+      name: folder.name,
+    };
+
     await this.prisma.folder.delete({
       where: { id: folderId },
+    });
+
+    // Audit log
+    const user = (this.request as any).user;
+    const requestId = (this.request as any).requestId || null;
+    const ip = extractIp(this.request);
+    const userAgent = extractUserAgent(this.request);
+    await this.auditDomainEvents.emit({
+      organizationId,
+      actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
+      requestId,
+      action: AuditAction.DELETE,
+      entityType: AuditEntityType.Folder,
+      entityId: folderId,
+      before,
+      after: { deleted: true },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
   }
 }

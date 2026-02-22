@@ -11,7 +11,7 @@ import {
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditLogService } from '../common/audit/audit-log.service';
+import { AuditDomainEventsService } from '../common/audit/audit-domain-events.service';
 import { AuditAction, AuditEntityType } from '@remember-me/prisma';
 import { CreateStockItemDto } from './dto/create-stock-item.dto';
 import { UpdateStockItemDto } from './dto/update-stock-item.dto';
@@ -33,7 +33,7 @@ export class StockService {
 
   constructor(
     private prisma: PrismaService,
-    private auditLogService: AuditLogService,
+    private auditDomainEvents: AuditDomainEventsService,
     @Inject(REQUEST) private request: Request,
   ) {}
 
@@ -253,7 +253,7 @@ export class StockService {
 
       // Audit log
       const metadata = this.getRequestMetadata();
-      await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
         organizationId,
         actorUserId: userId,
         requestId: metadata.requestId,
@@ -525,7 +525,7 @@ export class StockService {
 
       // Audit log
       const metadata = this.getRequestMetadata();
-      await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
         organizationId,
         actorUserId: userId,
         requestId: metadata.requestId,
@@ -732,7 +732,7 @@ export class StockService {
 
         // Audit log
         const metadata = this.getRequestMetadata();
-        await this.auditLogService.log({
+        await this.auditDomainEvents.emit({
           organizationId,
           actorUserId: userId,
           requestId: metadata.requestId,
@@ -812,7 +812,7 @@ export class StockService {
 
         // Audit log
         const metadata = this.getRequestMetadata();
-        await this.auditLogService.log({
+        await this.auditDomainEvents.emit({
           organizationId,
           actorUserId: userId,
           requestId: metadata.requestId,
@@ -1020,7 +1020,7 @@ export class StockService {
 
           // Audit log
           const metadata = this.getRequestMetadata();
-          await this.auditLogService.log({
+          await this.auditDomainEvents.emit({
             organizationId,
             actorUserId: userId,
             requestId: metadata.requestId,
