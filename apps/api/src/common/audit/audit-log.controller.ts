@@ -10,7 +10,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 @Controller('audit-logs')
 @UseGuards(JwtAuthGuard, RolesGuard, OwnerOnlyGuard)
 export class AuditLogController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+    console.log('[AuditLogController] mounted');
+  }
 
   @Get()
   @OwnerOnly()
