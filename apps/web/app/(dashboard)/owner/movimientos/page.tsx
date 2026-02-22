@@ -27,6 +27,7 @@ export default function MovimientosPage() {
   const { user } = useAuthStore();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  const [activeTab, setActiveTab] = useState('logs');
   const [filters, setFilters] = useState({
     dateFrom: '',
     dateTo: '',
@@ -57,6 +58,8 @@ export default function MovimientosPage() {
     pageSize,
     ...apiFilters,
   });
+
+  const { data: statsData, isLoading: statsLoading } = useAuditLogsStats();
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -94,8 +97,15 @@ export default function MovimientosPage() {
         description="Registro de auditoría de todos los movimientos del sistema"
         breadcrumbs={breadcrumbs}
       >
-        {/* Filters */}
-        <Card className="mb-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="logs">Registros</TabsTrigger>
+            <TabsTrigger value="stats">Estadísticas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="logs" className="space-y-6">
+            {/* Filters */}
+            <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -220,11 +230,32 @@ export default function MovimientosPage() {
           </CardContent>
         </Card>
 
-        {/* Results */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Registros de Auditoría</CardTitle>
-          </CardHeader>
+            {/* Results */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Registros de Auditoría</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const params = new URLSearchParams();
+                      if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+                      if (filters.dateTo) params.set('dateTo', filters.dateTo);
+                      if (filters.actorUserId) params.set('actorUserId', filters.actorUserId);
+                      if (filters.actorRole && filters.actorRole !== 'ALL') params.set('actorRole', filters.actorRole);
+                      if (filters.action && filters.action !== 'ALL') params.set('action', filters.action);
+                      if (filters.entityType && filters.entityType !== 'ALL') params.set('entityType', filters.entityType);
+                      if (filters.entityId) params.set('entityId', filters.entityId);
+                      params.set('format', 'csv');
+                      window.open(`/api/audit-logs/export?${params.toString()}`, '_blank');
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar CSV
+                  </Button>
+                </div>
+              </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="text-center py-8 text-muted-foreground">Cargando movimientos...</div>
@@ -331,8 +362,98 @@ export default function MovimientosPage() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="stats" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Estadísticas de Movimientos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Cargando estadísticas...</div>
+                ) : statsData ? (
+                  <div className="space-y-6">
+                    {/* Totales */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-4 border rounded">
+                        <div className="text-sm text-muted-foreground">Total Movimientos</div>
+                        <div className="text-2xl font-bold">{statsData.totalMovements.toLocaleString()}</div>
+                      </div>
+                      <div className="p-4 border rounded">
+                        <div className="text-sm text-muted-foreground">Últimos 7 días</div>
+                        <div className="text-2xl font-bold">{statsData.movementsLast7Days.toLocaleString()}</div>
+                      </div>
+                      <div className="p-4 border rounded">
+                        <div className="text-sm text-muted-foreground">Últimos 30 días</div>
+                        <div className="text-2xl font-bold">{statsData.movementsLast30Days.toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    {/* Por Rol */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Movimientos por Rol</h3>
+                      <div className="space-y-2">
+                        {statsData.movementsByRole.map((item) => (
+                          <div key={item.role} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm">{item.role || 'UNKNOWN'}</span>
+                            <span className="text-sm font-medium">{item.count.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Por Acción */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Movimientos por Acción</h3>
+                      <div className="space-y-2">
+                        {statsData.movementsByAction.map((item) => (
+                          <div key={item.action} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm">{item.action}</span>
+                            <span className="text-sm font-medium">{item.count.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Por Entidad */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Movimientos por Tipo de Entidad</h3>
+                      <div className="space-y-2">
+                        {statsData.movementsByEntity.map((item) => (
+                          <div key={item.entityType} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm">{item.entityType}</span>
+                            <span className="text-sm font-medium">{item.count.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Top Actores */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Top 5 Actores</h3>
+                      <div className="space-y-2">
+                        {statsData.topActors.map((actor, idx) => (
+                          <div key={actor.userId || idx} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm">{actor.email || 'Sistema'}</span>
+                            <span className="text-sm font-medium">{actor.count.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No hay estadísticas disponibles</div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Details Dialog */}
         <Dialog open={showDetails} onOpenChange={setShowDetails}>

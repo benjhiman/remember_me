@@ -17,16 +17,17 @@ export class AuditLogExportController {
   @OwnerOnly()
   async exportCsv(
     @CurrentOrganization() organizationId: string,
-    @Query('format') format: string = 'csv',
+    @Res() res: Response,
+    @Query('format') format?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('actorUserId') actorUserId?: string,
     @Query('actorRole') actorRole?: string,
     @Query('action') action?: string,
     @Query('entityType') entityType?: string,
-    @Res() res: Response,
   ) {
-    if (format !== 'csv') {
+    const exportFormat = format || 'csv';
+    if (exportFormat !== 'csv') {
       throw new BadRequestException('Only CSV format is supported');
     }
 
