@@ -5,12 +5,15 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditDomainEventsService } from '../common/audit/audit-domain-events.service';
+import { AuditAction, AuditEntityType } from '@remember-me/prisma';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -24,7 +27,8 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    @Optional() private auditDomainEvents?: AuditDomainEventsService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
@@ -261,6 +265,23 @@ export class AuthService {
     // Verify password
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {
+      // Log failed login attempt
+      if (this.auditDomainEvents) {
+        await this.auditDomainEvents.emit({
+          organizationId: user.memberships[0]?.organizationId || 'unknown',
+          actorUserId: user.id,
+          actorEmail: user.email,
+          requestId: null,
+          action: AuditAction.LOGIN_FAILED,
+          entityType: AuditEntityType.User,
+          entityId: user.id,
+          before: null,
+          after: { email: user.email },
+          metadata: { reason: 'Invalid password' },
+          source: 'api',
+          severity: 'warn',
+        });
+      }
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -277,6 +298,25 @@ export class AuthService {
         membership.organizationId,
         membership.role
       );
+
+      // Log successful login
+      if (this.auditDomainEvents) {
+        await this.auditDomainEvents.emit({
+          organizationId: membership.organizationId,
+          actorUserId: user.id,
+          actorRole: membership.role,
+          actorEmail: user.email,
+          requestId: null,
+          action: AuditAction.LOGIN_SUCCESS,
+          entityType: AuditEntityType.User,
+          entityId: user.id,
+          before: null,
+          after: { email: user.email, organizationId: membership.organizationId },
+          metadata: {},
+          source: 'api',
+          severity: 'info',
+        });
+      }
 
       return {
         ...tokens,

@@ -7,10 +7,12 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { TempTokenStrategy } from './strategies/temp-token.strategy';
 import { DevLoginGuard } from '../common/guards/dev-login.guard';
+import { AuditLogModule } from '../common/audit/audit-log.module';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    AuditLogModule, // Import AuditLogModule to get AuditDomainEventsService
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
