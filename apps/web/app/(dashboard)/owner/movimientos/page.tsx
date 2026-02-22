@@ -29,19 +29,31 @@ export default function MovimientosPage() {
     dateFrom: '',
     dateTo: '',
     actorUserId: '',
-    actorRole: '',
-    action: '',
-    entityType: '',
+    actorRole: 'ALL',
+    action: 'ALL',
+    entityType: 'ALL',
     entityId: '',
     search: '',
   });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
+  // Prepare filters for API call - exclude "ALL" values
+  const apiFilters = {
+    ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
+    ...(filters.dateTo && { dateTo: filters.dateTo }),
+    ...(filters.actorUserId && { actorUserId: filters.actorUserId }),
+    ...(filters.actorRole && filters.actorRole !== 'ALL' && { actorRole: filters.actorRole }),
+    ...(filters.action && filters.action !== 'ALL' && { action: filters.action }),
+    ...(filters.entityType && filters.entityType !== 'ALL' && { entityType: filters.entityType }),
+    ...(filters.entityId && { entityId: filters.entityId }),
+    ...(filters.search && { search: filters.search }),
+  };
+
   const { data, isLoading, error } = useAuditLogs({
     page,
     pageSize,
-    ...filters,
+    ...apiFilters,
   });
 
   const handleFilterChange = (key: string, value: string) => {
@@ -54,16 +66,22 @@ export default function MovimientosPage() {
       dateFrom: '',
       dateTo: '',
       actorUserId: '',
-      actorRole: '',
-      action: '',
-      entityType: '',
+      actorRole: 'ALL',
+      action: 'ALL',
+      entityType: 'ALL',
       entityId: '',
       search: '',
     });
     setPage(1);
   };
 
-  const hasActiveFilters = Object.values(filters).some((v) => v !== '');
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    // Don't count "ALL" as an active filter
+    if (key === 'actorRole' || key === 'action' || key === 'entityType') {
+      return value !== 'ALL' && value !== '';
+    }
+    return value !== '';
+  });
 
   const breadcrumbs = [{ label: 'Movimientos', href: '/owner/movimientos' }];
 
@@ -117,12 +135,12 @@ export default function MovimientosPage() {
               {/* Actor Role */}
               <div>
                 <Label htmlFor="actorRole">Rol</Label>
-                <Select value={filters.actorRole} onValueChange={(v) => handleFilterChange('actorRole', v)}>
+                <Select value={filters.actorRole || 'ALL'} onValueChange={(v) => handleFilterChange('actorRole', v)}>
                   <SelectTrigger id="actorRole">
                     <SelectValue placeholder="Todos los roles" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los roles</SelectItem>
+                    <SelectItem value="ALL">Todos los roles</SelectItem>
                     <SelectItem value="OWNER">OWNER</SelectItem>
                     <SelectItem value="ADMIN">ADMIN</SelectItem>
                     <SelectItem value="MANAGER">MANAGER</SelectItem>
@@ -134,12 +152,12 @@ export default function MovimientosPage() {
               {/* Action */}
               <div>
                 <Label htmlFor="action">Acción</Label>
-                <Select value={filters.action} onValueChange={(v) => handleFilterChange('action', v)}>
+                <Select value={filters.action || 'ALL'} onValueChange={(v) => handleFilterChange('action', v)}>
                   <SelectTrigger id="action">
                     <SelectValue placeholder="Todas las acciones" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas las acciones</SelectItem>
+                    <SelectItem value="ALL">Todas las acciones</SelectItem>
                     <SelectItem value="CREATE">CREATE</SelectItem>
                     <SelectItem value="UPDATE">UPDATE</SelectItem>
                     <SelectItem value="DELETE">DELETE</SelectItem>
@@ -156,12 +174,12 @@ export default function MovimientosPage() {
               {/* Entity Type */}
               <div>
                 <Label htmlFor="entityType">Tipo de Entidad</Label>
-                <Select value={filters.entityType} onValueChange={(v) => handleFilterChange('entityType', v)}>
+                <Select value={filters.entityType || 'ALL'} onValueChange={(v) => handleFilterChange('entityType', v)}>
                   <SelectTrigger id="entityType">
                     <SelectValue placeholder="Todos los tipos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los tipos</SelectItem>
+                    <SelectItem value="ALL">Todos los tipos</SelectItem>
                     <SelectItem value="Customer">Customer</SelectItem>
                     <SelectItem value="Sale">Sale</SelectItem>
                     <SelectItem value="StockItem">StockItem</SelectItem>
