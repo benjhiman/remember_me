@@ -11,8 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuditLogs, AuditLog } from '@/lib/api/hooks/use-audit-logs';
+import { useAuditLogsStats } from '@/lib/api/hooks/use-audit-logs-stats';
 import { formatDate } from '@/lib/utils/lead-utils';
-import { Search, Filter, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Search, Filter, X, ChevronLeft, ChevronRight, Eye, Download, BarChart3 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
