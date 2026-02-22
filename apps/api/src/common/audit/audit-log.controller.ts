@@ -6,6 +6,8 @@ import { OwnerOnlyGuard } from '../guards/owner-only.guard';
 import { CurrentOrganization } from '../decorators/current-organization.decorator';
 import { Role, Prisma, AuditAction } from '@remember-me/prisma';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ListAuditLogsDto } from './dto/list-audit-logs.dto';
+import { redactSensitiveData } from './utils/redact-sensitive-data';
 
 @Controller('audit-logs')
 @UseGuards(JwtAuthGuard, RolesGuard, OwnerOnlyGuard)
@@ -18,73 +20,82 @@ export class AuditLogController {
   @OwnerOnly()
   async listAuditLogs(
     @CurrentOrganization() organizationId: string,
-    @Query('page') page: string = '1',
-    @Query('pageSize') pageSize: string = '50',
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string,
-    @Query('actorUserId') actorUserId?: string,
-    @Query('actorRole') actorRole?: string,
-    @Query('action') action?: string,
-    @Query('entityType') entityType?: string,
-    @Query('entityId') entityId?: string,
-    @Query('search') search?: string,
+    @Query() query: ListAuditLogsDto,
   ) {
-    const pageNum = parseInt(page, 10) || 1;
-    const limitNum = parseInt(pageSize, 10) || 50;
+    const pageNum = query.page || 1;
+    const limitNum = query.pageSize || 50;
     const skip = (pageNum - 1) * limitNum;
 
-    // Validate pageSize (max 200)
-    if (limitNum > 200) {
-      throw new BadRequestException('pageSize cannot exceed 200');
+    // Validate pageSize (max 100 - hardened)
+    if (limitNum > 100) {
+      throw new BadRequestException('pageSize cannot exceed 100');
     }
 
     // Validate search (min 3 chars)
-    if (search && search.length < 3) {
+    if (query.search && query.search.length < 3) {
       throw new BadRequestException('search must be at least 3 characters');
     }
 
-    // Build where clause
+    // Build where clause - ALWAYS scoped to organizationId
     const where: Prisma.AuditLogWhereInput = {
-      organizationId,
+      organizationId, // CRITICAL: Always enforce multi-tenant isolation
     };
 
-    // Date range filter
-    if (dateFrom || dateTo) {
+    // Date range filter with fallback to last 90 days if no dates provided
+    const now = new Date();
+    const defaultDateFrom = new Date(now);
+    defaultDateFrom.setDate(defaultDateFrom.getDate() - 90);
+
+    if (query.dateFrom || query.dateTo) {
       where.createdAt = {};
-      if (dateFrom) {
-        where.createdAt.gte = new Date(dateFrom);
+      if (query.dateFrom) {
+        where.createdAt.gte = new Date(query.dateFrom);
+      } else {
+        // If only dateTo is provided, default dateFrom to 90 days ago
+        where.createdAt.gte = defaultDateFrom;
       }
-      if (dateTo) {
-        where.createdAt.lte = new Date(dateTo);
+      if (query.dateTo) {
+        const dateTo = new Date(query.dateTo);
+        dateTo.setHours(23, 59, 59, 999); // End of day
+        where.createdAt.lte = dateTo;
+      } else {
+        // If only dateFrom is provided, default dateTo to now
+        where.createdAt.lte = now;
       }
+    } else {
+      // No dates provided - default to last 90 days
+      where.createdAt = {
+        gte: defaultDateFrom,
+        lte: now,
+      };
     }
 
     // Actor filters
-    if (actorUserId) {
-      where.actorUserId = actorUserId;
+    if (query.actorUserId) {
+      where.actorUserId = query.actorUserId;
     }
 
-    if (actorRole) {
-      where.actorRole = actorRole;
+    if (query.actorRole) {
+      where.actorRole = query.actorRole;
     }
 
     // Action filter
-    if (action) {
-      where.action = action as any;
+    if (query.action) {
+      where.action = query.action as any;
     }
 
     // Entity filters
-    if (entityType) {
-      where.entityType = entityType as any;
+    if (query.entityType) {
+      where.entityType = query.entityType as any;
     }
 
-    if (entityId) {
-      where.entityId = entityId;
+    if (query.entityId) {
+      where.entityId = query.entityId;
     }
 
     // Search filter (safe search - only if >= 3 chars)
-    if (search && search.length >= 3) {
-      const searchLower = search.toLowerCase();
+    if (query.search && query.search.length >= 3) {
+      const searchLower = query.search.toLowerCase();
       
       // For enum fields (action), we need to match against enum values using 'in'
       // Get all AuditAction enum values and filter those that match the search
@@ -95,8 +106,8 @@ export class AuditLogController {
       
       // Build OR conditions
       const orConditions: Prisma.AuditLogWhereInput[] = [
-        { actorEmail: { contains: search, mode: 'insensitive' } },
-        { entityId: { contains: search, mode: 'insensitive' } },
+        { actorEmail: { contains: query.search, mode: 'insensitive' } },
+        { entityId: { contains: query.search, mode: 'insensitive' } },
       ];
       
       // Only add action filter if we have matches
@@ -130,6 +141,12 @@ export class AuditLogController {
     return {
       data: data.map((log) => {
         const actorUser = log.actorUserId ? userMap.get(log.actorUserId) : null;
+        
+        // Redact sensitive data from before/after/metadata
+        const beforeRedacted = log.beforeJson ? redactSensitiveData(log.beforeJson) : null;
+        const afterRedacted = log.afterJson ? redactSensitiveData(log.afterJson) : null;
+        const metadataRedacted = log.metadataJson ? redactSensitiveData(log.metadataJson) : null;
+        
         return {
           id: log.id,
           action: log.action,
@@ -144,9 +161,9 @@ export class AuditLogController {
             : null,
           actorRole: log.actorRole,
           actorEmail: log.actorEmail,
-          before: log.beforeJson,
-          after: log.afterJson,
-          metadata: log.metadataJson,
+          before: beforeRedacted,
+          after: afterRedacted,
+          metadata: metadataRedacted,
           requestId: log.requestId,
           severity: log.severity,
           source: log.source,
