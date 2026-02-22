@@ -619,7 +619,7 @@ export class SalesService {
     const requestId = (this.request as any).requestId || null;
     const ip = extractIp(this.request);
     const userAgent = extractUserAgent(this.request);
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       actorRole: role,
@@ -979,7 +979,7 @@ export class SalesService {
 
     // Audit log
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       requestId: metadata.requestId,
@@ -1071,7 +1071,7 @@ export class SalesService {
 
     // Audit log
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       requestId: metadata.requestId,
@@ -1133,7 +1133,7 @@ export class SalesService {
 
     // Audit log
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       requestId: metadata.requestId,
@@ -1209,7 +1209,7 @@ export class SalesService {
 
     // Audit log
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       requestId: metadata.requestId,

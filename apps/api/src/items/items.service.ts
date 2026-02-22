@@ -233,24 +233,36 @@ export class ItemsService {
       },
     });
 
-    const metadata = this.getRequestMetadata();
     const user = (this.request as any).user;
+    const requestId = (this.request as any).requestId || null;
     const ip = extractIp(this.request);
     const userAgent = extractUserAgent(this.request);
     await this.auditDomainEvents.emit({
-      actorRole: role,
-      actorEmail: user?.email || null,
-      ip,
-      userAgent,
       organizationId,
       actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
+      requestId,
       action: AuditAction.CREATE,
       entityType: AuditEntityType.Item,
       entityId: item.id,
-      metadata: {
-        ...metadata,
-        changes: { created: dto },
+      before: null,
+      after: {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        brand: item.brand,
+        model: item.model,
       },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
 
     return item;
@@ -335,24 +347,43 @@ export class ItemsService {
       data: updateData,
     });
 
-    const metadata = this.getRequestMetadata();
     const user = (this.request as any).user;
+    const requestId = (this.request as any).requestId || null;
     const ip = extractIp(this.request);
     const userAgent = extractUserAgent(this.request);
     await this.auditDomainEvents.emit({
-      actorRole: role,
-      actorEmail: user?.email || null,
-      ip,
-      userAgent,
       organizationId,
       actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
+      requestId,
       action: AuditAction.UPDATE,
       entityType: AuditEntityType.Item,
       entityId: item.id,
-      metadata: {
-        ...metadata,
-        changes: { before: existingItem, after: dto },
+      before: {
+        id: existingItem.id,
+        name: existingItem.name,
+        sku: existingItem.sku,
+        brand: existingItem.brand,
+        model: existingItem.model,
       },
+      after: {
+        id: item.id,
+        name: item.name,
+        sku: item.sku,
+        brand: item.brand,
+        model: item.model,
+      },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+        updatedFields: Object.keys(updateData),
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
 
     return item;
@@ -385,24 +416,36 @@ export class ItemsService {
       },
     });
 
-    const metadata = this.getRequestMetadata();
     const user = (this.request as any).user;
+    const requestId = (this.request as any).requestId || null;
     const ip = extractIp(this.request);
     const userAgent = extractUserAgent(this.request);
     await this.auditDomainEvents.emit({
-      actorRole: role,
-      actorEmail: user?.email || null,
-      ip,
-      userAgent,
       organizationId,
       actorUserId: userId,
+      actorRole: role,
+      actorEmail: user?.email || null,
+      requestId,
       action: AuditAction.DELETE,
       entityType: AuditEntityType.Item,
       entityId: item.id,
-      metadata: {
-        ...metadata,
-        changes: { deleted: existingItem },
+      before: {
+        id: existingItem.id,
+        name: existingItem.name,
+        sku: existingItem.sku,
+        brand: existingItem.brand,
+        model: existingItem.model,
       },
+      after: { deletedAt: new Date().toISOString() },
+      metadata: {
+        method: this.request.method,
+        path: this.request.path || this.request.url,
+        requestId,
+      },
+      ip,
+      userAgent,
+      source: 'api',
+      severity: 'info',
     });
 
     return { message: 'Item deleted successfully' };

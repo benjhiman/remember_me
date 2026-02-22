@@ -358,7 +358,7 @@ export class StockService {
 
     // Audit log
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       requestId: metadata.requestId,
@@ -422,7 +422,7 @@ export class StockService {
 
     // Audit log
     const metadata = this.getRequestMetadata();
-    await this.auditLogService.log({
+      await this.auditDomainEvents.emit({
       organizationId,
       actorUserId: userId,
       requestId: metadata.requestId,
